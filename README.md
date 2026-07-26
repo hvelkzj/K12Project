@@ -1,23 +1,21 @@
 # K12 教育培训综合管理平台
 
-本项目面向家长、学生、教师/班主任、教务管理员和系统总后台，复刻并深化一个 K12 培训机构的综合管理平台。
+五人协作完成的课程项目，包含家长、学生、教师/班主任、教务和系统后台。
 
-## 项目重点
+## 核心功能
 
-- 排课与调课流转：教师请假 → 教务审批 → 系统推荐代课 → 家长通知 → 影响班级确认。
-- 家校反馈工单：班主任发起反馈 → 家长认可/提出异议 → 教务客服介入 → 回访与关闭。
-- 权限隔离：教师仅可见本人班级，班主任可见负责学生完整跟进记录，教务可处理业务，系统总后台负责机构级配置和审计。
+- 排课与调课：教师申请，教务审批并安排代课，家长收到通知。
+- 家校反馈：教师填写反馈，家长确认或提出异议，教务处理。
+- 作业：教师发布和批改，学生提交并查看结果。
+- 权限：不同角色只能查看和操作自己范围内的数据。
 
 ## 文档
 
-- [四周计划与五人分工](docs/project-plan.md)
-- [Git 与 AI 协作规范](AGENTS.md)
-- [权限与业务规则](docs/business-rules.md)
-- [实验报告证据清单](docs/report-evidence.md)
+- [项目分工与四周计划](docs/project-plan.md)
+- [第一周执行计划](docs/week-1-execution-plan.md)
+- [参考产品](docs/reference-products.md)
+- [业务规则](docs/business-rules.md)
+- [实验报告材料](docs/report-evidence.md)
+- [协作规则](AGENTS.md)
 
-## 建议技术栈
-
-Vue 3 + TypeScript + Vite + Element Plus；Node.js + NestJS/Express；PostgreSQL；Prisma；JWT + RBAC；Docker Compose。
-
-技术栈不是评分重点，优先保证业务链闭环、可测试、易协作。
-
+建议技术栈：Vue 3 + TypeScript + Node.js + PostgreSQL。以按时完成和流程可演示为主。
