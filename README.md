@@ -18,4 +18,47 @@
 - [实验报告材料](docs/report-evidence.md)
 - [协作规则](AGENTS.md)
 
-建议技术栈：Vue 3 + TypeScript + Node.js + PostgreSQL。以按时完成和流程可演示为主。
+## 项目目录
+
+| 目录 | 负责人 | 本地地址 |
+|---|---|---|
+| `apps/api` | A | `http://127.0.0.1:3000` |
+| `apps/parent-web` | B | `http://127.0.0.1:5173` |
+| `apps/student-web` | C | `http://127.0.0.1:5174` |
+| `apps/teacher-web` | D | `http://127.0.0.1:5175` |
+| `apps/admin-web` | E | `http://127.0.0.1:5176` |
+
+教务后台和系统后台共用 `admin-web`，登录后再按角色显示功能。
+
+## 本地启动
+
+要求：Node.js 22.12 或更高版本，npm 10 或更高版本。
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run dev` 会同时启动后端和四个前端。后端健康检查地址为
+`http://127.0.0.1:3000/health`。
+
+只启动一个项目：
+
+```bash
+npm run dev:api
+npm run dev:parent
+npm run dev:student
+npm run dev:teacher
+npm run dev:admin
+```
+
+需要修改端口或 API 地址时，先复制对应项目中的 `.env.example` 为
+`.env`，再修改本地文件。不要提交 `.env`。
+
+## 提交前检查
+
+```bash
+npm run check
+```
+
+该命令依次运行代码规范、类型检查、测试和生产构建。
