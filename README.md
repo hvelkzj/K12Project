@@ -32,10 +32,12 @@
 
 ## 本地启动
 
-要求：Node.js 22.12 或更高版本，npm 10 或更高版本。
+支持 macOS 和 Windows。两种系统都需要 Node.js 22.12 或更高版本、npm 10 或更高版本。
 
 ```bash
-npm install
+node -v
+npm -v
+npm ci
 npm run dev
 ```
 
@@ -55,10 +57,26 @@ npm run dev:admin
 需要修改端口或 API 地址时，先复制对应项目中的 `.env.example` 为
 `.env`，再修改本地文件。不要提交 `.env`。
 
+macOS：
+
+```bash
+cp apps/parent-web/.env.example apps/parent-web/.env
+```
+
+Windows PowerShell：
+
+```powershell
+Copy-Item apps/parent-web/.env.example apps/parent-web/.env
+```
+
+其他模块只需替换路径中的模块名。默认配置可直接运行时，不需要创建 `.env`。
+
 ## 提交前检查
 
 ```bash
 npm run check
 ```
 
-该命令依次运行代码规范、类型检查、测试和生产构建。
+该命令在 macOS 终端和 Windows PowerShell 中相同，会运行代码规范、类型检查、测试和生产构建。
+
+依赖发生变化时运行 `npm install` 并提交 `package-lock.json`；仅同步别人已提交的依赖时运行 `npm ci`。
