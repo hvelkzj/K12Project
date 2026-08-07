@@ -1,12 +1,35 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mockParentCredentials } from './mockData'
 import {
+  authenticateParent,
   ensureBoundStudent,
   getNoticesByStudent,
   getSchedulesByStudent,
   submitLeaveRequest,
   updateFeedbackStatus
 } from './parentService'
+
+test('家长可以使用 Mock 账号登录', () => {
+  const user = authenticateParent(
+    mockParentCredentials.username,
+    mockParentCredentials.password,
+  )
+
+  assert.equal(user.id, 1)
+  assert.equal(user.displayName, '王女士')
+})
+
+test('错误的家长账号或密码不能登录', () => {
+  assert.throws(
+    () => authenticateParent(mockParentCredentials.username, 'wrong-password'),
+    /账号或密码错误/,
+  )
+  assert.throws(
+    () => authenticateParent('not-a-parent', mockParentCredentials.password),
+    /账号或密码错误/,
+  )
+})
 
 test('家长可以查看已绑定学生课表', () => {
   assert.equal(getSchedulesByStudent(2).length, 2)

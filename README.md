@@ -19,6 +19,7 @@
 - [ABCDE 字段联合决议](docs/abcde-field-decisions-2026-08-07.md)
 - [公共字段契约](docs/api-field-contract.md)
 - [公共数据模型](docs/data-model.md)
+- [模块页面总清单](docs/module-page-inventory.md)
 - [实验报告材料](docs/report-evidence.md)
 - [协作规则](AGENTS.md)
 

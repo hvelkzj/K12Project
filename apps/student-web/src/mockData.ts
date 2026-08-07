@@ -1,0 +1,188 @@
+import type {
+  Assignment,
+  CoursewareMaterial,
+  StudentUser,
+  Submission,
+} from './types'
+
+export const mockNow = '2026-08-07T10:00:00+08:00'
+
+export const mockCredentials = {
+  account: 'student01',
+  password: 'Student123',
+}
+
+export const studentUser: StudentUser = {
+  id: 1001,
+  displayName: '林小满',
+  role: 'STUDENT',
+  campusId: 1,
+  campusName: '中心校区',
+  classId: 101,
+  className: '六年级一班',
+}
+
+export const coursewareMaterials: CoursewareMaterial[] = [
+  {
+    id: 201,
+    courseId: 11,
+    courseName: '数学',
+    title: '分数混合运算课堂讲义',
+    description: '复习运算顺序，并完成讲义中的三个例题。',
+    file: {
+      id: 2001,
+      originalName: '分数混合运算讲义.pdf',
+      mimeType: 'application/pdf',
+      byteSize: 1_248_900,
+      createdAt: '2026-08-05T16:20:00+08:00',
+    },
+    publishedAt: '2026-08-05T16:20:00+08:00',
+  },
+  {
+    id: 202,
+    courseId: 12,
+    courseName: '语文',
+    title: '《草原》阅读提示',
+    description: '结合问题清单预习课文，标记不理解的句子。',
+    file: {
+      id: 2002,
+      originalName: '草原阅读提示.docx',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      byteSize: 486_200,
+      createdAt: '2026-08-06T18:00:00+08:00',
+    },
+    publishedAt: '2026-08-06T18:00:00+08:00',
+  },
+  {
+    id: 203,
+    courseId: 13,
+    courseName: '英语',
+    title: 'Unit 2 单词表',
+    description: '跟读单词，并在下次课前完成自测。',
+    file: {
+      id: 2003,
+      originalName: 'unit-2-words.pdf',
+      mimeType: 'application/pdf',
+      byteSize: 820_400,
+      createdAt: '2026-08-07T08:30:00+08:00',
+    },
+    publishedAt: '2026-08-07T08:30:00+08:00',
+  },
+]
+
+export const assignments: Assignment[] = [
+  {
+    id: 301,
+    campusId: 1,
+    classId: 101,
+    courseId: 11,
+    scheduleId: 701,
+    teacherId: 2001,
+    title: '分数单元练习',
+    description:
+      '完成练习册第 18—20 页，并写出第 6 题和第 9 题的计算过程。可以填写文字说明，也可以上传 PDF 或图片。',
+    attachments: [
+      {
+        id: 3001,
+        originalName: '分数单元练习.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 932_100,
+        createdAt: '2026-08-06T17:00:00+08:00',
+      },
+    ],
+    dueAt: '2026-08-20T20:00:00+08:00',
+    allowLate: false,
+    publishedAt: '2026-08-06T17:00:00+08:00',
+    createdAt: '2026-08-06T16:55:00+08:00',
+    updatedAt: '2026-08-06T17:00:00+08:00',
+  },
+  {
+    id: 302,
+    campusId: 1,
+    classId: 101,
+    courseId: 12,
+    scheduleId: 702,
+    teacherId: 2002,
+    title: '《草原》段落仿写',
+    description: '仿照课文第一自然段，写一段 150 字左右的景物描写。',
+    attachments: [],
+    dueAt: '2026-08-12T20:00:00+08:00',
+    allowLate: false,
+    publishedAt: '2026-08-04T16:30:00+08:00',
+    createdAt: '2026-08-04T16:20:00+08:00',
+    updatedAt: '2026-08-04T16:30:00+08:00',
+  },
+  {
+    id: 303,
+    campusId: 1,
+    classId: 101,
+    courseId: 13,
+    scheduleId: 703,
+    teacherId: 2003,
+    title: 'Unit 2 口语练习',
+    description: '录制一段 1 分钟的自我介绍，并根据老师评语完成订正。',
+    attachments: [],
+    dueAt: '2026-08-22T20:00:00+08:00',
+    allowLate: true,
+    publishedAt: '2026-08-05T18:00:00+08:00',
+    createdAt: '2026-08-05T17:50:00+08:00',
+    updatedAt: '2026-08-05T18:00:00+08:00',
+  },
+  {
+    id: 304,
+    campusId: 1,
+    classId: 101,
+    courseId: 14,
+    teacherId: 2004,
+    title: '科学观察日记',
+    description: '记录一周内植物叶片的变化。',
+    attachments: [],
+    dueAt: '2026-08-01T20:00:00+08:00',
+    allowLate: false,
+    publishedAt: '2026-07-24T16:00:00+08:00',
+    createdAt: '2026-07-24T15:50:00+08:00',
+    updatedAt: '2026-07-24T16:00:00+08:00',
+  },
+]
+
+export const initialSubmissions: Submission[] = [
+  {
+    id: 501,
+    assignmentId: 302,
+    studentId: 1001,
+    attempt: 1,
+    content: '清晨的湖面像一面银色的镜子，远处的小船慢慢划开水纹。',
+    attachments: [],
+    status: 'GRADED',
+    submittedAt: '2026-08-06T19:10:00+08:00',
+    score: 92,
+    teacherComment: '景物顺序清楚，可以再加入声音描写。',
+    gradedBy: 2002,
+    gradedAt: '2026-08-07T09:00:00+08:00',
+    updatedAt: '2026-08-07T09:00:00+08:00',
+  },
+  {
+    id: 502,
+    assignmentId: 303,
+    studentId: 1001,
+    attempt: 1,
+    content: '第一次口语录音。',
+    attachments: [
+      {
+        id: 5001,
+        originalName: 'unit-2-speaking.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 302_100,
+        createdAt: '2026-08-06T20:00:00+08:00',
+      },
+    ],
+    status: 'REVISION_REQUIRED',
+    submittedAt: '2026-08-06T20:00:00+08:00',
+    score: 70,
+    teacherComment: '请补充完整句子，并重新提交第二次记录。',
+    gradedBy: 2003,
+    gradedAt: '2026-08-07T08:20:00+08:00',
+    updatedAt: '2026-08-07T08:20:00+08:00',
+  },
+]

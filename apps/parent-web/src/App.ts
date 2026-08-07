@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, ref } from 'vue'
-import { parentUser } from './mockData'
+import { mockParentCredentials, parentUser } from './mockData'
 import {
+  authenticateParent,
   getBoundStudents,
   getFeedbackByStudent,
   getNoticesByStudent,
@@ -16,13 +17,17 @@ type TabName = (typeof tabs)[number]
 export default defineComponent({
   name: 'ParentApp',
   setup() {
+    const isAuthenticated = ref(false)
+    const username = ref<string>(mockParentCredentials.username)
+    const password = ref<string>(mockParentCredentials.password)
+    const loginMessage = ref('')
     const activeTab = ref<TabName>('首页')
     const boundStudents = getBoundStudents()
     const selectedStudentId = ref<number | null>(boundStudents[0]?.id ?? null)
     const selectedScheduleId = ref<number | null>(null)
     const leaveReason = ref('发烧需要休息')
     const disputeReason = ref('希望核对本周课堂记录')
-    const message = ref('已使用家长测试账号登录')
+    const message = ref('')
 
     const selectedStudent = computed(() =>
       boundStudents.find((student) => student.id === selectedStudentId.value),
@@ -43,6 +48,91 @@ export default defineComponent({
         : getFeedbackByStudent(selectedStudentId.value),
     )
     const leaveRequests = computed(() => listLeaveRequests())
+
+    function login() {
+      try {
+        const user = authenticateParent(username.value, password.value)
+        isAuthenticated.value = true
+        activeTab.value = '首页'
+        loginMessage.value = ''
+        message.value = `已使用 ${user.displayName} 的 Mock 账号登录`
+      } catch (error) {
+        loginMessage.value =
+          error instanceof Error ? error.message : '登录失败，请稍后重试'
+      }
+    }
+
+    function logout() {
+      isAuthenticated.value = false
+      password.value = ''
+      loginMessage.value = '已退出家长端'
+      activeTab.value = '首页'
+      selectedScheduleId.value = null
+      message.value = ''
+    }
+
+    function renderLogin() {
+      return h('main', { class: 'login-shell' }, [
+        h('section', { class: 'login-card', 'aria-labelledby': 'login-title' }, [
+          h('div', { class: 'login-intro' }, [
+            h('p', { class: 'login-eyebrow' }, 'K12 家校平台'),
+            h('h1', { id: 'login-title' }, '家长端登录'),
+            h(
+              'p',
+              { class: 'login-description' },
+              '使用家长 Mock 账号查看已绑定学生的课表、请假、通知和反馈。',
+            ),
+            h('dl', { class: 'demo-account' }, [
+              h('div', [h('dt', '测试账号'), h('dd', mockParentCredentials.username)]),
+              h('div', [h('dt', '测试密码'), h('dd', mockParentCredentials.password)]),
+            ]),
+          ]),
+          h(
+            'form',
+            {
+              class: 'login-form',
+              onSubmit: (event: Event) => {
+                event.preventDefault()
+                login()
+              },
+            },
+            [
+              h('label', [
+                '账号',
+                h('input', {
+                  name: 'username',
+                  autocomplete: 'username',
+                  value: username.value,
+                  onInput: (event: Event) => {
+                    username.value = (event.target as HTMLInputElement).value
+                  },
+                }),
+              ]),
+              h('label', [
+                '密码',
+                h('input', {
+                  name: 'password',
+                  type: 'password',
+                  autocomplete: 'current-password',
+                  value: password.value,
+                  onInput: (event: Event) => {
+                    password.value = (event.target as HTMLInputElement).value
+                  },
+                }),
+              ]),
+              loginMessage.value
+                ? h('p', { class: 'login-message', role: 'status' }, loginMessage.value)
+                : null,
+              h(
+                'button',
+                { class: 'primary login-submit', type: 'submit' },
+                '登录并进入首页',
+              ),
+            ],
+          ),
+        ]),
+      ])
+    }
 
     function switchStudent(studentId: number) {
       selectedStudentId.value = studentId
@@ -82,7 +172,8 @@ export default defineComponent({
     }
 
     return () =>
-      h('main', { class: 'shell' }, [
+      isAuthenticated.value
+        ? h('main', { class: 'shell' }, [
         h('aside', { class: 'sidebar' }, [
           h('div', [
             h('p', { class: 'eyebrow' }, '家长端'),
@@ -105,6 +196,14 @@ export default defineComponent({
               ),
             ),
           ),
+          h('div', { class: 'account-actions' }, [
+            h('span', 'Mock 登录状态'),
+            h(
+              'button',
+              { class: 'logout-button', type: 'button', onClick: logout },
+              '退出登录',
+            ),
+          ]),
         ]),
         h('section', { class: 'content' }, [
           h('header', { class: 'topbar' }, [
@@ -300,5 +399,6 @@ export default defineComponent({
             : null
         ])
       ])
+        : renderLogin()
   },
 })

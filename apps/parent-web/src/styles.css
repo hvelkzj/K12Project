@@ -13,9 +13,112 @@ body {
 }
 
 button,
+input,
 select,
 textarea {
   font: inherit;
+}
+
+.login-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #e4f4f1 0%, #f5f7fb 55%, #dfe8f3 100%);
+}
+
+.login-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 48px;
+  width: min(820px, 100%);
+  padding: 42px;
+  border: 1px solid #d9e1e7;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(47, 93, 98, 0.12);
+}
+
+.login-intro,
+.login-form {
+  display: grid;
+  align-content: center;
+  gap: 18px;
+}
+
+.login-intro h1,
+.login-intro p,
+.login-form p {
+  margin: 0;
+}
+
+.login-intro h1 {
+  color: #1d3437;
+  font-size: 36px;
+}
+
+.login-eyebrow {
+  color: #2f5d62;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.login-description {
+  color: #667085;
+  line-height: 1.7;
+}
+
+.demo-account {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #f2f8f7;
+}
+
+.demo-account div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.demo-account dt {
+  color: #667085;
+}
+
+.demo-account dd {
+  margin: 0;
+  color: #24545a;
+  font-family: Consolas, "Courier New", monospace;
+  font-weight: 700;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5df;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.login-form input:focus,
+select:focus,
+textarea:focus {
+  border-color: #2f5d62;
+  outline: 3px solid rgba(47, 93, 98, 0.14);
+}
+
+.login-message {
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #8b3a32;
+  background: #fff1ef;
+}
+
+.login-submit {
+  width: 100%;
 }
 
 .shell {
@@ -31,6 +134,34 @@ textarea {
   padding: 28px 20px;
   color: #fff;
   background: #2f5d62;
+}
+
+.account-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.account-actions span {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+}
+
+.logout-button {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 6px;
+  color: #fff;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.logout-button:hover,
+.logout-button:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .sidebar h1,
@@ -208,6 +339,16 @@ textarea {
 }
 
 @media (max-width: 760px) {
+  .login-card {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding: 28px 22px;
+  }
+
+  .login-intro h1 {
+    font-size: 30px;
+  }
+
   .shell {
     grid-template-columns: 1fr;
   }

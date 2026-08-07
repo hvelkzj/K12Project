@@ -1,13 +1,35 @@
-import { feedbackList, notices, parentUser, schedules, students } from './mockData'
+import {
+  feedbackList,
+  mockParentCredentials,
+  notices,
+  parentUser,
+  schedules,
+  students,
+} from './mockData'
 import type {
   LeaveRequest,
   ParentNotice,
+  ParentUser,
   ScheduleItem,
   Student,
   StudentFeedback,
 } from './types'
 
 const leaveRequests: LeaveRequest[] = [];
+
+export function authenticateParent(
+  username: string,
+  password: string,
+): ParentUser {
+  const validUsername = username.trim() === mockParentCredentials.username
+  const validPassword = password === mockParentCredentials.password
+
+  if (!validUsername || !validPassword) {
+    throw new Error('账号或密码错误')
+  }
+
+  return parentUser
+}
 
 export function getBoundStudents(): Student[] {
   return students.filter((student) => parentUser.boundStudentIds.includes(student.id));

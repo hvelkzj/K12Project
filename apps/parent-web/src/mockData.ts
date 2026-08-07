@@ -6,6 +6,11 @@ import type {
   StudentFeedback,
 } from './types'
 
+export const mockParentCredentials = {
+  username: 'parent_b',
+  password: 'Parent123!',
+} as const
+
 export const parentUser: ParentUser = {
   id: 1,
   displayName: '王女士',

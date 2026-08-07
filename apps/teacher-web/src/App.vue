@@ -24,7 +24,7 @@ const pages: Array<{ key: PageKey; label: string; shortLabel: string }> = [
   { key: 'schedule-change', label: '调课申请', shortLabel: '调课' },
 ]
 
-const activePage = ref<PageKey>('today')
+const activePage = ref<PageKey>('login')
 const activeRole = ref<Role>('teacher')
 const notice = ref('')
 
