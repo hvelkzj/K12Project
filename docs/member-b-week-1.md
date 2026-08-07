@@ -1,5 +1,7 @@
 # 成员 B 第一周交付记录
 
+> 集成说明：本文件保留 B 分支的原始字段提案和交付过程。跨端开发使用 `docs/api-field-contract.md` 的数字 ID、公共状态和最终字段；家长端 Mock 已在合并时完成对应调整。
+
 ## 负责范围
 
 家长端和通知。
@@ -83,7 +85,9 @@
 - 调课通知展示原时间、新时间和代课教师。
 - 家长可以确认反馈或提出异议。
 
-## 需要 D/E 确认
+## 原分支待确认项
 
 - 调课通知中的 `originalTime`、`newTime`、`substituteTeacherName` 是否与教师端和教务端字段名一致。
 - 家长异议是否需要新增 `disputeReason` 字段；第一周 Mock 暂未加入公共字段。
+
+以上问题已在 `docs/abcde-field-decisions-2026-08-07.md` 中解决。

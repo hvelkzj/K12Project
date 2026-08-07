@@ -11,6 +11,8 @@ type PageKey =
   | 'schedule-change'
 
 type Role = 'teacher' | 'headTeacher'
+type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE'
+type SubmissionStatus = 'GRADED' | 'REVISION_REQUIRED'
 
 const pages: Array<{ key: PageKey; label: string; shortLabel: string }> = [
   { key: 'login', label: '登录', shortLabel: '登录' },
@@ -54,27 +56,27 @@ const todayCourses = [
 ]
 
 const students = ref([
-  { id: 'S001', name: '林晓雨', attendance: 'present', note: '' },
-  { id: 'S002', name: '周明轩', attendance: 'late', note: '迟到 8 分钟' },
-  { id: 'S003', name: '陈安然', attendance: 'leave', note: '已提交请假' },
-  { id: 'S004', name: '许嘉宁', attendance: 'present', note: '' },
+  { id: 1, name: '林晓雨', attendance: 'PRESENT' as AttendanceStatus, note: '' },
+  { id: 2, name: '周明轩', attendance: 'LATE' as AttendanceStatus, note: '迟到 8 分钟' },
+  { id: 3, name: '陈安然', attendance: 'LEAVE' as AttendanceStatus, note: '已提交请假' },
+  { id: 4, name: '许嘉宁', attendance: 'PRESENT' as AttendanceStatus, note: '' },
 ])
 
 const assignment = reactive({
   title: '分数乘法巩固练习',
-  content: '完成练习册第 18–20 页，写出计算过程。',
-  deadline: '2026-08-08T20:00',
+  description: '完成练习册第 18–20 页，写出计算过程。',
+  dueAt: '2026-08-08T20:00',
   allowLate: false,
 })
 
 const submissions = ref([
-  { student: '林晓雨', submittedAt: '08-06 19:24', score: 92, correction: false },
-  { student: '周明轩', submittedAt: '08-06 20:03', score: 78, correction: true },
-  { student: '许嘉宁', submittedAt: '08-06 20:17', score: 88, correction: false },
+  { student: '林晓雨', submittedAt: '08-06 19:24', score: 92, status: 'GRADED' as SubmissionStatus },
+  { student: '周明轩', submittedAt: '08-06 20:03', score: 78, status: 'REVISION_REQUIRED' as SubmissionStatus },
+  { student: '许嘉宁', submittedAt: '08-06 20:17', score: 88, status: 'GRADED' as SubmissionStatus },
 ])
 
 const feedback = reactive({
-  student: 'S001',
+  studentId: 1,
   performance: '课堂专注，能主动回答问题。',
   strengths: '分数乘法计算准确。',
   improvements: '应用题的单位换算需要更细心。',
@@ -82,9 +84,9 @@ const feedback = reactive({
 })
 
 const scheduleChange = reactive({
-  requestedDate: '2026-08-10',
-  startTime: '10:00',
-  endTime: '11:30',
+  proposedDate: '2026-08-10',
+  proposedStartTime: '10:00',
+  proposedEndTime: '11:30',
   reason: '参加学校教研活动',
 })
 
@@ -100,6 +102,13 @@ function showNotice(message: string) {
 function login() {
   goTo('today')
   showNotice(`已使用 ${roleName.value} Mock 账号进入教师端`)
+}
+
+function setCorrectionRequired(
+  submission: (typeof submissions.value)[number],
+  required: boolean,
+) {
+  submission.status = required ? 'REVISION_REQUIRED' : 'GRADED'
 }
 </script>
 
@@ -217,10 +226,10 @@ function login() {
                 <td><strong>{{ student.name }}</strong><small>{{ student.id }}</small></td>
                 <td>
                   <select v-model="student.attendance">
-                    <option value="present">出勤</option>
-                    <option value="late">迟到</option>
-                    <option value="absent">缺勤</option>
-                    <option value="leave">请假</option>
+                    <option value="PRESENT">出勤</option>
+                    <option value="LATE">迟到</option>
+                    <option value="ABSENT">缺勤</option>
+                    <option value="LEAVE">请假</option>
                   </select>
                 </td>
                 <td><input v-model="student.note" placeholder="可选备注" /></td>
@@ -229,7 +238,7 @@ function login() {
           </table>
         </div>
         <div class="panel-footer">
-          <p class="muted">重复提交由后端按课程和学生校验；本页暂不定义公共状态值。</p>
+          <p class="muted">使用公共签到状态；重复提交由后端按课次和学生校验。</p>
           <button class="primary" type="button" @click="showNotice('签到 Mock 已保存')">保存签到</button>
         </div>
       </section>
@@ -237,13 +246,13 @@ function login() {
       <section v-else-if="activePage === 'publish'" class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">教师发布</p><h2>新建作业</h2></div>
-          <span class="mock-tag">字段待与 C 确认</span>
+          <span class="mock-tag">已对齐公共字段</span>
         </div>
         <form class="form-grid" @submit.prevent="showNotice('作业发布 Mock 已提交')">
           <label class="full"><span>班级与课程</span><select><option>六年级 1 班 · 数学提高班</option></select></label>
           <label class="full"><span>作业标题</span><input v-model="assignment.title" required /></label>
-          <label class="full"><span>作业内容</span><textarea v-model="assignment.content" rows="4" required></textarea></label>
-          <label><span>截止时间</span><input v-model="assignment.deadline" type="datetime-local" required /></label>
+          <label class="full"><span>作业内容</span><textarea v-model="assignment.description" rows="4" required></textarea></label>
+          <label><span>截止时间</span><input v-model="assignment.dueAt" type="datetime-local" required /></label>
           <label class="check-field"><input v-model="assignment.allowLate" type="checkbox" /><span>允许截止后提交</span></label>
           <div class="full form-actions"><button class="primary" type="submit">发布作业</button></div>
         </form>
@@ -262,13 +271,22 @@ function login() {
                 <td><strong>{{ item.student }}</strong></td>
                 <td>{{ item.submittedAt }}</td>
                 <td><input v-model="item.score" class="score-input" type="number" min="0" max="100" /></td>
-                <td><label class="inline-check"><input v-model="item.correction" type="checkbox" />需订正</label></td>
+                <td>
+                  <label class="inline-check">
+                    <input
+                      :checked="item.status === 'REVISION_REQUIRED'"
+                      type="checkbox"
+                      @change="setCorrectionRequired(item, ($event.target as HTMLInputElement).checked)"
+                    />
+                    需订正
+                  </label>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="panel-footer">
-          <p class="muted">批改状态、订正次数与 C 成员确认后接入。</p>
+          <p class="muted">需订正使用 REVISION_REQUIRED；重新提交时递增 attempt。</p>
           <button class="primary" type="button" @click="showNotice('批改结果 Mock 已保存')">保存批改</button>
         </div>
       </section>
@@ -276,11 +294,11 @@ function login() {
       <section v-else-if="activePage === 'feedback'" class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">课后家校沟通</p><h2>发送学生反馈</h2></div>
-          <span class="mock-tag">状态待与 B、E 确认</span>
+          <span class="mock-tag">已对齐反馈状态</span>
         </div>
         <form class="form-grid" @submit.prevent="showNotice('课后反馈 Mock 已发送')">
           <label><span>课程</span><select><option>六年级 1 班 · 数学提高班</option></select></label>
-          <label><span>学生</span><select v-model="feedback.student"><option value="S001">林晓雨</option><option value="S002">周明轩</option></select></label>
+          <label><span>学生</span><select v-model="feedback.studentId"><option :value="1">林晓雨</option><option :value="2">周明轩</option></select></label>
           <label class="full"><span>课堂表现</span><textarea v-model="feedback.performance" rows="2" required></textarea></label>
           <label><span>优点</span><textarea v-model="feedback.strengths" rows="3" required></textarea></label>
           <label><span>待提升</span><textarea v-model="feedback.improvements" rows="3" required></textarea></label>
@@ -292,14 +310,14 @@ function login() {
       <section v-else class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">当前课程：8 月 10 日 09:00–10:30</p><h2>提交调课申请</h2></div>
-          <span class="mock-tag">审批由 E 负责</span>
+          <span class="mock-tag">已对齐调课流程</span>
         </div>
         <form class="form-grid" @submit.prevent="showNotice('调课申请 Mock 已提交，等待教务审批')">
           <label class="full"><span>课程</span><input value="六年级 1 班 · 数学提高班 · A-302" readonly /></label>
-          <label><span>申请日期</span><input v-model="scheduleChange.requestedDate" type="date" required /></label>
+          <label><span>申请日期</span><input v-model="scheduleChange.proposedDate" type="date" required /></label>
           <div class="time-fields">
-            <label><span>开始时间</span><input v-model="scheduleChange.startTime" type="time" required /></label>
-            <label><span>结束时间</span><input v-model="scheduleChange.endTime" type="time" required /></label>
+            <label><span>开始时间</span><input v-model="scheduleChange.proposedStartTime" type="time" required /></label>
+            <label><span>结束时间</span><input v-model="scheduleChange.proposedEndTime" type="time" required /></label>
           </div>
           <label class="full"><span>调课原因</span><textarea v-model="scheduleChange.reason" rows="4" required></textarea></label>
           <div class="full flow-note">

@@ -1,5 +1,7 @@
 # E成员：教务/系统后台页面与字段清单
 
+> 集成说明：本文件保留 E 分支的原始字段提案。审批、代课和工单的最终结构已经合并到 `schedule_changes` 与 `feedback_work_orders`，开发时以 `docs/api-field-contract.md` 和 `docs/data-model.md` 为准。
+
 ## 1. 页面清单
 
 | 页面 | 路由 | 说明 |
