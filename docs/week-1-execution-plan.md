@@ -50,6 +50,21 @@
 
 7/27 不提前定义业务字段。B/C/D/E 仍需在 7/28 前把字段清单交给 A。
 
+## 7/28 A 成员交付
+
+状态：已完成。
+
+| 交付 | 位置 | 结果 |
+|---|---|---|
+| B/C/D/E 字段汇总 | `docs/a-field-summary-2026-07-28.md` | 15 个字段组、131 行字段提案已汇总 |
+| 五方字段决议 | `docs/abcde-field-decisions-2026-08-07.md` | 9 个跨端问题已关闭 |
+| 公共字段契约 | `docs/api-field-contract.md` | 名称、ID、时间、状态和权限范围已统一 |
+| 公共数据模型 | `docs/data-model.md` | 23 张表及主要关联已确定 |
+| PostgreSQL 初始迁移 | `apps/api/db/migrations/001_initial.sql` | 基础数据和四端业务表已建立 |
+| 结构测试 | `apps/api/test/schema.test.ts` | 校验公共实体、状态和关键约束 |
+
+7/28 不实现 B/C/D/E 的页面业务。7/29 全员按公共字段契约检查页面模型，A 再发布公共 TypeScript 类型、测试账号和 Mock 数据。
+
 ## A：公共架构、数据库、登录权限
 
 任务：

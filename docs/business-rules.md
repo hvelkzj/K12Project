@@ -36,3 +36,12 @@
 | 系统管理员 | 全部校区 |
 
 权限必须由后端检查，不能只隐藏前端按钮。
+
+## 7/28 公共实现约定
+
+- 公共 ID 为数字；API 和 TypeScript 使用 camelCase，PostgreSQL 使用 snake_case。
+- 时间点通过 API 传带时区的 ISO 8601 字符串；课次日期和开始、结束时间分开保存。
+- 调课申请、审批和代课使用一条流程记录，状态依次为 `PENDING`、`APPROVED`、`REJECTED`、`SUBSTITUTE_ASSIGNED`、`COMPLETED`。
+- 家校反馈状态为 `PENDING_PARENT`、`CONFIRMED`、`DISPUTED`；反馈工单状态为 `OPEN`、`PROCESSING`、`CLOSED`。
+- 作业“未提交”和请假草稿是页面状态，不写入数据库；订正提交通过递增 `attempt` 保留历史。
+- 完整字段见 `docs/api-field-contract.md`，数据库关系见 `docs/data-model.md`。

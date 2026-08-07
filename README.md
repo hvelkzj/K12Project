@@ -15,6 +15,10 @@
 - [第一周执行计划](docs/week-1-execution-plan.md)
 - [参考产品](docs/reference-products.md)
 - [业务规则](docs/business-rules.md)
+- [7/28 字段汇总](docs/a-field-summary-2026-07-28.md)
+- [ABCDE 字段联合决议](docs/abcde-field-decisions-2026-08-07.md)
+- [公共字段契约](docs/api-field-contract.md)
+- [公共数据模型](docs/data-model.md)
 - [实验报告材料](docs/report-evidence.md)
 - [协作规则](AGENTS.md)
 
@@ -80,3 +84,19 @@ npm run check
 该命令在 macOS 终端和 Windows PowerShell 中相同，会运行代码规范、类型检查、测试和生产构建。
 
 依赖发生变化时运行 `npm install` 并提交 `package-lock.json`；仅同步别人已提交的依赖时运行 `npm ci`。
+
+## 数据库结构
+
+7/28 初始迁移位于 `apps/api/db/migrations/001_initial.sql`。安装 PostgreSQL 客户端后，macOS 终端和 Windows PowerShell 使用相同命令创建本地结构：
+
+```bash
+psql -d k12 -f apps/api/db/migrations/001_initial.sql
+```
+
+不连接数据库也可以运行迁移结构测试：
+
+```bash
+npm run test --workspace @k12/api
+```
+
+初始迁移不包含真实账号或个人信息。
