@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
+import type { AssignmentListRow } from './assignmentPresentation'
+import { listAssignmentRows } from './assignmentListService'
 import { mockCredentials, mockNow } from './mockData'
 import {
   authenticateStudent,
@@ -8,7 +10,6 @@ import {
   getLatestSubmission,
   getSubmissionHistory,
   getSubmissionViewStatus,
-  listAssignments,
   listCourseware,
   submitAssignment,
 } from './studentService'
@@ -18,6 +19,7 @@ import type {
   StudentUser,
   SubmissionViewStatus,
 } from './types'
+import AssignmentList from './views/AssignmentList.vue'
 
 const courseNames: Record<number, string> = {
   11: '数学',
@@ -44,15 +46,24 @@ const submissionAttachments = ref<FileSummary[]>([])
 const submissionError = ref('')
 const notice = ref('')
 const submissionVersion = ref(0)
+const currentNow = ref(new Date().toISOString())
+let clockId: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+  clockId = setInterval(() => {
+    currentNow.value = new Date().toISOString()
+  }, 60_000)
+})
+
+onUnmounted(() => {
+  if (clockId !== undefined) clearInterval(clockId)
+})
 
 const studentId = computed(() => currentStudent.value?.id ?? 1001)
 const materials = computed(() => listCourseware(studentId.value))
-const assignmentRows = computed(() => {
+const assignmentRows = computed<AssignmentListRow[]>(() => {
   void submissionVersion.value
-  return listAssignments(studentId.value).map((assignment) => ({
-    assignment,
-    status: getSubmissionViewStatus(assignment.id, studentId.value),
-  }))
+  return listAssignmentRows(studentId.value)
 })
 const selectedAssignment = computed(() =>
   getAssignment(selectedAssignmentId.value, studentId.value),
@@ -172,6 +183,10 @@ function handleSubmission(): void {
 
 function showDownload(fileName: string): void {
   notice.value = `Mock 下载已准备：${fileName}`
+}
+
+function showPlaceholder(featureName: string): void {
+  notice.value = `${featureName}将在后续周次接入，本周作业主流程不受影响。`
 }
 
 function courseName(courseId: number): string {
@@ -338,25 +353,13 @@ function formatBytes(byteSize: number): string {
           </div>
         </section>
 
-        <section v-else-if="page === 'assignments'" class="page-section">
-          <div class="page-heading">
-            <div><p class="eyebrow">我的任务</p><h2>作业列表</h2><p>查看要求、截止时间与当前提交状态。</p></div>
-          </div>
-          <div class="assignment-list">
-            <article v-for="row in assignmentRows" :key="row.assignment.id" class="assignment-card">
-              <div class="assignment-main">
-                <span class="course-tag">{{ courseName(row.assignment.courseId) }}</span>
-                <h3>{{ row.assignment.title }}</h3>
-                <p>{{ row.assignment.description }}</p>
-                <small>截止 {{ formatDateTime(row.assignment.dueAt) }} · {{ row.assignment.allowLate ? '允许迟交' : '不允许迟交' }}</small>
-              </div>
-              <div class="assignment-action">
-                <em :class="['status', row.status.toLowerCase()]">{{ statusLabel(row.status) }}</em>
-                <button class="secondary-button" @click="openAssignment(row.assignment.id)">查看作业</button>
-              </div>
-            </article>
-          </div>
-        </section>
+        <AssignmentList
+          v-else-if="page === 'assignments'"
+          :rows="assignmentRows"
+          :now="currentNow"
+          @open="openAssignment"
+          @placeholder="showPlaceholder"
+        />
 
         <section v-else-if="page === 'assignmentDetail'" class="page-section narrow">
           <button class="back-button" @click="navigate('assignments')">← 返回作业列表</button>

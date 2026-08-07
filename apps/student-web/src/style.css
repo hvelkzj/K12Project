@@ -73,7 +73,7 @@ textarea { resize: vertical; line-height: 1.7; }
 .summary-card.coral strong { color: #e47964; }.summary-card.blue strong { color: #4f83ce; }.summary-card.green strong { color: #3b9c78; }
 .section-heading, .page-heading, .detail-title { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
 .section-heading h3, .page-heading h2 { margin: 0; }.page-heading { margin-bottom: 24px; }.page-heading h2 { font-size: 32px; }.page-heading p:last-child { margin-bottom: 0; color: #7c8596; }
-.compact-list, .assignment-list { display: grid; gap: 12px; }
+.compact-list { display: grid; gap: 12px; }
 .compact-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; width: 100%; border: 1px solid #e8eaf0; border-radius: 14px; padding: 14px 16px; color: inherit; background: #fff; text-align: left; }
 .compact-item:hover { border-color: #aaa5e2; transform: translateY(-1px); }
 .compact-item > span:nth-child(2) { display: grid; gap: 5px; }.compact-item small { color: #7b8496; }
@@ -85,9 +85,6 @@ textarea { resize: vertical; line-height: 1.7; }
 .file-cover { display: grid; min-height: 128px; place-items: center; color: #fff; background: linear-gradient(145deg, #70a9d8, #625bcf); font-size: 50px; font-weight: 900; }
 .material-content { padding: 20px; }.material-content h3 { margin: 10px 0 8px; }.material-content p { min-height: 48px; color: #707a8d; line-height: 1.6; }.material-content small { display: block; min-height: 38px; color: #9097a6; }.material-content button { margin-top: 14px; }
 .course-tag { display: inline-flex; border-radius: 6px; padding: 4px 8px; color: #605abf; background: #efefff; font-size: 12px; font-weight: 800; }
-.assignment-card { display: grid; grid-template-columns: 1fr auto; gap: 24px; border: 1px solid #e7e9f0; border-radius: 16px; padding: 22px; background: #fff; }
-.assignment-main h3 { margin: 10px 0 8px; }.assignment-main p { color: #667185; line-height: 1.65; }.assignment-main small { color: #8991a1; }
-.assignment-action { display: flex; min-width: 112px; flex-direction: column; align-items: end; justify-content: space-between; gap: 18px; }
 .back-button { margin-bottom: 16px; }
 .detail-card, .result-card { border: 1px solid #e5e8ef; border-radius: 20px; padding: 30px; background: #fff; box-shadow: 0 10px 35px rgb(38 51 75 / 6%); }
 .detail-title h2 { margin: 10px 0 0; font-size: 30px; }.meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }.meta-grid div { padding: 14px; border-radius: 11px; background: #f7f8fc; }.meta-grid dt { margin-bottom: 6px; color: #858da0; font-size: 12px; }.meta-grid dd { margin: 0; font-weight: 800; }
@@ -102,5 +99,5 @@ textarea { resize: vertical; line-height: 1.7; }
 }
 
 @media (max-width: 640px) {
-  .login-page { padding: 16px; }.login-form { padding: 32px 24px; }.app-shell { display: block; }.sidebar { position: fixed; z-index: 10; top: auto; bottom: 0; width: 100%; height: 68px; padding: 8px 14px; }.sidebar .brand, .sidebar-note { display: none; }.sidebar nav { grid-template-columns: repeat(3, 1fr); }.sidebar nav button, .sidebar nav button:not(.active) { display: flex; justify-content: center; gap: 7px; font-size: 12px; }.sidebar nav button span { font-size: 16px; }.topbar { padding: 12px 18px; }.topbar > div:first-child { display: none; }.page-content { padding: 24px 16px 96px; }.welcome-banner { padding: 28px 24px; }.banner-symbol { display: none; }.summary-grid, .card-grid, .meta-grid, .result-summary { grid-template-columns: 1fr; }.summary-card { padding: 16px; }.assignment-card { grid-template-columns: 1fr; }.assignment-action { min-width: 0; flex-direction: row; align-items: center; }.compact-item { grid-template-columns: auto 1fr; }.compact-item em { grid-column: 2; }.detail-card, .result-card { padding: 22px 18px; }.detail-title { flex-direction: column; }.file-row { grid-template-columns: auto 1fr; }.file-row small { grid-column: 2; }
+  .login-page { padding: 16px; }.login-form { padding: 32px 24px; }.app-shell { display: block; }.sidebar { position: fixed; z-index: 10; top: auto; bottom: 0; width: 100%; height: 68px; padding: 8px 14px; }.sidebar .brand, .sidebar-note { display: none; }.sidebar nav { grid-template-columns: repeat(3, 1fr); }.sidebar nav button, .sidebar nav button:not(.active) { display: flex; justify-content: center; gap: 7px; font-size: 12px; }.sidebar nav button span { font-size: 16px; }.topbar { padding: 12px 18px; }.topbar > div:first-child { display: none; }.page-content { padding: 24px 16px 96px; }.welcome-banner { padding: 28px 24px; }.banner-symbol { display: none; }.summary-grid, .card-grid, .meta-grid, .result-summary { grid-template-columns: 1fr; }.summary-card { padding: 16px; }.compact-item { grid-template-columns: auto 1fr; }.compact-item em { grid-column: 2; }.detail-card, .result-card { padding: 22px 18px; }.detail-title { flex-direction: column; }.file-row { grid-template-columns: auto 1fr; }.file-row small { grid-column: 2; }
 }

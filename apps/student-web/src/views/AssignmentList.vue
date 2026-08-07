@@ -1,430 +1,608 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { mockAssignments, calculateGlobalProgress, type Assignment } from '../mock/assignment';
+import { computed } from 'vue'
 
-const assignmentList = ref<Assignment[]>(mockAssignments);
-const router = useRouter();
+import {
+  calculateGlobalProgress,
+  formatCountdown,
+  getAssignmentActionLabel,
+  getAssignmentProgress,
+  getScoreGrade,
+  getSubmissionStatusLabel,
+  isAssignmentSubmissionClosed,
+} from '../assignmentPresentation'
+import type { AssignmentListRow } from '../assignmentPresentation'
+import type { SubmissionViewStatus } from '../types'
 
-// 计算全局完成率 (Mock计算)
-const globalProgressPercent = computed(() => calculateGlobalProgress(assignmentList.value));
+const props = defineProps<{
+  rows: AssignmentListRow[]
+  now: string
+}>()
 
-// 页面跳转逻辑：点击卡片进入详情页
-const goToDetail = (id: string) => {
-  router.push(`/assignment/${id}`);
-};
+const emit = defineEmits<{
+  open: [assignmentId: number]
+  placeholder: [featureName: string]
+}>()
 
-// 新增：顶部占位按钮的交互提示
-const handlePlaceholderClick = (featureName: string) => {
-  alert(`【${featureName}】功能模块正在开发中，敬请期待！`);
-};
+const courseCodes: Record<number, string> = {
+  11: 'MATH',
+  12: 'CHN',
+  13: 'ENG',
+  14: 'SCI',
+}
 
-// 辅助函数：根据课程获取图标（Mock）
-const getCourseIcon = (courseId: string) => {
-  const icons: Record<string, string> = {
-    MATH: '∫',
-    ENG: '📖',
-    PHY: '⚛️'
-  };
-  return icons[courseId] || '📚';
-};
+const courseNames: Record<number, string> = {
+  11: '数学',
+  12: '语文',
+  13: '英语',
+  14: '科学',
+}
 
-// 辅助函数：根据状态获取状态图标（Mock）
-const getStatusIcon = (status: string) => {
-  const icons: Record<string, string> = {
-    未提交: '🕒',
-    已提交: '✔️',
-    已批改: '🟢',
-    需订正: '⚠️'
-  };
-  return icons[status] || '📋';
-};
+const courseIcons: Record<number, string> = {
+  11: '∫',
+  12: '文',
+  13: 'A',
+  14: '⚗',
+}
+
+const statusIcons: Record<SubmissionViewStatus, string> = {
+  NOT_SUBMITTED: '◷',
+  SUBMITTED: '✓',
+  GRADED: '●',
+  REVISION_REQUIRED: '!',
+}
+
+const globalProgressPercent = computed(() =>
+  calculateGlobalProgress(props.rows.map((row) => row.status)),
+)
+
+function courseCode(courseId: number): string {
+  return courseCodes[courseId] ?? `COURSE-${courseId}`
+}
+
+function courseName(courseId: number): string {
+  return courseNames[courseId] ?? '课程'
+}
+
+function courseIcon(courseId: number): string {
+  return courseIcons[courseId] ?? '书'
+}
+
+function statusClass(status: SubmissionViewStatus): string {
+  return status.toLowerCase().replace(/_/g, '-')
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
+}
+
+function scoreColor(score: number): string {
+  if (score >= 90) return '#23845f'
+  if (score >= 70) return '#356fbd'
+  return '#b64f55'
+}
+
+function actionLabel(row: AssignmentListRow): string {
+  return getAssignmentActionLabel(
+    row.status,
+    isAssignmentSubmissionClosed(row.assignment, props.now),
+  )
+}
+
+function assignmentAriaLabel(row: AssignmentListRow): string {
+  const countdown = formatCountdown(row.assignment.dueAt, props.now)
+  const score =
+    row.latestSubmission?.score === undefined
+      ? ''
+      : `，得分 ${row.latestSubmission.score}`
+
+  return [
+    `${courseName(row.assignment.courseId)}作业：${row.assignment.title}`,
+    getSubmissionStatusLabel(row.status),
+    countdown,
+    `${actionLabel(row)}${score}`,
+  ].join('，')
+}
 </script>
 
 <template>
-  <div class="main-layout">
-    <!-- 1. Header Bar (已绑定点击提示事件) -->
-    <header class="top-header">
-      <h1 class="page-title">我的作业本</h1>
-      <div class="header-actions">
-        <button class="header-btn dashboard-btn" @click="handlePlaceholderClick('作业统计')">
-          <span>📊</span> 作业统计
+  <section class="c-assignment-page" aria-labelledby="assignment-page-title">
+    <header class="c-assignment-header">
+      <div>
+        <p class="c-eyebrow">我的任务</p>
+        <h1 id="assignment-page-title">我的作业本</h1>
+      </div>
+      <div class="c-header-actions" aria-label="作业辅助功能">
+        <button
+          class="c-header-button c-dashboard-button"
+          type="button"
+          @click="emit('placeholder', '作业统计')"
+        >
+          <span aria-hidden="true">▥</span>作业统计
         </button>
-        <button class="header-btn calendar-btn" @click="handlePlaceholderClick('日历')">
-          <span>📅</span>
+        <button
+          class="c-header-button c-icon-button"
+          type="button"
+          aria-label="日历"
+          @click="emit('placeholder', '日历')"
+        >
+          <span aria-hidden="true">□</span>
         </button>
-        <button class="header-btn message-btn" @click="handlePlaceholderClick('消息通知')">
-          <span>🔔</span>
+        <button
+          class="c-header-button c-icon-button"
+          type="button"
+          aria-label="消息通知"
+          @click="emit('placeholder', '消息通知')"
+        >
+          <span aria-hidden="true">♢</span>
         </button>
-        <!-- 增加 cursor: pointer 让鼠标放上去有点击手势 -->
-        <div class="user-profile" @click="handlePlaceholderClick('个人中心')" style="cursor: pointer;">
-          <img src="https://via.placeholder.com/40" alt="avatar" class="avatar" />
-          <span class="user-name">我的</span>
-        </div>
+        <button
+          class="c-user-profile"
+          type="button"
+          @click="emit('placeholder', '个人中心')"
+        >
+          <span class="c-avatar" aria-hidden="true">林</span>
+          <span>我的</span>
+        </button>
       </div>
     </header>
 
-    <!-- 2. 全局完成率进度条 (保持不变) -->
-    <div class="global-progress-bar-container">
-      <div class="progress-bar-wrapper">
-        <div class="progress-label">全局完成率</div>
-        <div class="progress-track">
-          <div
-            class="progress-fill"
-            :style="{ width: globalProgressPercent + '%' }"
-          ></div>
-        </div>
-        <div class="progress-percent">{{ globalProgressPercent }}%</div>
+    <div class="c-global-progress">
+      <strong>全局完成率</strong>
+      <div
+        class="c-progress-track"
+        role="progressbar"
+        aria-label="作业全局完成率"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-valuenow="globalProgressPercent"
+      >
+        <span
+          class="c-progress-fill"
+          :style="{ width: `${globalProgressPercent}%` }"
+        ></span>
       </div>
+      <b>{{ globalProgressPercent }}%</b>
     </div>
 
-    <!-- 3. 作业卡片列表 (已将跳转绑定到整个卡片上) -->
-    <main class="assignment-content">
-      <div
-        v-for="item in assignmentList"
-        :key="item.assignment_id"
-        class="assignment-card"
-        @click="goToDetail(item.assignment_id)"
+    <div v-if="rows.length" class="c-assignment-grid">
+      <button
+        v-for="row in rows"
+        :key="row.assignment.id"
+        class="c-assignment-card"
+        type="button"
+        :aria-label="assignmentAriaLabel(row)"
+        @click="emit('open', row.assignment.id)"
       >
-        <div class="card-body">
-          <div class="card-meta">
-            <span :class="['course-tag', item.course_id]">
-              <span class="course-icon">{{ getCourseIcon(item.course_id) }}</span>
-              {{ item.course_id }}
+        <span class="c-card-body">
+          <span class="c-card-meta">
+            <span
+              :class="['c-course-tag', `course-${row.assignment.courseId}`]"
+              :title="courseName(row.assignment.courseId)"
+            >
+              <span class="c-course-icon" aria-hidden="true">
+                {{ courseIcon(row.assignment.courseId) }}
+              </span>
+              {{ courseCode(row.assignment.courseId) }}
             </span>
-
-            <span :class="['status-badge', item.status]">
-              <span class="status-icon">{{ getStatusIcon(item.status) }}</span>
-              {{ item.status }}
+            <span
+              :class="['c-status-badge', statusClass(row.status)]"
+            >
+              <span aria-hidden="true">{{ statusIcons[row.status] }}</span>
+              {{ getSubmissionStatusLabel(row.status) }}
             </span>
-          </div>
+          </span>
 
-          <h3 class="assignment-title">{{ item.title }}</h3>
+          <strong class="c-assignment-title">{{ row.assignment.title }}</strong>
+          <span class="c-assignment-description">
+            {{ row.assignment.description }}
+          </span>
+          <span class="c-time-row">
+            倒计时时间：
+            <b>{{ formatCountdown(row.assignment.dueAt, now) }}</b>
+          </span>
+          <span class="c-time-row">
+            截止时间：<b>{{ formatDateTime(row.assignment.dueAt) }}</b>
+          </span>
+          <span class="c-late-rule">
+            {{ row.assignment.allowLate ? '允许迟交' : '截止后不可提交' }}
+          </span>
 
-          <p class="countdown-row">
-            倒计时时间: <span class="countdown-text">{{ item.countdown }}</span>
-          </p>
-          <p class="deadline-row">
-            截止时间: <span class="deadline-text">{{ new Date(item.deadline).toLocaleString() }}</span>
-          </p>
+          <span
+            v-if="row.latestSubmission?.score !== undefined"
+            class="c-score-card"
+          >
+            <span class="c-score-main">
+              <strong :style="{ color: scoreColor(row.latestSubmission.score) }">
+                得分：{{ row.latestSubmission.score }}
+              </strong>
+              <b>{{ getScoreGrade(row.latestSubmission.score) }}</b>
+            </span>
+            <span v-if="row.latestSubmission.teacherComment" class="c-feedback">
+              老师评语：{{ row.latestSubmission.teacherComment }}
+            </span>
+          </span>
+        </span>
 
-          <div v-if="item.score_grade" class="score-card">
-            <div class="score-main">
-              <span class="score-value" :style="{ color: item.score_color }">得分: {{ item.score }}</span>
-              <span class="score-grade-icon">{{ item.score_grade }}</span>
-            </div>
-            <p v-if="item.teacher_feedback_preview" class="feedback-preview">{{ item.teacher_feedback_preview }}</p>
-          </div>
-        </div>
+        <span class="c-card-footer">
+          <span class="c-card-progress">
+            <span>{{ getAssignmentProgress(row.status).text }}</span>
+            <span class="c-card-progress-track">
+              <span
+                class="c-card-progress-fill"
+                :style="{
+                  width: `${getAssignmentProgress(row.status).percent}%`,
+                }"
+              ></span>
+            </span>
+          </span>
+          <span class="c-action-button">
+            {{ actionLabel(row) }}
+          </span>
+        </span>
+      </button>
+    </div>
 
-        <div class="card-footer">
-          <div class="card-progress-bar-wrapper">
-            <div class="card-progress-text">{{ item.visual_progress_text }}</div>
-            <div class="card-progress-track">
-              <div
-                class="card-progress-fill"
-                :style="{ width: (item.visual_progress * 100) + '%' }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- 即使按钮被遮挡，点击整个卡片依然可以跳转 -->
-          <button class="action-btn">
-            {{ item.status === '未提交' || item.status === '需订正' ? '去提交' : '看结果' }}
-          </button>
-        </div>
-      </div>
-    </main>
-  </div>
+    <p v-else class="c-empty-state">当前没有已发布的作业。</p>
+  </section>
 </template>
 
 <style scoped>
-/* ==================================
-   全局布局与变量
-   ================================== */
-:root {
-  --primary-color: #1890ff;
-  --secondary-color: #1890ff;
-  --bg-color: #f5f5f5;
-  --text-color: #333;
-  --meta-color: #888;
-  --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  --border-radius: 12px;
-  --transition: all 0.3s ease;
+.c-assignment-page {
+  --c-primary: #625bcf;
+  --c-text: #263247;
+  --c-muted: #7c8596;
+  --c-shadow: 0 10px 30px rgb(38 51 75 / 8%);
+  color: var(--c-text);
 }
 
-.main-layout {
-  min-height: 100vh;
-  background-color: #f5f7f9;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  padding-bottom: 40px;
-}
-
-/* ==================================
-   1. Header Bar
-   ================================== */
-.top-header {
-  background-color: #fff;
-  padding: 16px 40px;
+.c-assignment-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  gap: 24px;
+  padding: 20px 24px;
+  border: 1px solid #e7e9f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--c-shadow);
 }
 
-.page-title {
+.c-assignment-header h1 {
   margin: 0;
-  font-size: 24px;
-  color: var(--text-color);
-  font-weight: 700;
+  font-size: clamp(26px, 4vw, 34px);
 }
 
-.header-actions {
-  display: flex;
-  gap: 16px;
-  align-items: center;
+.c-eyebrow {
+  margin: 0 0 5px;
+  color: var(--c-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
-.header-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--text-color);
-  padding: 8px 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.header-btn:hover { background-color: #f0f2f5; }
-
-.dashboard-btn {
-  background-color: #f0f7ff;
-  color: var(--primary-color);
-  font-weight: 600;
-}
-
-.user-profile {
+.c-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.avatar { border-radius: 50%; }
 
-/* ==================================
-   2. 全局进度条
-   ================================== */
-.global-progress-bar-container {
-  padding: 24px 40px 0 40px;
-  max-width: 1200px;
-  margin: 0 auto;
+.c-header-button,
+.c-user-profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #445068;
+  background: #f7f8fb;
+  font-weight: 750;
 }
 
-.progress-bar-wrapper {
-  background-color: #fff;
-  padding: 16px 20px;
-  border-radius: var(--border-radius);
-  box-shadow: var(--card-shadow);
-  display: flex;
+.c-header-button:hover,
+.c-user-profile:hover {
+  background: #eeeff8;
+}
+
+.c-dashboard-button {
+  color: var(--c-primary);
+  background: #f0efff;
+}
+
+.c-icon-button {
+  width: 40px;
+  padding-inline: 0;
+}
+
+.c-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #ed956c;
+  font-weight: 900;
+}
+
+.c-global-progress {
+  display: grid;
+  grid-template-columns: auto 1fr 48px;
   align-items: center;
   gap: 16px;
+  margin-top: 20px;
+  padding: 17px 20px;
+  border: 1px solid #e7e9f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--c-shadow);
 }
 
-.progress-label {
-  font-weight: 700;
-  color: var(--text-color);
-  font-size: 16px;
-}
-
-.progress-track {
-  flex-grow: 1;
-  height: 10px;
-  background-color: #e6e9ed;
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background-color: #52c41a;
-  border-radius: 5px;
-  transition: width 0.3s ease;
-}
-
-.progress-percent {
-  font-weight: 700;
-  color: var(--meta-color);
-  width: 40px;
+.c-global-progress b {
+  color: #637086;
   text-align: right;
 }
 
-/* ==================================
-   3. 作业卡片区域
-   ================================== */
-.assignment-content {
-  padding: 24px 40px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* 稍微调小最小宽度防挤压 */
-  gap: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.assignment-card {
-  background-color: #fff;
-  border-radius: var(--border-radius);
-  box-shadow: var(--card-shadow);
-  display: flex;
-  flex-direction: column;
+.c-progress-track,
+.c-card-progress-track {
   overflow: hidden;
-  transition: var(--transition);
-  cursor: pointer; /* 鼠标悬浮时变成小手 */
-}
-.assignment-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  border-radius: 999px;
+  background: #e9ebf1;
 }
 
-.card-body {
-  padding: 24px;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
+.c-progress-track {
+  height: 10px;
 }
 
-.card-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.course-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.course-tag.MATH { background-color: #e6f7ff; color: #1890ff; }
-.course-tag.ENG { background-color: #f6ffed; color: #52c41a; }
-.course-tag.PHY { background-color: #fff1f0; color: #f5222d; }
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.status-badge.未提交 { background-color: #fffbe6; color: #faad14; }
-.status-badge.已提交 { background-color: #e6f7ff; color: #1890ff; }
-.status-badge.已批改 { background-color: #f6ffed; color: #52c41a; }
-.status-badge.需订正 { background-color: #fff1f0; color: #f5222d; }
-
-.assignment-title {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  color: var(--text-color);
-  font-weight: 700;
-}
-
-.countdown-row, .deadline-row {
-  margin: 0 0 6px 0;
-  color: var(--meta-color);
-  font-size: 14px;
-}
-
-.countdown-text, .deadline-text {
-  font-weight: 600;
-  color: var(--text-color);
-}
-
-.score-card {
-  margin-top: 16px;
-  border-top: 1px solid #f0f0f0;
-  padding-top: 16px;
-}
-
-.score-main {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.score-value {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.score-grade-icon {
-  font-size: 24px;
-  font-weight: 800;
-  color: #52c41a;
-}
-
-.feedback-preview {
-  margin: 0;
-  font-size: 12px;
-  color: #999;
-  line-height: 1.4;
-}
-
-.card-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #f0f0f0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.card-progress-bar-wrapper {
-  flex-grow: 1;
-  max-width: 150px;
-}
-
-.card-progress-text {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 4px;
-}
-
-.card-progress-track {
-  height: 6px;
-  background-color: #f0f0f0;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.card-progress-fill {
+.c-progress-fill,
+.c-card-progress-fill {
+  display: block;
   height: 100%;
-  background-color: #52c41a;
-  border-radius: 3px;
+  border-radius: inherit;
+  background: #41a77d;
+  transition: width 0.3s ease;
 }
 
-.action-btn {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 8px 24px;
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  transition: var(--transition);
+.c-assignment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 22px;
+  margin-top: 22px;
 }
 
-.action-btn:hover { background-color: #40a9ff; }
+.c-assignment-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e3e6ee;
+  border-radius: 16px;
+  padding: 0;
+  color: inherit;
+  background: #fff;
+  box-shadow: var(--c-shadow);
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.c-assignment-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 38px rgb(38 51 75 / 13%);
+}
+
+.c-assignment-card:focus-visible {
+  outline: 3px solid rgb(98 91 207 / 25%);
+  outline-offset: 3px;
+}
+
+.c-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 22px;
+}
+
+.c-card-meta,
+.c-score-main,
+.c-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.c-card-meta {
+  margin-bottom: 18px;
+}
+
+.c-course-tag,
+.c-status-badge,
+.c-late-rule {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.c-course-tag {
+  color: #356fbd;
+  background: #e9f2ff;
+}
+
+.c-course-tag.course-12 {
+  color: #8c5c17;
+  background: #fff2d8;
+}
+
+.c-course-tag.course-13 {
+  color: #26765a;
+  background: #e8f7f0;
+}
+
+.c-course-tag.course-14 {
+  color: #9a4d75;
+  background: #fbeaf3;
+}
+
+.c-course-icon {
+  font-size: 15px;
+}
+
+.c-status-badge.not-submitted {
+  color: #8c5c17;
+  background: #fff2d8;
+}
+
+.c-status-badge.submitted {
+  color: #376db4;
+  background: #e9f2ff;
+}
+
+.c-status-badge.graded {
+  color: #26765a;
+  background: #e8f7f0;
+}
+
+.c-status-badge.revision-required {
+  color: #b54d4f;
+  background: #ffeded;
+}
+
+.c-assignment-title {
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+.c-assignment-description {
+  min-height: 48px;
+  margin-bottom: 16px;
+  color: #667185;
+  line-height: 1.6;
+}
+
+.c-time-row {
+  margin-bottom: 6px;
+  color: var(--c-muted);
+  font-size: 13px;
+}
+
+.c-time-row b {
+  color: #3f4a60;
+}
+
+.c-late-rule {
+  margin-top: 7px;
+  color: #655fae;
+  background: #f1efff;
+}
+
+.c-score-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0f4;
+}
+
+.c-score-main strong {
+  font-size: 17px;
+}
+
+.c-score-main b {
+  color: #23845f;
+  font-size: 22px;
+}
+
+.c-feedback {
+  color: #7b8495;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.c-card-footer {
+  padding: 15px 22px;
+  border-top: 1px solid #edf0f4;
+  background: #fbfcfe;
+}
+
+.c-card-progress {
+  display: grid;
+  width: min(160px, 55%);
+  gap: 6px;
+  color: #7b8495;
+  font-size: 12px;
+}
+
+.c-card-progress-track {
+  height: 6px;
+}
+
+.c-action-button {
+  border-radius: 10px;
+  padding: 8px 16px;
+  color: #fff;
+  background: var(--c-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.c-empty-state {
+  margin-top: 22px;
+  padding: 40px;
+  border: 1px dashed #cfd3df;
+  border-radius: 16px;
+  color: var(--c-muted);
+  background: #fff;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .c-assignment-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .c-header-actions {
+    flex-wrap: wrap;
+  }
+
+  .c-user-profile {
+    margin-left: auto;
+  }
+
+  .c-global-progress {
+    grid-template-columns: 1fr auto;
+  }
+
+  .c-global-progress .c-progress-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 460px) {
+  .c-dashboard-button {
+    flex: 1;
+  }
+
+  .c-user-profile > span:last-child {
+    display: none;
+  }
+
+  .c-assignment-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

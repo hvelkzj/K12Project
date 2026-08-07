@@ -1,6 +1,6 @@
 # C成员：学生端作业与批改字段清单
 
-> 集成说明：本文件保留 `feature/C-assignment` 的原始字段提案。最终公共字段已统一为 camelCase、数字 ID 和公共状态，开发时以 `docs/api-field-contract.md` 为准。本次按用户要求不合并 `feature/C-assignment-pages`。
+> 集成说明：本文件保留 `feature/C-assignment` 的原始字段提案。最终公共字段已统一为 camelCase、数字 ID 和公共状态，开发时以 `docs/api-field-contract.md` 为准。`feature/C-assignment-pages` 已通过 PR #3 完成审查、评论、批准和合并；其中视觉页面作为作业列表主页面。合并后的契约、接入、交互和测试问题已在 `develop` 修复，没有新增或修改公共字段。
 
 ## 1. 作业基础表 (Assignment)
 
