@@ -4,8 +4,10 @@ import {
   authenticateParent,
   getBoundStudents,
   getFeedbackByStudent,
+  getLeaveRequestsByStudent,
   getNoticesByStudent,
   getSchedulesByStudent,
+  markNoticeRead,
   listLeaveRequests,
   submitLeaveRequest,
   updateFeedbackStatus,
@@ -13,6 +15,7 @@ import {
 
 const tabs = ['首页', '学生切换', '课表', '请假', '通知', '反馈'] as const
 type TabName = (typeof tabs)[number]
+type NoticeFilter = '全部' | '未读' | '调课通知'
 
 export default defineComponent({
   name: 'ParentApp',
@@ -27,6 +30,7 @@ export default defineComponent({
     const selectedScheduleId = ref<number | null>(null)
     const leaveReason = ref('发烧需要休息')
     const disputeReason = ref('希望核对本周课堂记录')
+    const noticeFilter = ref<NoticeFilter>('全部')
     const message = ref('')
 
     const selectedStudent = computed(() =>
@@ -42,12 +46,39 @@ export default defineComponent({
         ? []
         : getNoticesByStudent(selectedStudentId.value),
     )
+    const leaveHistory = computed(() =>
+      selectedStudentId.value === null
+        ? []
+        : getLeaveRequestsByStudent(selectedStudentId.value),
+    )
     const feedback = computed(() =>
       selectedStudentId.value === null
         ? []
         : getFeedbackByStudent(selectedStudentId.value),
     )
     const leaveRequests = computed(() => listLeaveRequests())
+    const unreadNoticeCount = computed(
+      () => notices.value.filter((notice) => !notice.readAt).length,
+    )
+    const scheduleChangeNoticeCount = computed(
+      () => notices.value.filter((notice) => notice.type === 'SCHEDULE_CHANGE').length,
+    )
+    const todayScheduleCount = computed(
+      () => schedules.value.filter((item) => item.lessonDate === '2026-08-01').length,
+    )
+    const pendingFeedbackCount = computed(
+      () => feedback.value.filter((item) => item.status === 'PENDING_PARENT').length,
+    )
+    const currentLeaveRequests = computed(() =>
+      leaveRequests.value.filter((item) => item.studentId === selectedStudentId.value),
+    )
+    const visibleNotices = computed(() =>
+      notices.value.filter((notice) => {
+        if (noticeFilter.value === '未读') return !notice.readAt
+        if (noticeFilter.value === '调课通知') return notice.type === 'SCHEDULE_CHANGE'
+        return true
+      }),
+    )
 
     function login() {
       try {
@@ -158,6 +189,11 @@ export default defineComponent({
       message.value = `请假已提交，状态：${request.status}`
     }
 
+    function readNotice(noticeId: number) {
+      markNoticeRead(noticeId)
+      message.value = '通知已标记为已读'
+    }
+
     function markFeedback(
       feedbackId: number,
       status: 'CONFIRMED' | 'DISPUTED',
@@ -218,14 +254,59 @@ export default defineComponent({
           ]),
           activeTab.value === '首页'
             ? h('section', { class: 'panel' }, [
-                h('h3', '今日概览'),
-                h('div', { class: 'summary-grid' }, [
-                  h('article', [h('strong', String(schedules.value.length)), h('span', '课程')]),
-                  h('article', [h('strong', String(notices.value.length)), h('span', '通知')]),
-                  h('article', [
-                    h('strong', String(feedback.value.length)),
-                    h('span', '待看反馈'),
+                h('div', { class: 'section-header' }, [
+                  h('div', [
+                    h('h3', '今日待办'),
+                    h('p', '按家长最常看的内容排在前面，进入后就能直接处理。'),
                   ]),
+                  h('span', { class: 'section-badge' }, `${selectedStudent.value?.displayName ?? ''}`),
+                ]),
+                h('div', { class: 'summary-grid dashboard-grid' }, [
+                  h('article', [
+                    h('strong', String(todayScheduleCount.value)),
+                    h('span', '今日课次'),
+                    h('small', '先看今天有哪些课'),
+                  ]),
+                  h('article', [
+                    h('strong', String(unreadNoticeCount.value)),
+                    h('span', '未读通知'),
+                    h('small', '调课和提醒优先查看'),
+                  ]),
+                  h('article', [
+                    h('strong', String(pendingFeedbackCount.value)),
+                    h('span', '待确认反馈'),
+                    h('small', '可直接确认或提出异议'),
+                  ]),
+                  h('article', [
+                    h('strong', String(currentLeaveRequests.value.length)),
+                    h('span', '请假记录'),
+                    h('small', '可回看审批状态'),
+                  ]),
+                ]),
+                h('div', { class: 'quick-actions' }, [
+                  h(
+                    'button',
+                    {
+                      class: 'primary',
+                      type: 'button',
+                      onClick: () => {
+                        activeTab.value = '请假'
+                      },
+                    },
+                    '去提交请假',
+                  ),
+                  h(
+                    'button',
+                    {
+                      class: 'ghost-button',
+                      type: 'button',
+                      onClick: () => {
+                        activeTab.value = '通知'
+                        noticeFilter.value = '未读'
+                      },
+                    },
+                    '查看未读通知',
+                  ),
                 ]),
               ])
             : null,
@@ -275,7 +356,12 @@ export default defineComponent({
             : null,
           activeTab.value === '请假'
             ? h('section', { class: 'panel' }, [
-                h('h3', '提交请假'),
+                h('div', { class: 'section-header' }, [
+                  h('div', [
+                    h('h3', '提交请假'),
+                    h('p', '先选课程，再写原因，提交后可立即在记录里看到状态。'),
+                  ]),
+                ]),
                 h('label', [
                   '选择课程',
                   h(
@@ -317,10 +403,23 @@ export default defineComponent({
                 h(
                   'div',
                   { class: 'list compact' },
-                  leaveRequests.value.map((item) =>
+                  leaveRequests.value
+                    .filter((item) => item.studentId === selectedStudentId.value)
+                    .map((item) =>
                     h('article', { class: 'row', key: item.id }, [
                       h('strong', item.reason),
                       h('span', item.status),
+                    ]),
+                    ),
+                ),
+                h('h4', '当前学生请假记录'),
+                h(
+                  'div',
+                  { class: 'list compact' },
+                  leaveHistory.value.map((item) =>
+                    h('article', { class: 'row', key: item.id }, [
+                      h('strong', item.reason),
+                      h('span', `${item.status} · ${item.createdAt.slice(0, 10)}`),
                     ]),
                   ),
                 ),
@@ -328,11 +427,51 @@ export default defineComponent({
             : null,
           activeTab.value === '通知'
             ? h('section', { class: 'panel' }, [
-                h('h3', '通知'),
+                h('div', { class: 'section-header' }, [
+                  h('div', [
+                    h('h3', '通知中心'),
+                    h('p', '把调课、提醒和普通消息放在一处，支持快速筛选。'),
+                  ]),
+                  h('div', { class: 'segmented' }, [
+                    h(
+                      'button',
+                      {
+                        class: { active: noticeFilter.value === '全部' },
+                        type: 'button',
+                        onClick: () => {
+                          noticeFilter.value = '全部'
+                        },
+                      },
+                      '全部',
+                    ),
+                    h(
+                      'button',
+                      {
+                        class: { active: noticeFilter.value === '未读' },
+                        type: 'button',
+                        onClick: () => {
+                          noticeFilter.value = '未读'
+                        },
+                      },
+                      '未读',
+                    ),
+                    h(
+                      'button',
+                      {
+                        class: { active: noticeFilter.value === '调课通知' },
+                        type: 'button',
+                        onClick: () => {
+                          noticeFilter.value = '调课通知'
+                        },
+                      },
+                      '调课通知',
+                    ),
+                  ]),
+                ]),
                 h(
                   'div',
                   { class: 'list' },
-                  notices.value.map((notice) =>
+                  visibleNotices.value.map((notice) =>
                     h('article', { class: 'row notice', key: notice.id }, [
                       h('div', [
                         h('strong', notice.title),
@@ -344,7 +483,20 @@ export default defineComponent({
                             )
                           : null
                       ]),
-                      h('span', notice.readAt ? '已读' : '未读'),
+                      h('div', { class: 'notice-actions' }, [
+                        h('span', notice.readAt ? '已读' : '未读'),
+                        !notice.readAt
+                          ? h(
+                              'button',
+                              {
+                                type: 'button',
+                                class: 'ghost-button',
+                                onClick: () => readNotice(notice.id),
+                              },
+                              '标为已读',
+                            )
+                          : null,
+                      ]),
                     ]),
                   ),
                 ),

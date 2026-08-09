@@ -189,7 +189,8 @@ nav {
 nav button,
 .row-button,
 .primary,
-.actions button {
+.actions button,
+.ghost-button {
   border: 0;
   border-radius: 6px;
   cursor: pointer;
@@ -238,10 +239,38 @@ nav button:hover {
   max-width: 920px;
 }
 
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-header h3,
+.section-header p {
+  margin: 0;
+}
+
+.section-header p {
+  color: #667085;
+}
+
+.section-badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #24545a;
+  background: #e4f4f1;
+  white-space: nowrap;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .summary-grid article,
@@ -262,6 +291,38 @@ nav button:hover {
 .summary-grid strong {
   font-size: 28px;
   color: #2f5d62;
+}
+
+.summary-grid small {
+  color: #667085;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #edf4f5;
+}
+
+.segmented button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #24545a;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(47, 93, 98, 0.12);
 }
 
 .list {
@@ -338,6 +399,24 @@ textarea {
   background: #e4f4f1;
 }
 
+.ghost-button {
+  padding: 8px 12px;
+  color: #2f5d62;
+  background: #edf5f4;
+}
+
+.notice-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.panel h4 {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: #344054;
+}
+
 @media (max-width: 760px) {
   .login-card {
     grid-template-columns: 1fr;
@@ -366,5 +445,9 @@ textarea {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    flex-direction: column;
   }
 }

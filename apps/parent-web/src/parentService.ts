@@ -1,6 +1,8 @@
 import {
   feedbackList,
   mockParentCredentials,
+  initialNoticeReadState,
+  initialFeedbackState,
   notices,
   parentUser,
   schedules,
@@ -16,6 +18,7 @@ import type {
 } from './types'
 
 const leaveRequests: LeaveRequest[] = [];
+const noticeReadMap = new Map(initialNoticeReadState.map((item) => [item.id, item.readAt]));
 
 export function authenticateParent(
   username: string,
@@ -48,7 +51,16 @@ export function getSchedulesByStudent(studentId: number): ScheduleItem[] {
 
 export function getNoticesByStudent(studentId: number): ParentNotice[] {
   ensureBoundStudent(studentId);
-  return notices.filter((notice) => notice.studentId === studentId);
+  return notices
+    .filter((notice) => notice.studentId === studentId)
+    .map((notice) => ({
+      ...notice,
+      readAt: noticeReadMap.get(notice.id) ?? notice.readAt,
+    }));
+}
+
+export function getUnreadNoticesByStudent(studentId: number): ParentNotice[] {
+  return getNoticesByStudent(studentId).filter((notice) => !notice.readAt);
 }
 
 export function getFeedbackByStudent(studentId: number): StudentFeedback[] {
@@ -93,6 +105,28 @@ export function submitLeaveRequest(input: {
   return request;
 }
 
+export function getLeaveRequestsByStudent(studentId: number): LeaveRequest[] {
+  ensureBoundStudent(studentId);
+  return leaveRequests.filter((item) => item.studentId === studentId);
+}
+
+export function markNoticeRead(noticeId: number): ParentNotice {
+  const notice = notices.find((item) => item.id === noticeId);
+
+  if (!notice) {
+    throw new Error('通知不存在');
+  }
+
+  ensureBoundStudent(notice.studentId);
+  const now = new Date().toISOString();
+  noticeReadMap.set(noticeId, now);
+
+  return {
+    ...notice,
+    readAt: now,
+  };
+}
+
 export function updateFeedbackStatus(
   feedbackId: number,
   status: 'CONFIRMED' | 'DISPUTED',
@@ -116,4 +150,19 @@ export function updateFeedbackStatus(
 
 export function listLeaveRequests(): LeaveRequest[] {
   return [...leaveRequests];
+}
+
+export function resetParentMockState(): void {
+  leaveRequests.length = 0
+  noticeReadMap.clear()
+  initialNoticeReadState.forEach((item) => {
+    noticeReadMap.set(item.id, item.readAt)
+  })
+  initialFeedbackState.forEach((item) => {
+    const feedback = feedbackList.find((record) => record.id === item.id)
+    if (feedback) {
+      feedback.status = item.status
+      feedback.parentResponse = item.parentResponse
+    }
+  })
 }

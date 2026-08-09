@@ -81,6 +81,11 @@ export const notices: ParentNotice[] = [
   },
 ]
 
+export const initialNoticeReadState = notices.map((notice) => ({
+  id: notice.id,
+  readAt: notice.readAt,
+}))
+
 export const feedbackList: StudentFeedback[] = [
   {
     id: 1,
@@ -94,3 +99,9 @@ export const feedbackList: StudentFeedback[] = [
     parentResponse: '',
   },
 ]
+
+export const initialFeedbackState = feedbackList.map((feedback) => ({
+  id: feedback.id,
+  status: feedback.status,
+  parentResponse: feedback.parentResponse,
+}))

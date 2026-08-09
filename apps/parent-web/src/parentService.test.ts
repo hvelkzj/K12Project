@@ -1,14 +1,22 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { beforeEach } from 'node:test'
 import { mockParentCredentials } from './mockData'
 import {
   authenticateParent,
   ensureBoundStudent,
+  getLeaveRequestsByStudent,
   getNoticesByStudent,
   getSchedulesByStudent,
+  getUnreadNoticesByStudent,
+  markNoticeRead,
+  resetParentMockState,
   submitLeaveRequest,
   updateFeedbackStatus
 } from './parentService'
+
+beforeEach(() => {
+  resetParentMockState()
+})
 
 test('家长可以使用 Mock 账号登录', () => {
   const user = authenticateParent(
@@ -51,6 +59,17 @@ test('家长可以为已绑定学生提交请假', () => {
   assert.equal(request.reason, '身体不适')
 })
 
+test('家长可以查看当前学生的请假历史', () => {
+  submitLeaveRequest({
+    studentId: 2,
+    scheduleId: 2,
+    reason: '下午请假',
+    contactPhone: '13800000001',
+  })
+
+  assert.equal(getLeaveRequestsByStudent(2).length >= 1, true)
+})
+
 test('调课通知包含原时间、新时间和代课教师', () => {
   const notice = getNoticesByStudent(2).find(
     (item) => item.type === 'SCHEDULE_CHANGE',
@@ -59,6 +78,16 @@ test('调课通知包含原时间、新时间和代课教师', () => {
   assert.equal(notice?.originalTime, '2026-08-01 09:00-10:30')
   assert.equal(notice?.newTime, '2026-08-01 16:00-17:30')
   assert.equal(notice?.substituteTeacherName, '周老师')
+})
+
+test('家长可以把通知标记为已读', () => {
+  const notice = markNoticeRead(1)
+  assert.equal(notice.readAt !== null, true)
+})
+
+test('家长的未读通知可以单独筛选', () => {
+  markNoticeRead(1)
+  assert.equal(getUnreadNoticesByStudent(2).length, 0)
 })
 
 test('家长可以确认反馈或填写原因后提出异议', () => {
