@@ -1,8 +1,10 @@
 # 公共字段契约
 
-版本：7/28 开发基线。
+版本：7/28 字段基线，7/29 公共 TypeScript 包已在 `feature/A-auth` 实现，待合并。
 
 本文件只确定跨端字段，不提前实现 B、C、D、E 的业务接口。接口 JSON 使用 camelCase，数据库列使用 snake_case。
+
+实现位置：业务类型和状态由 `@k12/shared` 导出；六角色测试账号由 `@k12/shared/mock-accounts` 导出。
 
 ## 公共规则
 
@@ -12,14 +14,18 @@
 | 时间点 | 带时区的 ISO 8601 字符串，例如 `2026-08-07T09:30:00+08:00` |
 | 课次日期 | `YYYY-MM-DD` |
 | 课次时间 | `HH:mm:ss` |
-| 可选值 | JSON 使用 `null` 或省略；数据库按字段定义允许 `NULL` |
+| 可选值 | 标记为 `?` 的字段可使用 `null` 或省略；TypeScript 表达为 `?: T \| null` |
 | 权限 | 后端根据当前用户和关联 ID 校验，不能只依赖前端隐藏入口 |
 
 ## 公共摘要
 
 | 类型 | 字段 |
 |---|---|
+| `CampusSummary` | `id`、`name` |
+| `ClassSummary` | `id`、`campusId`、`name` |
+| `CourseSummary` | `id`、`campusId`、`name`、`subject` |
 | `UserSummary` | `id`、`displayName`、`role`、`campusId`、`campusName?` |
+| `UserAccountSummary` | `UserSummary` 全部字段，以及 `username`、`active` |
 | `StudentSummary` | `id`、`displayName`、`classId`、`className`、`campusId`、`campusName` |
 | `FileSummary` | `id`、`originalName`、`mimeType`、`byteSize`、`createdAt` |
 | `ScheduleSummary` | `id`、`campusId`、`classId`、`courseId`、`teacherId`、`lessonDate`、`startTime`、`endTime`、`room`、`status` |
@@ -40,6 +46,23 @@
 
 `NOT_SUBMITTED` 是没有提交记录时的页面派生状态；`DRAFT` 是未发送请假表单的本地状态。两者不写入数据库。
 
+## 登录与当前用户
+
+| 类型 | 字段 |
+|---|---|
+| `LoginRequest` | `username`、`password` |
+| `LoginResponse` | `accessToken`、`tokenType`、`expiresAt`、`user` |
+| `CurrentUserResponse` | `user` |
+| `ApiError` | `code`、`message` |
+
+| 接口 | 说明 |
+|---|---|
+| `POST /auth/login` | 使用六角色 Mock 账号创建八小时会话 |
+| `GET /auth/me` | 使用 Bearer 令牌读取当前用户 |
+| `POST /auth/logout` | 删除当前令牌对应的会话 |
+
+Mock 密码不进入用户响应。当前内存会话用于第一周演示，后续再接 `users` 和 `sessions` 表。
+
 ## B：家长端和通知
 
 | 类型 | 字段 |
@@ -49,12 +72,13 @@
 | `Notification` | `id`、`userId`、`studentId?`、`type`、`title`、`content`、`relatedType`、`relatedId?`、`readAt?`、`createdAt` |
 | `ScheduleChangeNotice` | `notification`、`originalDate`、`originalStartTime`、`originalEndTime`、`newDate`、`newStartTime`、`newEndTime`、`originalTeacherName`、`substituteTeacherName?` |
 
-`read` 由 `readAt !== null` 推导。调课通知展示字段由通知关联的调课记录生成，不在通知表中重复保存。
+`read` 由 `readAt != null` 推导。调课通知展示字段由通知关联的调课记录生成，不在通知表中重复保存。
 
 ## C、D：作业、提交和批改
 
 | 类型 | 字段 |
 |---|---|
+| `Courseware` | `id`、`classId`、`courseId`、`teacherId`、`title`、`description`、`attachments`、`publishedAt` |
 | `Assignment` | `id`、`campusId`、`classId`、`courseId`、`scheduleId?`、`teacherId`、`title`、`description`、`attachments`、`dueAt`、`allowLate`、`publishedAt`、`createdAt`、`updatedAt` |
 | `Submission` | `id`、`assignmentId`、`studentId`、`attempt`、`content`、`attachments`、`status`、`submittedAt`、`score?`、`teacherComment`、`gradedBy?`、`gradedAt?`、`updatedAt` |
 

@@ -19,6 +19,7 @@
 - [ABCDE 字段联合决议](docs/abcde-field-decisions-2026-08-07.md)
 - [公共字段契约](docs/api-field-contract.md)
 - [公共数据模型](docs/data-model.md)
+- [7/29 公共类型与登录交付](docs/a-7-29-public-types-and-auth.md)
 - [模块页面总清单](docs/module-page-inventory.md)
 - [实验报告材料](docs/report-evidence.md)
 - [协作规则](AGENTS.md)
@@ -27,6 +28,7 @@
 
 | 目录 | 负责人 | 本地地址 |
 |---|---|---|
+| `packages/shared` | A | 公共类型、状态和测试账号，不单独启动 |
 | `apps/api` | A | `http://127.0.0.1:3000` |
 | `apps/parent-web` | B | `http://127.0.0.1:5173` |
 | `apps/student-web` | C | `http://127.0.0.1:5174` |
@@ -48,6 +50,14 @@ npm run dev
 
 `npm run dev` 会同时启动后端和四个前端。后端健康检查地址为
 `http://127.0.0.1:3000/health`。
+
+认证接口：
+
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/logout`
+
+六角色测试账号和请求格式见 [7/29 公共类型与登录交付](docs/a-7-29-public-types-and-auth.md)。
 
 只启动一个项目：
 

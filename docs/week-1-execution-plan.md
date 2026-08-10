@@ -63,7 +63,23 @@
 | PostgreSQL 初始迁移 | `apps/api/db/migrations/001_initial.sql` | 基础数据和四端业务表已建立 |
 | 结构测试 | `apps/api/test/schema.test.ts` | 校验公共实体、状态和关键约束 |
 
-7/28 不实现 B/C/D/E 的页面业务。7/29 全员按公共字段契约检查页面模型，A 再发布公共 TypeScript 类型、测试账号和 Mock 数据。
+7/28 不实现 B/C/D/E 的页面业务。A 的 7/29 公共类型、测试账号和认证 API 已在 `feature/A-auth` 完成，待 Windows 验证和 PR 合并；B/C/D/E 后续各自在本人模块中接入。
+
+## 7/29 A 成员交付
+
+状态：功能已完成，待 Windows 验证和 PR 合并。
+
+| 交付 | 位置 | 结果 |
+|---|---|---|
+| 公共 TypeScript 包 | `packages/shared` | 发布角色、状态和公共业务接口类型 |
+| 六角色 Mock 账号 | `@k12/shared/mock-accounts` | 六个唯一账号、数字 ID 和统一测试密码 |
+| 登录 | `POST /auth/login` | 创建八小时内存会话 |
+| 当前用户 | `GET /auth/me` | Bearer 令牌读取用户 |
+| 退出 | `POST /auth/logout` | 当前令牌立即失效 |
+| 完整说明 | `docs/a-7-29-public-types-and-auth.md` | 包含账号、接口、错误码和成员交接 |
+| 验证 | `npm run check` | 48 项测试无失败，六个工作区构建通过；1 项端口测试因沙箱限制跳过 |
+
+A 不修改 B/C/D/E 页面。各成员按照交接表把自己的本地类型和 Mock 账号替换为公共内容。
 
 ## 成员分支集成交付
 

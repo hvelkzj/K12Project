@@ -1,17 +1,26 @@
 {
-  "name": "@k12/api",
+  "name": "@k12/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mock-accounts": {
+      "types": "./dist/mockAccounts.d.ts",
+      "import": "./dist/mockAccounts.js"
+    }
+  },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts"
-  },
-  "dependencies": {
-    "@k12/shared": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

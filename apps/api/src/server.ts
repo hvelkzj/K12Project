@@ -18,6 +18,8 @@ if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
 }
 
 const server = createServer(requestHandler)
+server.headersTimeout = 10_000
+server.requestTimeout = 15_000
 
 server.listen(port, host, () => {
   console.log(`K12 API 已启动：http://${host}:${port}`)
