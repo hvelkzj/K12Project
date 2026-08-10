@@ -69,4 +69,4 @@ npm run test --workspace @k12/api
 psql -d k12 -f apps/api/db/migrations/001_initial.sql
 ```
 
-迁移只创建结构，不包含真实账号或个人信息。7/29 再由 A 增加公共类型、登录接口和测试账号 Mock。
+迁移只创建结构，不包含真实账号或个人信息。A 的 7/29 公共类型、登录接口和六角色测试账号 Mock 已在 `feature/A-auth` 完成，见 `docs/a-7-29-public-types-and-auth.md`。当前认证使用内存会话，后续数据库接入时再读写 `users` 和 `sessions` 表。
