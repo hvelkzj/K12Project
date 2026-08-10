@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "workspaces": [
+    "packages/*",
     "apps/*"
   ],
   "scripts": {
+    "prepare": "npm run build --workspace @k12/shared",
+    "predev": "npm run build --workspace @k12/shared",
     "dev": "node scripts/dev.mjs",
+    "predev:api": "npm run build --workspace @k12/shared",
     "dev:api": "npm run dev --workspace @k12/api",
     "dev:parent": "npm run dev --workspace @k12/parent-web",
     "dev:student": "npm run dev --workspace @k12/student-web",
@@ -15,7 +19,9 @@
     "dev:admin": "npm run dev --workspace @k12/admin-web",
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint .",
+    "pretypecheck": "npm run build --workspace @k12/shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "pretest": "npm run build --workspace @k12/shared",
     "test": "npm run test --workspaces --if-present",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
