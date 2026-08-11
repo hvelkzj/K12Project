@@ -1,57 +1,50 @@
 import {
   feedbackList,
-  mockParentCredentials,
+  initialLeaveRequests,
+  parentProfile,
+  parentStudentBindings,
   notices,
   parentUser,
   schedules,
-  students,
 } from './mockData'
+import type { LeaveRequest } from '@k12/shared'
 import type {
-  LeaveRequest,
+  ParentFeedback,
   ParentNotice,
-  ParentUser,
-  ScheduleItem,
-  Student,
-  StudentFeedback,
-} from './types'
+  ParentSchedule,
+} from './mockData'
 
-const leaveRequests: LeaveRequest[] = [];
+const leaveRequests: LeaveRequest[] = [...initialLeaveRequests]
 
-export function authenticateParent(
-  username: string,
-  password: string,
-): ParentUser {
-  const validUsername = username.trim() === mockParentCredentials.username
-  const validPassword = password === mockParentCredentials.password
-
-  if (!validUsername || !validPassword) {
-    throw new Error('账号或密码错误')
-  }
-
-  return parentUser
-}
-
-export function getBoundStudents(): Student[] {
-  return students.filter((student) => parentUser.boundStudentIds.includes(student.id));
+export function getBoundStudents() {
+  return parentStudentBindings.map((binding) => binding.student)
 }
 
 export function ensureBoundStudent(studentId: number): void {
-  if (!parentUser.boundStudentIds.includes(studentId)) {
+  const isBound = parentStudentBindings.some(
+    (binding) => binding.student.id === studentId,
+  )
+
+  if (!isBound) {
     throw new Error('家长只能查看已绑定学生的数据');
   }
 }
 
-export function getSchedulesByStudent(studentId: number): ScheduleItem[] {
+export function getSchedulesByStudent(studentId: number): ParentSchedule[] {
   ensureBoundStudent(studentId);
   return schedules.filter((schedule) => schedule.studentId === studentId);
 }
 
 export function getNoticesByStudent(studentId: number): ParentNotice[] {
   ensureBoundStudent(studentId);
-  return notices.filter((notice) => notice.studentId === studentId);
+  return notices.filter((notice) =>
+    'notification' in notice
+      ? notice.notification.studentId === studentId
+      : notice.studentId === studentId,
+  );
 }
 
-export function getFeedbackByStudent(studentId: number): StudentFeedback[] {
+export function getFeedbackByStudent(studentId: number): ParentFeedback[] {
   ensureBoundStudent(studentId);
   return feedbackList.filter((feedback) => feedback.studentId === studentId);
 }
@@ -76,6 +69,17 @@ export function submitLeaveRequest(input: {
     throw new Error('请假原因不能为空');
   }
 
+  const duplicateRequest = leaveRequests.find(
+    (request) =>
+      request.studentId === input.studentId &&
+      request.scheduleId === input.scheduleId &&
+      request.status === 'PENDING',
+  )
+
+  if (duplicateRequest) {
+    throw new Error('该课程已提交待处理请假申请');
+  }
+
   const now = new Date().toISOString()
   const request: LeaveRequest = {
     id: leaveRequests.length + 1,
@@ -85,6 +89,9 @@ export function submitLeaveRequest(input: {
     reason: input.reason.trim(),
     contactPhone: input.contactPhone,
     status: 'PENDING',
+    reviewedBy: null,
+    reviewNote: '',
+    reviewedAt: null,
     createdAt: now,
     updatedAt: now,
   }
@@ -97,7 +104,7 @@ export function updateFeedbackStatus(
   feedbackId: number,
   status: 'CONFIRMED' | 'DISPUTED',
   parentResponse = '',
-): StudentFeedback {
+): ParentFeedback {
   const feedback = feedbackList.find((item) => item.id === feedbackId);
 
   if (!feedback) {
@@ -111,9 +118,26 @@ export function updateFeedbackStatus(
   ensureBoundStudent(feedback.studentId)
   feedback.status = status
   feedback.parentResponse = status === 'DISPUTED' ? parentResponse.trim() : ''
+  feedback.respondedBy = parentUser.id
+  feedback.respondedAt = new Date().toISOString()
+  feedback.updatedAt = feedback.respondedAt
   return feedback
 }
 
 export function listLeaveRequests(): LeaveRequest[] {
   return [...leaveRequests];
+}
+
+export function getParentContactPhone(): string {
+  return parentProfile.phone
+}
+
+export function resetParentServiceState(): void {
+  leaveRequests.splice(0, leaveRequests.length, ...initialLeaveRequests)
+  for (const feedback of feedbackList) {
+    feedback.status = 'PENDING_PARENT'
+    feedback.parentResponse = ''
+    feedback.respondedBy = null
+    feedback.respondedAt = null
+  }
 }
