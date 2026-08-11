@@ -3,15 +3,19 @@ import test from 'node:test'
 
 import {
   assignSubstitute,
+  availableSubstituteTeachers,
   closeWorkOrder,
   ensureCampusAccess,
   filterByScope,
   reviewScheduleChange,
 } from './adminService'
+import { isAdminRole } from './authService'
 import {
   initialScheduleChanges,
   initialSchedules,
+  initialUsers,
   initialWorkOrders,
+  teachers,
 } from './mockData'
 
 function findScheduleChange(id: number) {
@@ -41,6 +45,30 @@ test('系统管理员可以查看全部校区数据', () => {
 
   assert.deepEqual(new Set(visible.map((item) => item.campusId)), new Set([1, 2]))
   assert.doesNotThrow(() => ensureCampusAccess(2, 'SYSTEM_ADMIN', 1))
+})
+
+test('两种管理员角色都可以进入后台，非管理员不能进入', () => {
+  assert.equal(isAdminRole('ACADEMIC_ADMIN'), true)
+  assert.equal(isAdminRole('SYSTEM_ADMIN'), true)
+  assert.equal(isAdminRole('PARENT'), false)
+  assert.equal(isAdminRole('STUDENT'), false)
+  assert.equal(isAdminRole('TEACHER'), false)
+  assert.equal(isAdminRole('HOMEROOM_TEACHER'), false)
+  assert.equal(isAdminRole(undefined), false)
+})
+
+test('用户账号字段使用 username 和 active，不再使用 account 和 enabled', () => {
+  const academic = initialUsers.find((user) => user.role === 'ACADEMIC_ADMIN')
+  const admin = initialUsers.find((user) => user.role === 'SYSTEM_ADMIN')
+
+  assert.ok(academic)
+  assert.ok(admin)
+  assert.equal(academic.username, 'academic_901')
+  assert.equal(admin.username, 'system_999')
+  assert.equal(academic.active, true)
+  assert.equal(admin.active, true)
+  assert.equal('account' in academic, false)
+  assert.equal('enabled' in academic, false)
 })
 
 test('待审批调课申请可以通过', () => {
@@ -104,6 +132,27 @@ test('只有已通过的申请可以选择代课教师', () => {
       ),
     /只有已通过的调课申请可以安排代课/,
   )
+})
+
+test('代课教师只限申请所在校区且不能是原教师', () => {
+  const campusOneChange = findScheduleChange(3002)
+
+  const campusOneTeachers = availableSubstituteTeachers(campusOneChange, teachers)
+  assert.ok(campusOneTeachers.every((teacher) => teacher.campusId === 1))
+  assert.ok(campusOneTeachers.every((teacher) => teacher.id !== 303))
+  assert.deepEqual(
+    campusOneTeachers.map((teacher) => teacher.id).sort(),
+    [301, 302],
+  )
+
+  const campusTwoChange = findScheduleChange(3003)
+  const campusTwoTeachers = availableSubstituteTeachers(campusTwoChange, teachers)
+  assert.deepEqual(
+    campusTwoTeachers.map((teacher) => teacher.id).sort(),
+    [402],
+  )
+
+  assert.deepEqual(availableSubstituteTeachers(undefined, teachers), [])
 })
 
 test('关闭反馈工单前必须填写处理结果', () => {

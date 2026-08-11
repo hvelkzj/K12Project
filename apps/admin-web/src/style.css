@@ -239,6 +239,7 @@ h2 {
 }
 
 .role-switch,
+.topbar-user,
 .inline-filter {
   display: flex;
   align-items: center;
@@ -276,6 +277,14 @@ input[readonly] {
 .role-switch select {
   width: auto;
   min-width: 208px;
+}
+
+.topbar-user .secondary {
+  width: auto;
+}
+
+.topbar-name {
+  color: #172033;
 }
 
 .inline-filter select {
