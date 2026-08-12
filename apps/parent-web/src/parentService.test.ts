@@ -1,38 +1,20 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import { mockParentCredentials } from './mockData'
+import test, { beforeEach } from 'node:test'
 import {
-  authenticateParent,
   ensureBoundStudent,
   getNoticesByStudent,
   getSchedulesByStudent,
+  resetParentServiceState,
   submitLeaveRequest,
   updateFeedbackStatus
 } from './parentService'
 
-test('家长可以使用 Mock 账号登录', () => {
-  const user = authenticateParent(
-    mockParentCredentials.username,
-    mockParentCredentials.password,
-  )
-
-  assert.equal(user.id, 1)
-  assert.equal(user.displayName, '王女士')
-})
-
-test('错误的家长账号或密码不能登录', () => {
-  assert.throws(
-    () => authenticateParent(mockParentCredentials.username, 'wrong-password'),
-    /账号或密码错误/,
-  )
-  assert.throws(
-    () => authenticateParent('not-a-parent', mockParentCredentials.password),
-    /账号或密码错误/,
-  )
+beforeEach(() => {
+  resetParentServiceState()
 })
 
 test('家长可以查看已绑定学生课表', () => {
-  assert.equal(getSchedulesByStudent(2).length, 2)
+  assert.equal(getSchedulesByStudent(101).length, 2)
 })
 
 test('家长不能访问未绑定学生', () => {
@@ -41,7 +23,7 @@ test('家长不能访问未绑定学生', () => {
 
 test('家长可以为已绑定学生提交请假', () => {
   const request = submitLeaveRequest({
-    studentId: 2,
+    studentId: 101,
     scheduleId: 1,
     reason: '身体不适',
     contactPhone: '13800000001',
@@ -51,14 +33,49 @@ test('家长可以为已绑定学生提交请假', () => {
   assert.equal(request.reason, '身体不适')
 })
 
+test('请假必填字段缺失时会拦截提交', () => {
+  assert.throws(
+    () =>
+      submitLeaveRequest({
+        studentId: 101,
+        scheduleId: 1,
+        reason: '   ',
+        contactPhone: '13800000001',
+      }),
+    /请假原因不能为空/,
+  )
+})
+
+test('同一课程不能重复提交待处理请假', () => {
+  const input = {
+    studentId: 101,
+    scheduleId: 1,
+    reason: '身体不适',
+    contactPhone: '13800000001',
+  }
+
+  submitLeaveRequest(input)
+
+  assert.throws(
+    () => submitLeaveRequest(input),
+    /该课程已提交待处理请假申请/,
+  )
+})
+
 test('调课通知包含原时间、新时间和代课教师', () => {
-  const notice = getNoticesByStudent(2).find(
-    (item) => item.type === 'SCHEDULE_CHANGE',
+  const notice = getNoticesByStudent(101).find(
+    (item) =>
+      'notification' in item && item.notification.type === 'SCHEDULE_CHANGE',
   )
 
-  assert.equal(notice?.originalTime, '2026-08-01 09:00-10:30')
-  assert.equal(notice?.newTime, '2026-08-01 16:00-17:30')
-  assert.equal(notice?.substituteTeacherName, '周老师')
+  assert.ok(notice && 'notification' in notice)
+  assert.equal(notice.originalDate, '2026-08-01')
+  assert.equal(notice.originalStartTime, '09:00')
+  assert.equal(notice.originalEndTime, '10:30')
+  assert.equal(notice.newDate, '2026-08-01')
+  assert.equal(notice.newStartTime, '16:00')
+  assert.equal(notice.newEndTime, '17:30')
+  assert.equal(notice.substituteTeacherName, '周老师')
 })
 
 test('家长可以确认反馈或填写原因后提出异议', () => {

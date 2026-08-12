@@ -1,9 +1,11 @@
-import { computed, defineComponent, h, ref } from 'vue'
-import { mockParentCredentials, parentUser } from './mockData'
+import { computed, defineComponent, h, onMounted, ref } from 'vue'
+import type { UserSummary } from '@k12/shared'
+import { parentAuthClient } from './authClient'
+import { mockParentCredentials, parentProfile, parentUser } from './mockData'
 import {
-  authenticateParent,
   getBoundStudents,
   getFeedbackByStudent,
+  getParentContactPhone,
   getNoticesByStudent,
   getSchedulesByStudent,
   listLeaveRequests,
@@ -18,6 +20,8 @@ export default defineComponent({
   name: 'ParentApp',
   setup() {
     const isAuthenticated = ref(false)
+    const isRestoringSession = ref(true)
+    const currentUser = ref<UserSummary | null>(null)
     const username = ref<string>(mockParentCredentials.username)
     const password = ref<string>(mockParentCredentials.password)
     const loginMessage = ref('')
@@ -49,29 +53,70 @@ export default defineComponent({
     )
     const leaveRequests = computed(() => listLeaveRequests())
 
-    function login() {
+    const displayUser = computed(() => currentUser.value ?? parentUser)
+
+    async function restoreSession() {
       try {
-        const user = authenticateParent(username.value, password.value)
+        const user = await parentAuthClient.restoreCurrentUser()
+        currentUser.value = user
+        isAuthenticated.value = user !== null
+        loginMessage.value = user ? '' : '请使用家长账号登录'
+        message.value = user ? `已恢复 ${user.displayName} 的登录状态` : ''
+      } catch (error) {
+        currentUser.value = null
+        isAuthenticated.value = false
+        loginMessage.value =
+          error instanceof Error ? error.message : '登录状态恢复失败'
+      } finally {
+        isRestoringSession.value = false
+      }
+    }
+
+    onMounted(() => {
+      void restoreSession()
+    })
+
+    async function login() {
+      loginMessage.value = ''
+      try {
+        const user = await parentAuthClient.login(username.value, password.value)
+        currentUser.value = user
         isAuthenticated.value = true
         activeTab.value = '首页'
         loginMessage.value = ''
-        message.value = `已使用 ${user.displayName} 的 Mock 账号登录`
+        message.value = `已使用 ${user.displayName} 的真实认证账号登录`
       } catch (error) {
         loginMessage.value =
           error instanceof Error ? error.message : '登录失败，请稍后重试'
       }
     }
 
-    function logout() {
-      isAuthenticated.value = false
-      password.value = ''
-      loginMessage.value = '已退出家长端'
-      activeTab.value = '首页'
-      selectedScheduleId.value = null
-      message.value = ''
+    async function logout() {
+      try {
+        await parentAuthClient.logout()
+      } catch (error) {
+        loginMessage.value =
+          error instanceof Error ? error.message : '退出登录失败，请稍后重试'
+      } finally {
+        currentUser.value = null
+        isAuthenticated.value = false
+        password.value = ''
+        activeTab.value = '首页'
+        selectedScheduleId.value = null
+        message.value = ''
+        loginMessage.value = '已退出家长端'
+      }
     }
 
     function renderLogin() {
+      if (isRestoringSession.value) {
+        return h('main', { class: 'login-shell' }, [
+          h('section', { class: 'login-card single' }, [
+            h('p', { class: 'login-description' }, '正在检查登录状态...'),
+          ]),
+        ])
+      }
+
       return h('main', { class: 'login-shell' }, [
         h('section', { class: 'login-card', 'aria-labelledby': 'login-title' }, [
           h('div', { class: 'login-intro' }, [
@@ -80,7 +125,7 @@ export default defineComponent({
             h(
               'p',
               { class: 'login-description' },
-              '使用家长 Mock 账号查看已绑定学生的课表、请假、通知和反馈。',
+              '使用家长测试账号完成登录、学生切换、课表查看、请假提交、通知查看和退出流程。',
             ),
             h('dl', { class: 'demo-account' }, [
               h('div', [h('dt', '测试账号'), h('dd', mockParentCredentials.username)]),
@@ -93,7 +138,7 @@ export default defineComponent({
               class: 'login-form',
               onSubmit: (event: Event) => {
                 event.preventDefault()
-                login()
+                void login()
               },
             },
             [
@@ -148,14 +193,19 @@ export default defineComponent({
         return
       }
 
-      const request = submitLeaveRequest({
-        studentId: selectedStudentId.value,
-        scheduleId: firstScheduleId,
-        reason: leaveReason.value,
-        contactPhone: parentUser.phone,
-      })
+      try {
+        const request = submitLeaveRequest({
+          studentId: selectedStudentId.value,
+          scheduleId: firstScheduleId,
+          reason: leaveReason.value,
+          contactPhone: getParentContactPhone(),
+        })
 
-      message.value = `请假已提交，状态：${request.status}`
+        message.value = `请假已提交，状态：${request.status}`
+      } catch (error) {
+        message.value =
+          error instanceof Error ? error.message : '请假提交失败，请稍后重试'
+      }
     }
 
     function markFeedback(
@@ -177,8 +227,8 @@ export default defineComponent({
         h('aside', { class: 'sidebar' }, [
           h('div', [
             h('p', { class: 'eyebrow' }, '家长端'),
-            h('h1', parentUser.displayName),
-            h('p', { class: 'muted' }, parentUser.phone),
+            h('h1', displayUser.value.displayName),
+            h('p', { class: 'muted' }, parentProfile.phone),
           ]),
           h(
             'nav',
@@ -196,11 +246,11 @@ export default defineComponent({
               ),
             ),
           ),
-          h('div', { class: 'account-actions' }, [
-            h('span', 'Mock 登录状态'),
+        h('div', { class: 'account-actions' }, [
+            h('span', '真实认证登录状态'),
             h(
               'button',
-              { class: 'logout-button', type: 'button', onClick: logout },
+              { class: 'logout-button', type: 'button', onClick: () => void logout() },
               '退出登录',
             ),
           ]),
@@ -267,7 +317,7 @@ export default defineComponent({
                           `${item.lessonDate} ${item.startTime}-${item.endTime}`,
                         ),
                       ]),
-                      h('span', `${item.teacherName} · ${item.roomName}`),
+                      h('span', `${item.teacherName} · ${item.room}`),
                     ]),
                   ),
                 ),
@@ -333,18 +383,18 @@ export default defineComponent({
                   'div',
                   { class: 'list' },
                   notices.value.map((notice) =>
-                    h('article', { class: 'row notice', key: notice.id }, [
+                    h('article', { class: 'row notice', key: 'notification' in notice ? notice.notification.id : notice.id }, [
                       h('div', [
-                        h('strong', notice.title),
-                        h('p', notice.content),
-                        notice.type === 'SCHEDULE_CHANGE'
+                        h('strong', 'notification' in notice ? notice.notification.title : notice.title),
+                        h('p', 'notification' in notice ? notice.notification.content : notice.content),
+                        'notification' in notice
                           ? h(
                               'p',
-                              `原时间：${notice.originalTime}；新时间：${notice.newTime}；代课：${notice.substituteTeacherName}`,
+                              `原时间：${notice.originalDate} ${notice.originalStartTime}-${notice.originalEndTime}；新时间：${notice.newDate} ${notice.newStartTime}-${notice.newEndTime}；代课：${notice.substituteTeacherName ?? '待确认'}`,
                             )
                           : null
                       ]),
-                      h('span', notice.readAt ? '已读' : '未读'),
+                      h('span', ('notification' in notice ? notice.notification.readAt : notice.readAt) ? '已读' : '未读'),
                     ]),
                   ),
                 ),
