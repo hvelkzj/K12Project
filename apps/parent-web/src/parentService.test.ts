@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import test, { beforeEach } from 'node:test'
+import { feedbackList, notices, schedules } from './mockData'
 import {
   ensureBoundStudent,
   getNoticesByStudent,
   getSchedulesByStudent,
   resetParentServiceState,
   submitLeaveRequest,
-  updateFeedbackStatus
+  updateFeedbackStatus,
 } from './parentService'
 
 beforeEach(() => {
@@ -70,12 +71,49 @@ test('调课通知包含原时间、新时间和代课教师', () => {
 
   assert.ok(notice && 'notification' in notice)
   assert.equal(notice.originalDate, '2026-08-01')
-  assert.equal(notice.originalStartTime, '09:00')
-  assert.equal(notice.originalEndTime, '10:30')
+  assert.equal(notice.originalStartTime, '09:00:00')
+  assert.equal(notice.originalEndTime, '10:30:00')
   assert.equal(notice.newDate, '2026-08-01')
-  assert.equal(notice.newStartTime, '16:00')
-  assert.equal(notice.newEndTime, '17:30')
+  assert.equal(notice.newStartTime, '16:00:00')
+  assert.equal(notice.newEndTime, '17:30:00')
   assert.equal(notice.substituteTeacherName, '周老师')
+})
+
+test('家长端 Mock 时间符合公共字段契约', () => {
+  const lessonTimePattern = /^\d{2}:\d{2}:\d{2}$/
+  const zonedDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})$/
+
+  for (const schedule of schedules) {
+    assert.match(schedule.startTime, lessonTimePattern)
+    assert.match(schedule.endTime, lessonTimePattern)
+  }
+
+  for (const notice of notices) {
+    const notification = 'notification' in notice ? notice.notification : notice
+    assert.match(notification.createdAt, zonedDateTimePattern)
+
+    if ('notification' in notice) {
+      assert.match(notice.originalStartTime, lessonTimePattern)
+      assert.match(notice.originalEndTime, lessonTimePattern)
+      assert.match(notice.newStartTime, lessonTimePattern)
+      assert.match(notice.newEndTime, lessonTimePattern)
+    }
+  }
+})
+
+test('家长端教师 ID 与公共账号展示名一致', () => {
+  const teacherNames = new Map([
+    [301, '李老师'],
+    [302, '周老师'],
+  ])
+
+  for (const schedule of schedules) {
+    assert.equal(schedule.teacherName, teacherNames.get(schedule.teacherId))
+  }
+
+  for (const feedback of feedbackList) {
+    assert.equal(feedback.teacherName, teacherNames.get(feedback.teacherId))
+  }
 })
 
 test('家长可以确认反馈或填写原因后提出异议', () => {

@@ -163,3 +163,34 @@ test('退出登录会调用 /auth/logout 并阻止继续访问', async () => {
   assert.equal(client.getAccessToken(), null)
   assert.equal(await client.restoreCurrentUser(), null)
 })
+
+test('退出接口失败时仍清除本地 token', async (context) => {
+  for (const scenario of [
+    {
+      name: '服务端返回 500',
+      fetchImpl: async () =>
+        jsonResponse({ code: 'INTERNAL_ERROR', message: '服务异常' }, 500),
+      expectedError: /服务异常/,
+    },
+    {
+      name: '网络请求失败',
+      fetchImpl: async () => {
+        throw new TypeError('network unavailable')
+      },
+      expectedError: /network unavailable/,
+    },
+  ]) {
+    await context.test(scenario.name, async () => {
+      const storage = createStorage()
+      storage.setItem(accessTokenStorageKey, 'token-201')
+      const client = createParentAuthClient({
+        apiBaseUrl: 'http://api.test',
+        storage,
+        fetchImpl: scenario.fetchImpl,
+      })
+
+      await assert.rejects(() => client.logout(), scenario.expectedError)
+      assert.equal(client.getAccessToken(), null)
+    })
+  }
+})

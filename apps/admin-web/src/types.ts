@@ -12,7 +12,10 @@ import type {
   WorkOrderStatus,
 } from '@k12/shared'
 
-export type AdminRole = 'ACADEMIC_ADMIN' | 'SYSTEM_ADMIN'
+export type AdminRole = Extract<
+  UserRole,
+  'ACADEMIC_ADMIN' | 'SYSTEM_ADMIN'
+>
 
 export type Campus = CampusSummary
 export type ClassGroup = ClassSummary

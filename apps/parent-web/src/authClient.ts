@@ -168,20 +168,22 @@ export function createParentAuthClient(
     async logout() {
       const accessToken = getAccessToken()
 
-      if (accessToken) {
-        const response = await fetchImpl(`${apiBaseUrl}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        })
+      try {
+        if (accessToken) {
+          const response = await fetchImpl(`${apiBaseUrl}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          })
 
-        if (!response.ok && response.status !== 401) {
-          throw new Error(await readErrorMessage(response))
+          if (!response.ok && response.status !== 401) {
+            throw new Error(await readErrorMessage(response))
+          }
         }
+      } finally {
+        clearAccessToken()
       }
-
-      clearAccessToken()
     },
 
     getAccessToken,

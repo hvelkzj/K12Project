@@ -12,7 +12,10 @@ import {
   startWorkOrder,
 } from './adminService'
 import {
+  canAccessAdminPage,
   createAuthClient,
+  getAdminActorId,
+  isAuthenticatedAdmin,
   isAdminRole,
 } from './authService'
 import {
@@ -112,7 +115,13 @@ const selectedWorkOrderId = ref<number | null>(4001)
 const workOrderResult = ref('')
 
 const currentPage = computed(
-  () => pages.find((page) => page.key === activePage.value) ?? pages[1],
+  () => pages.find((page) => page.key === activePage.value) ?? pages[0],
+)
+
+const visiblePages = computed(() =>
+  isAuthenticatedAdmin(currentUser.value)
+    ? pages.filter((page) => page.key !== 'login')
+    : pages.filter((page) => page.key === 'login'),
 )
 
 const apiBaseUrl =
@@ -124,10 +133,6 @@ const currentRoleLabel = computed(() =>
   currentUser.value && isAdminRole(currentUser.value.role)
     ? roleLabels[currentUser.value.role]
     : roleLabels[currentRole.value],
-)
-
-const currentUserId = computed(() =>
-  currentRole.value === 'ACADEMIC_ADMIN' ? 901 : 999,
 )
 
 const scopeDescription = computed(() =>
@@ -281,6 +286,13 @@ function showError(error: unknown) {
 }
 
 function goTo(page: PageKey) {
+  if (!canAccessAdminPage(page, currentUser.value)) {
+    activePage.value = 'login'
+    clearMessages()
+    showError(new Error('请先使用教务或系统管理员账号登录'))
+    return
+  }
+
   activePage.value = page
   clearMessages()
 }
@@ -426,7 +438,7 @@ function submitReview(decision: 'APPROVED' | 'REJECTED') {
       selected,
       decision,
       decisionNote.value,
-      currentUserId.value,
+      getAdminActorId(currentUser.value),
       reviewedAt,
     )
     const index = scheduleChanges.value.findIndex((item) => item.id === selected.id)
@@ -514,7 +526,7 @@ function beginSelectedWorkOrder() {
     ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
     const updated = startWorkOrder(
       selected,
-      currentUserId.value,
+      getAdminActorId(currentUser.value),
       new Date().toISOString(),
     )
     const index = workOrders.value.findIndex((item) => item.id === selected.id)
@@ -537,7 +549,7 @@ function closeSelectedWorkOrder() {
     const closed = closeWorkOrder(
       selected,
       workOrderResult.value,
-      currentUserId.value,
+      getAdminActorId(currentUser.value),
       new Date().toISOString(),
     )
     const index = workOrders.value.findIndex((item) => item.id === selected.id)
@@ -577,7 +589,7 @@ function toggleUser(userId: number) {
 
       <nav aria-label="后台页面">
         <button
-          v-for="page in pages"
+          v-for="page in visiblePages"
           :key="page.key"
           class="nav-item"
           :class="{ active: activePage === page.key }"
@@ -590,11 +602,15 @@ function toggleUser(userId: number) {
         </button>
       </nav>
 
-      <div class="scope-card">
+      <div v-if="currentUser" class="scope-card">
         <span>当前数据范围</span>
         <strong>{{ roleLabels[currentRole] }}</strong>
-        <p v-if="currentUser">{{ currentUser.displayName }} · {{ scopeDescription }}</p>
-        <p v-else>{{ scopeDescription }}</p>
+        <p>{{ currentUser.displayName }} · {{ scopeDescription }}</p>
+      </div>
+      <div v-else class="scope-card">
+        <span>访问状态</span>
+        <strong>尚未登录</strong>
+        <p>登录后显示角色对应的数据范围。</p>
       </div>
     </aside>
 
@@ -1140,7 +1156,7 @@ function toggleUser(userId: number) {
 
     <nav class="mobile-nav" aria-label="移动端后台页面">
       <button
-        v-for="page in pages.slice(1)"
+        v-for="page in visiblePages"
         :key="page.key"
         :class="{ active: activePage === page.key }"
         type="button"

@@ -3,12 +3,16 @@ import type {
   LoginResponse,
   UserSummary,
 } from '@k12/shared'
+import type { AdminRole } from './types'
 
 export const ACCESS_TOKEN_KEY = 'k12AccessToken'
 
-export const ADMIN_ROLES = ['ACADEMIC_ADMIN', 'SYSTEM_ADMIN'] as const
+export const ADMIN_ROLES = [
+  'ACADEMIC_ADMIN',
+  'SYSTEM_ADMIN',
+] as const satisfies readonly AdminRole[]
 
-export type AdminRole = (typeof ADMIN_ROLES)[number]
+export type AuthenticatedAdmin = UserSummary & { role: AdminRole }
 
 export interface AuthSession {
   user: UserSummary
@@ -30,6 +34,29 @@ export interface AuthClientOptions {
 
 export function isAdminRole(role: string | undefined): role is AdminRole {
   return role === 'ACADEMIC_ADMIN' || role === 'SYSTEM_ADMIN'
+}
+
+export function isAuthenticatedAdmin(
+  user: UserSummary | null | undefined,
+): user is AuthenticatedAdmin {
+  return Boolean(user && isAdminRole(user.role))
+}
+
+export function canAccessAdminPage(
+  page: string,
+  user: UserSummary | null | undefined,
+): boolean {
+  return page === 'login' || isAuthenticatedAdmin(user)
+}
+
+export function getAdminActorId(
+  user: UserSummary | null | undefined,
+): number {
+  if (!isAuthenticatedAdmin(user)) {
+    throw new Error('请先使用教务或系统管理员账号登录')
+  }
+
+  return user.id
 }
 
 export function createAuthClient(options: AuthClientOptions): AuthClient {

@@ -16,6 +16,10 @@ import {
 const tabs = ['首页', '学生切换', '课表', '请假', '通知', '反馈'] as const
 type TabName = (typeof tabs)[number]
 
+function formatLessonTime(time: string): string {
+  return time.slice(0, 5)
+}
+
 export default defineComponent({
   name: 'ParentApp',
   setup() {
@@ -314,7 +318,7 @@ export default defineComponent({
                         h('strong', item.courseName),
                         h(
                           'p',
-                          `${item.lessonDate} ${item.startTime}-${item.endTime}`,
+                          `${item.lessonDate} ${formatLessonTime(item.startTime)}-${formatLessonTime(item.endTime)}`,
                         ),
                       ]),
                       h('span', `${item.teacherName} · ${item.room}`),
@@ -343,7 +347,7 @@ export default defineComponent({
                         h(
                           'option',
                           { key: item.id, value: item.id },
-                          `${item.courseName} · ${item.lessonDate} ${item.startTime}`,
+                          `${item.courseName} · ${item.lessonDate} ${formatLessonTime(item.startTime)}`,
                         ),
                       ),
                     ],
@@ -390,7 +394,7 @@ export default defineComponent({
                         'notification' in notice
                           ? h(
                               'p',
-                              `原时间：${notice.originalDate} ${notice.originalStartTime}-${notice.originalEndTime}；新时间：${notice.newDate} ${notice.newStartTime}-${notice.newEndTime}；代课：${notice.substituteTeacherName ?? '待确认'}`,
+                              `原时间：${notice.originalDate} ${formatLessonTime(notice.originalStartTime)}-${formatLessonTime(notice.originalEndTime)}；新时间：${notice.newDate} ${formatLessonTime(notice.newStartTime)}-${formatLessonTime(notice.newEndTime)}；代课：${notice.substituteTeacherName ?? '待确认'}`,
                             )
                           : null
                       ]),

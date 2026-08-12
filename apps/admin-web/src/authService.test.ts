@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import type { UserSummary } from '@k12/shared'
 
 import {
   ACCESS_TOKEN_KEY,
+  canAccessAdminPage,
   createAuthClient,
+  getAdminActorId,
+  isAuthenticatedAdmin,
 } from './authService'
 
 interface FetchCall {
@@ -59,7 +63,7 @@ const academicUser = {
   role: 'ACADEMIC_ADMIN',
   campusId: 1,
   campusName: '滨江校区',
-}
+} satisfies UserSummary
 
 const adminUser = {
   id: 999,
@@ -67,7 +71,34 @@ const adminUser = {
   role: 'SYSTEM_ADMIN',
   campusId: 1,
   campusName: '滨江校区',
-}
+} satisfies UserSummary
+
+test('后台权限只接受已认证管理员并保留真实用户 ID', () => {
+  const anotherAcademicUser = {
+    ...academicUser,
+    id: 912,
+    displayName: '另一位教务',
+  }
+
+  assert.equal(isAuthenticatedAdmin(null), false)
+  assert.equal(
+    isAuthenticatedAdmin({ ...academicUser, role: 'PARENT' }),
+    false,
+  )
+  assert.equal(isAuthenticatedAdmin(anotherAcademicUser), true)
+  assert.equal(canAccessAdminPage('login', null), true)
+  assert.equal(canAccessAdminPage('dashboard', null), false)
+  assert.equal(
+    canAccessAdminPage('dashboard', { ...academicUser, role: 'PARENT' }),
+    false,
+  )
+  assert.equal(canAccessAdminPage('dashboard', anotherAcademicUser), true)
+  assert.equal(getAdminActorId(anotherAcademicUser), 912)
+  assert.throws(
+    () => getAdminActorId(null),
+    /请先使用教务或系统管理员账号登录/,
+  )
+})
 
 test('两种管理员都能使用真实登录接口登录并保存令牌', async () => {
   const storage = createMemoryStorage()
