@@ -63,11 +63,11 @@
 | PostgreSQL 初始迁移 | `apps/api/db/migrations/001_initial.sql` | 基础数据和四端业务表已建立 |
 | 结构测试 | `apps/api/test/schema.test.ts` | 校验公共实体、状态和关键约束 |
 
-7/28 不实现 B/C/D/E 的页面业务。A 的 7/29 公共类型、测试账号和认证 API 已在 `feature/A-auth` 完成，待 Windows 验证和 PR 合并；B/C/D/E 后续各自在本人模块中接入。
+7/28 不实现 B/C/D/E 的页面业务。A 的 7/29 公共类型、测试账号和认证 API 已通过 PR #4 合并；B/C/D/E 后续各自在本人模块中接入。
 
 ## 7/29 A 成员交付
 
-状态：功能已完成，待 Windows 验证和 PR 合并。
+状态：已完成并通过 PR #4 合并。
 
 | 交付 | 位置 | 结果 |
 |---|---|---|
@@ -77,9 +77,24 @@
 | 当前用户 | `GET /auth/me` | Bearer 令牌读取用户 |
 | 退出 | `POST /auth/logout` | 当前令牌立即失效 |
 | 完整说明 | `docs/a-7-29-public-types-and-auth.md` | 包含账号、接口、错误码和成员交接 |
-| 验证 | `npm run check` | 48 项测试无失败，六个工作区构建通过；1 项端口测试因沙箱限制跳过 |
+| 验证 | `npm run check` | 当前共 51 项测试无失败，六个工作区构建通过；1 项端口测试因沙箱限制跳过 |
 
 A 不修改 B/C/D/E 页面。各成员按照交接表把自己的本地类型和 Mock 账号替换为公共内容。
+
+## 7/30 A 成员公共依赖接入
+
+状态：功能已完成，草稿 PR #7 待 Windows 验证。
+
+| 交付 | 位置 | 结果 |
+|---|---|---|
+| 四端共享依赖 | 四个前端 `package.json` | 统一为精确版本 `@k12/shared@0.1.0` |
+| 根锁文件 | `package-lock.json` | 统一登记四端依赖，没有子目录锁文件 |
+| API 地址 | 四个前端 `.env.example` | 统一使用 `VITE_API_BASE_URL=http://127.0.0.1:3000` |
+| Token 约定 | `docs/a-7-29-public-types-and-auth.md` | 使用 `sessionStorage` 和 `k12AccessToken` |
+| 集成测试 | `packages/shared/test/frontendIntegration.test.ts` | 检查依赖、API 地址和唯一根锁文件 |
+| 验证 | `npm run check` | 51 项测试无失败，六个工作区构建通过 |
+
+A 本轮只修改包清单、根锁文件、共享测试和公共文档，不修改四端页面。PR 合并后 B/C/D/E 再接入各自认证逻辑。
 
 ## 成员分支集成交付
 

@@ -1,10 +1,10 @@
 # A 成员 7/29 公共类型与登录交付
 
-任务日期：2026-07-29。完成日期：2026-08-07。
+任务日期：2026-07-29。初次完成日期：2026-08-07。前端依赖接入日期：2026-08-12。
 
 ## 完成结论
 
-A 已在 `feature/A-auth` 完成可供五端复用的 TypeScript 公共包、六角色 Mock 账号，以及登录、当前用户和退出 API。没有修改 B、C、D、E 的业务页面；合并到 `develop` 前还需完成 Windows 验证和 PR 审查。
+A 的公共包、六角色 Mock 账号和认证 API 已通过 PR #4 合并到 `develop`。本轮在 `feature/A-shared-integration` 为四个前端登记精确共享包依赖，并提交草稿 PR #7；没有修改 B、C、D、E 的业务页面。
 
 | 交付 | 位置 | 结果 |
 |---|---|---|
@@ -12,6 +12,7 @@ A 已在 `feature/A-auth` 完成可供五端复用的 TypeScript 公共包、六
 | 角色与状态 | `packages/shared/src/constants.ts` | 六种角色、八组持久化状态和通知类型 |
 | 公共接口类型 | `packages/shared/src/types.ts` | 公共摘要、四端业务对象和认证响应 |
 | 六角色账号 | `@k12/shared/mock-accounts` | 六个唯一用户名、数字 ID 和统一测试密码 |
+| 四端依赖 | 四个前端 `package.json` | 均使用精确版本 `@k12/shared@0.1.0` |
 | 登录 API | `POST /auth/login` | 校验账号密码并创建八小时 Mock 会话 |
 | 当前用户 API | `GET /auth/me` | 使用 Bearer 令牌返回当前用户 |
 | 退出 API | `POST /auth/logout` | 删除当前会话，成功返回 204 |
@@ -35,6 +36,17 @@ import { MOCK_ACCOUNTS } from '@k12/shared/mock-accounts'
 ```
 
 `NOT_SUBMITTED` 和 `DRAFT` 仍是页面派生状态，不进入公共持久化状态。
+
+## 前端接入约定
+
+| 项目 | 统一约定 |
+|---|---|
+| API 地址 | 从 `VITE_API_BASE_URL` 读取，默认值为 `http://127.0.0.1:3000` |
+| Token 存储 | 使用 `sessionStorage` |
+| Token 键名 | `k12AccessToken` |
+| 会话失效 | 收到 401 时清除 Token 并返回登录页 |
+| 主动退出 | 调用 `/auth/logout` 后清除 Token |
+| 业务数据 | 本轮仍可使用各端 Mock；认证使用真实 API |
 
 ## 六角色 Mock 账号
 
@@ -89,7 +101,7 @@ import { MOCK_ACCOUNTS } from '@k12/shared/mock-accounts'
 
 ## 给 B、C、D、E 的交接
 
-各成员只修改自己的模块，并把本地类型和账号逐步替换为 A 发布的公共内容。
+四个前端已经声明公共包依赖。各成员只修改自己的模块，并把本地类型和账号逐步替换为 A 发布的公共内容。
 
 | 成员 | 后续接入重点 |
 |---|---|
@@ -103,7 +115,7 @@ A 的公共交付已完成。B、C、D、E 的页面接入属于各成员后续�
 ## 验证结果
 
 - macOS `npm ci`：通过，公共包会在安装阶段自动构建。
-- 公共包测试：4/4 通过。
+- 公共包测试：7/7 通过，其中 3 项检查四端精确依赖、统一 API 地址和唯一根锁文件。
 - API 测试：16 项通过、0 失败；另 1 项真实 HTTP 端口测试因当前沙箱禁止监听而跳过。无需端口的测试已覆盖多会话隔离、多分块请求和 16 KiB 精确边界。
-- 全仓 `npm run check`：通过，共发现 48 项测试（47 项通过、1 项因上述沙箱限制跳过），六个工作区类型检查和构建均成功。
+- 全仓 `npm run check`：通过，共发现 51 项测试（50 项通过、1 项因上述沙箱限制跳过），六个工作区类型检查和构建均成功。
 - Windows 成员仍需按合并规则运行 `npm ci`、`npm run check` 和 `npm run dev:api`。
