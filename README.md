@@ -59,6 +59,10 @@ npm run dev
 
 六角色测试账号和请求格式见 [7/29 公共类型与登录交付](docs/a-7-29-public-types-and-auth.md)。
 
+四个前端统一从 `VITE_API_BASE_URL` 读取 API 地址，默认值为
+`http://127.0.0.1:3000`。登录令牌保存在 `sessionStorage` 的
+`k12AccessToken` 中；收到 401 或退出时必须清除。
+
 只启动一个项目：
 
 ```bash
