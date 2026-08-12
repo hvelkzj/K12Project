@@ -4,7 +4,7 @@
 
 ## 完成结论
 
-A 的公共包、六角色 Mock 账号和认证 API 已通过 PR #4 合并到 `develop`。本轮在 `feature/A-shared-integration` 为四个前端登记精确共享包依赖，没有修改 B、C、D、E 的业务页面。
+A 的公共包、六角色 Mock 账号和认证 API 已通过 PR #4 合并到 `develop`。本轮在 `feature/A-shared-integration` 为四个前端登记精确共享包依赖，并提交草稿 PR #7；没有修改 B、C、D、E 的业务页面。
 
 | 交付 | 位置 | 结果 |
 |---|---|---|
