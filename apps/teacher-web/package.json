@@ -9,6 +9,7 @@
     "typecheck": "vue-tsc -b --noEmit"
   },
   "dependencies": {
+    "@k12/shared": "0.1.0",
     "vue": "^3.5.18"
   },
   "devDependencies": {
