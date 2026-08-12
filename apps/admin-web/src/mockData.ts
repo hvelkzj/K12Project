@@ -21,9 +21,9 @@ export const classGroups: ClassGroup[] = [
 ]
 
 export const courses: Course[] = [
-  { id: 11, name: '数学提高班' },
-  { id: 12, name: '英语阅读班' },
-  { id: 13, name: '科学探索班' },
+  { id: 11, campusId: 1, name: '数学提高班', subject: '数学' },
+  { id: 12, campusId: 1, name: '英语阅读班', subject: '英语' },
+  { id: 13, campusId: 2, name: '科学探索班', subject: '科学' },
 ]
 
 export const teachers: Teacher[] = [
@@ -216,12 +216,12 @@ export const initialWorkOrders: FeedbackWorkOrder[] = [
 ]
 
 export const initialUsers: UserAccount[] = [
-  { id: 101, campusId: 1, displayName: '林晓雨', account: 'student_101', role: 'STUDENT', enabled: true },
-  { id: 201, campusId: 1, displayName: '林女士', account: 'parent_201', role: 'PARENT', enabled: true },
-  { id: 301, campusId: 1, displayName: '李老师', account: 'teacher_301', role: 'TEACHER', enabled: true },
-  { id: 302, campusId: 1, displayName: '周老师', account: 'teacher_302', role: 'HOMEROOM_TEACHER', enabled: true },
-  { id: 901, campusId: 1, displayName: '许教务', account: 'academic_901', role: 'ACADEMIC_ADMIN', enabled: true },
-  { id: 401, campusId: 2, displayName: '陈老师', account: 'teacher_401', role: 'TEACHER', enabled: true },
-  { id: 402, campusId: 2, displayName: '赵老师', account: 'teacher_402', role: 'HOMEROOM_TEACHER', enabled: true },
-  { id: 999, campusId: 1, displayName: '系统管理员', account: 'system_999', role: 'SYSTEM_ADMIN', enabled: true },
+  { id: 101, campusId: 1, displayName: '林晓雨', username: 'student_101', role: 'STUDENT', active: true },
+  { id: 201, campusId: 1, displayName: '林女士', username: 'parent_201', role: 'PARENT', active: true },
+  { id: 301, campusId: 1, displayName: '李老师', username: 'teacher_301', role: 'TEACHER', active: true },
+  { id: 302, campusId: 1, displayName: '周老师', username: 'teacher_302', role: 'HOMEROOM_TEACHER', active: true },
+  { id: 901, campusId: 1, displayName: '许教务', username: 'academic_901', role: 'ACADEMIC_ADMIN', active: true },
+  { id: 401, campusId: 2, displayName: '陈老师', username: 'teacher_401', role: 'TEACHER', active: true },
+  { id: 402, campusId: 2, displayName: '赵老师', username: 'teacher_402', role: 'HOMEROOM_TEACHER', active: true },
+  { id: 999, campusId: 1, displayName: '系统管理员', username: 'system_999', role: 'SYSTEM_ADMIN', active: true },
 ]

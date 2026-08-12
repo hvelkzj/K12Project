@@ -1,14 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import type { UserSummary } from '@k12/shared'
 
 import {
   assignSubstitute,
+  availableSubstituteTeachers as availableSubstituteTeachersFor,
   closeWorkOrder,
   ensureCampusAccess,
   filterByScope,
   reviewScheduleChange,
   startWorkOrder,
 } from './adminService'
+import {
+  createAuthClient,
+  isAdminRole,
+} from './authService'
 import {
   campuses,
   classGroups,
@@ -83,7 +89,11 @@ const workOrderLabels: Record<WorkOrderStatus, string> = {
 
 const activePage = ref<PageKey>('login')
 const currentRole = ref<AdminRole>('ACADEMIC_ADMIN')
-const homeCampusId = 1
+const currentUser = ref<UserSummary | null>(null)
+const loginUsername = ref('academic_901')
+const loginPassword = ref('K12Demo123!')
+const isLoggingIn = ref(false)
+const homeCampusId = ref(1)
 const notice = ref('')
 const errorMessage = ref('')
 const scheduleCampusFilter = ref(0)
@@ -105,28 +115,35 @@ const currentPage = computed(
   () => pages.find((page) => page.key === activePage.value) ?? pages[1],
 )
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
+
+const authClient = createAuthClient({ apiBaseUrl })
+
+const currentRoleLabel = computed(() =>
+  currentUser.value && isAdminRole(currentUser.value.role)
+    ? roleLabels[currentUser.value.role]
+    : roleLabels[currentRole.value],
+)
+
 const currentUserId = computed(() =>
   currentRole.value === 'ACADEMIC_ADMIN' ? 901 : 999,
 )
 
-const currentAccount = computed(() =>
-  currentRole.value === 'ACADEMIC_ADMIN' ? 'academic_901' : 'system_999',
-)
-
 const scopeDescription = computed(() =>
   currentRole.value === 'ACADEMIC_ADMIN'
-    ? '仅可查看和处理所属的滨江校区数据'
+    ? `仅可查看和处理所属校区（${currentUser.value?.campusName ?? '当前校区'}）数据`
     : '可查看单一机构下的全部校区数据',
 )
 
 const visibleCampuses = computed(() =>
   currentRole.value === 'SYSTEM_ADMIN'
     ? campuses
-    : campuses.filter((campus) => campus.id === homeCampusId),
+    : campuses.filter((campus) => campus.id === homeCampusId.value),
 )
 
 const visibleSchedules = computed(() =>
-  filterByScope(schedules.value, currentRole.value, homeCampusId),
+  filterByScope(schedules.value, currentRole.value, homeCampusId.value),
 )
 
 const displayedSchedules = computed(() => {
@@ -140,15 +157,15 @@ const displayedSchedules = computed(() => {
 })
 
 const visibleScheduleChanges = computed(() =>
-  filterByScope(scheduleChanges.value, currentRole.value, homeCampusId),
+  filterByScope(scheduleChanges.value, currentRole.value, homeCampusId.value),
 )
 
 const visibleWorkOrders = computed(() =>
-  filterByScope(workOrders.value, currentRole.value, homeCampusId),
+  filterByScope(workOrders.value, currentRole.value, homeCampusId.value),
 )
 
 const visibleUsers = computed(() =>
-  filterByScope(users.value, currentRole.value, homeCampusId),
+  filterByScope(users.value, currentRole.value, homeCampusId.value),
 )
 
 const selectedApproval = computed(() =>
@@ -167,18 +184,9 @@ const selectedSubstituteChange = computed(() =>
   ),
 )
 
-const availableSubstituteTeachers = computed(() => {
-  const selected = selectedSubstituteChange.value
-  if (!selected) {
-    return []
-  }
-
-  return teachers.filter(
-    (teacher) =>
-      teacher.campusId === selected.campusId &&
-      teacher.id !== selected.originalTeacherId,
-  )
-})
+const availableSubstituteTeachers = computed(() =>
+  availableSubstituteTeachersFor(selectedSubstituteChange.value, teachers),
+)
 
 const assignedChanges = computed(() =>
   visibleScheduleChanges.value.filter(
@@ -277,12 +285,80 @@ function goTo(page: PageKey) {
   clearMessages()
 }
 
-function login() {
-  goTo('dashboard')
-  showNotice(
-    `已使用${roleLabels[currentRole.value]} Mock 账号登录，${scopeDescription.value}`,
-  )
+async function restoreSession() {
+  try {
+    const user = await authClient.getCurrentUser()
+    if (!user) return
+
+    if (!isAdminRole(user.role)) {
+      await authClient.logout()
+      return
+    }
+
+    currentUser.value = user
+    currentRole.value = user.role
+    homeCampusId.value = user.campusId
+    resetScopedSelections()
+    goTo('dashboard')
+    showNotice(
+      `欢迎回来，${user.displayName}。数据范围：${scopeDescription.value}`,
+    )
+  } catch (error) {
+    showError(error)
+  }
 }
+
+async function login() {
+  if (isLoggingIn.value) return
+
+  clearMessages()
+  isLoggingIn.value = true
+
+  try {
+    const session = await authClient.login(
+      loginUsername.value,
+      loginPassword.value,
+    )
+
+    if (!isAdminRole(session.user.role)) {
+      await authClient.logout()
+      showError(new Error('该账号不是教务或系统管理员，不能进入后台'))
+      return
+    }
+
+    currentUser.value = session.user
+    currentRole.value = session.user.role
+    homeCampusId.value = session.user.campusId
+    resetScopedSelections()
+    goTo('dashboard')
+    showNotice(
+      `已使用 ${session.user.displayName}（${roleLabels[session.user.role]}）登录，${scopeDescription.value}`,
+    )
+  } catch (error) {
+    showError(error)
+  } finally {
+    isLoggingIn.value = false
+  }
+}
+
+async function logout() {
+  try {
+    await authClient.logout()
+  } catch {
+    // 即使退出接口异常，本地令牌也必须清除
+  } finally {
+    currentUser.value = null
+    currentRole.value = 'ACADEMIC_ADMIN'
+    homeCampusId.value = 1
+    loginUsername.value = 'academic_901'
+    loginPassword.value = 'K12Demo123!'
+    resetScopedSelections()
+    clearMessages()
+    goTo('login')
+  }
+}
+
+onMounted(restoreSession)
 
 function campusName(campusId: number) {
   return campuses.find((campus) => campus.id === campusId)?.name ?? '未知校区'
@@ -296,7 +372,7 @@ function courseName(courseId: number) {
   return courses.find((course) => course.id === courseId)?.name ?? '未知课程'
 }
 
-function teacherName(teacherId: number | undefined) {
+function teacherName(teacherId: number | null | undefined) {
   if (teacherId === undefined) {
     return '未安排'
   }
@@ -344,7 +420,7 @@ function submitReview(decision: 'APPROVED' | 'REJECTED') {
   }
 
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId)
+    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
     const reviewedAt = new Date().toISOString()
     const reviewed = reviewScheduleChange(
       selected,
@@ -381,7 +457,7 @@ function submitSubstitute() {
   }
 
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId)
+    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
     const selectedTeacher = teachers.find(
       (teacher) => teacher.id === selectedSubstituteTeacherId.value,
     )
@@ -435,7 +511,7 @@ function beginSelectedWorkOrder() {
   if (!selected) return
 
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId)
+    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
     const updated = startWorkOrder(
       selected,
       currentUserId.value,
@@ -457,7 +533,7 @@ function closeSelectedWorkOrder() {
   }
 
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId)
+    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
     const closed = closeWorkOrder(
       selected,
       workOrderResult.value,
@@ -478,10 +554,10 @@ function toggleUser(userId: number) {
   if (!user) return
 
   try {
-    ensureCampusAccess(user.campusId, currentRole.value, homeCampusId)
+    ensureCampusAccess(user.campusId, currentRole.value, homeCampusId.value)
     const index = users.value.findIndex((item) => item.id === user.id)
-    users.value[index] = { ...user, enabled: !user.enabled }
-    showNotice(`${user.displayName}账号已${user.enabled ? '停用' : '启用'}`)
+    users.value[index] = { ...user, active: !user.active }
+    showNotice(`${user.displayName}账号已${user.active ? '停用' : '启用'}`)
   } catch (error) {
     showError(error)
   }
@@ -517,23 +593,31 @@ function toggleUser(userId: number) {
       <div class="scope-card">
         <span>当前数据范围</span>
         <strong>{{ roleLabels[currentRole] }}</strong>
-        <p>{{ scopeDescription }}</p>
+        <p v-if="currentUser">{{ currentUser.displayName }} · {{ scopeDescription }}</p>
+        <p v-else>{{ scopeDescription }}</p>
       </div>
     </aside>
 
     <main class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">第一周 Mock 管理流程 · 2026-08-07</p>
+          <p class="eyebrow">教务 / 系统后台 · 真实认证接入</p>
           <h1>{{ currentPage?.label }}</h1>
         </div>
-        <label class="role-switch">
-          <span>演示角色</span>
-          <select v-model="currentRole">
-            <option value="ACADEMIC_ADMIN">教务 · 滨江校区</option>
-            <option value="SYSTEM_ADMIN">系统管理员 · 全部校区</option>
-          </select>
-        </label>
+        <div class="topbar-user">
+          <span v-if="currentUser" class="topbar-name">
+            {{ currentUser.displayName }} ·
+            {{ currentRoleLabel }}
+          </span>
+          <button
+            v-if="currentUser"
+            class="secondary"
+            type="button"
+            @click="logout"
+          >
+            退出登录
+          </button>
+        </div>
       </header>
 
       <div v-if="notice" class="message success-message" role="status">
@@ -548,31 +632,35 @@ function toggleUser(userId: number) {
           <span class="feature-kicker">权限演示</span>
           <h2>进入教务后台</h2>
           <p>
-            使用 Mock 账号切换教务或系统管理员。后端接入后仍须按当前用户的
-            <code>campusId</code> 校验数据范围。
+            使用真实认证接口登录。教务仅能访问所属校区，系统管理员可访问
+            单一机构下的全部校区。
           </p>
           <ul class="check-list">
-            <li>教务：仅所属校区</li>
-            <li>系统管理员：单一机构下全部校区</li>
+            <li>教务：仅所属校区（academic_901）</li>
+            <li>系统管理员：全部校区（system_999）</li>
           </ul>
         </div>
         <form class="login-form" @submit.prevent="login">
           <label>
-            <span>账号</span>
-            <input :value="currentAccount" readonly />
-          </label>
-          <label>
-            <span>角色</span>
-            <select v-model="currentRole">
-              <option value="ACADEMIC_ADMIN">教务</option>
-              <option value="SYSTEM_ADMIN">系统管理员</option>
-            </select>
+            <span>用户名</span>
+            <input v-model="loginUsername" autocomplete="username" required />
           </label>
           <label>
             <span>密码</span>
-            <input value="mock-password" type="password" readonly />
+            <input
+              v-model="loginPassword"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
           </label>
-          <button class="primary wide" type="submit">登录并进入工作台</button>
+          <button
+            class="primary wide"
+            type="submit"
+            :disabled="isLoggingIn"
+          >
+            {{ isLoggingIn ? '登录中…' : '登录并进入工作台' }}
+          </button>
         </form>
       </section>
 
@@ -633,7 +721,7 @@ function toggleUser(userId: number) {
               <div><dt>校区</dt><dd>2 个</dd></div>
               <div><dt>班级</dt><dd>3 个</dd></div>
               <div><dt>排课</dt><dd>{{ schedules.length }} 条</dd></div>
-              <div><dt>当前账号</dt><dd>{{ currentAccount }}</dd></div>
+              <div><dt>当前用户</dt><dd>{{ currentUser?.displayName ?? '未登录' }}</dd></div>
             </dl>
             <button class="secondary wide" type="button" @click="goTo('board')">
               查看数据看板
@@ -987,17 +1075,17 @@ function toggleUser(userId: number) {
             <tbody>
               <tr v-for="user in visibleUsers" :key="user.id">
                 <td><strong>{{ user.displayName }}</strong><small>ID {{ user.id }}</small></td>
-                <td><code>{{ user.account }}</code></td>
+                <td><code>{{ user.username }}</code></td>
                 <td>{{ campusName(user.campusId) }}</td>
                 <td>{{ userRoleLabels[user.role] }}</td>
                 <td>
-                  <span class="status-pill" :class="user.enabled ? 'tone-success' : 'tone-danger'">
-                    {{ user.enabled ? '已启用' : '已停用' }}
+                  <span class="status-pill" :class="user.active ? 'tone-success' : 'tone-danger'">
+                    {{ user.active ? '已启用' : '已停用' }}
                   </span>
                 </td>
                 <td>
                   <button class="table-action" type="button" @click="toggleUser(user.id)">
-                    {{ user.enabled ? '停用' : '启用' }}
+                    {{ user.active ? '停用' : '启用' }}
                   </button>
                 </td>
               </tr>

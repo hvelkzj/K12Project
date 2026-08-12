@@ -1,8 +1,9 @@
 import type {
-  AdminRole,
   FeedbackWorkOrder,
   ScheduleChange,
-} from './types'
+} from '@k12/shared'
+
+import type { AdminRole, Teacher } from './types'
 
 export function filterByScope<T extends { campusId: number }>(
   items: readonly T[],
@@ -73,6 +74,21 @@ export function assignSubstitute(
     substituteNote: substituteNote.trim(),
     updatedAt,
   }
+}
+
+export function availableSubstituteTeachers(
+  change: ScheduleChange | undefined,
+  teachers: readonly Teacher[],
+): Teacher[] {
+  if (!change) {
+    return []
+  }
+
+  return teachers.filter(
+    (teacher) =>
+      teacher.campusId === change.campusId &&
+      teacher.id !== change.originalTeacherId,
+  )
 }
 
 export function startWorkOrder(
