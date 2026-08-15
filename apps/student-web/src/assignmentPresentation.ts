@@ -1,4 +1,5 @@
-import type { Assignment, Submission, SubmissionViewStatus } from './types'
+import type { Assignment, Submission } from '@k12/shared'
+import type { SubmissionViewStatus } from './types'
 
 export interface AssignmentListRow {
   assignment: Assignment
