@@ -7,7 +7,16 @@ import { isAssignmentSubmissionClosed } from '../assignmentPresentation'
 import type { AssignmentListRow } from '../assignmentPresentation'
 import AssignmentList from './AssignmentList.vue'
 
-const props = defineProps<{ currentUser: UserSummary }>()
+const props = withDefaults(
+  defineProps<{
+    currentUser: UserSummary
+    initialAssignmentId?: number | null
+  }>(),
+  { initialAssignmentId: null },
+)
+const emit = defineEmits<{
+  (event: 'assignmentsChanged'): void
+}>()
 type Page = 'list' | 'detail' | 'submit' | 'result'
 type SidePanel = 'statistics' | 'profile' | null
 const page = ref<Page>('list')
@@ -20,7 +29,12 @@ const errorMessage = ref('')
 const revision = ref(0)
 let timer: ReturnType<typeof setInterval> | undefined
 
-onMounted(() => { timer = setInterval(() => { currentNow.value = new Date().toISOString() }, 30_000) })
+onMounted(() => {
+  timer = setInterval(() => { currentNow.value = new Date().toISOString() }, 30_000)
+  if (props.initialAssignmentId !== null) {
+    openAssignment(props.initialAssignmentId)
+  }
+})
 onUnmounted(() => { if (timer) clearInterval(timer) })
 
 const rows = computed<AssignmentListRow[]>(() => { void revision.value; return listAssignmentRows(props.currentUser.id) })
@@ -54,6 +68,7 @@ function submit(): void {
   try {
     submitAssignment({ assignmentId: assignment.value.id, studentId: props.currentUser.id, content: content.value, attachments: attachments.value, submittedAt: new Date().toISOString() })
     revision.value += 1
+    emit('assignmentsChanged')
     page.value = 'result'
   } catch (error) { errorMessage.value = error instanceof Error ? error.message : '提交失败，请稍后重试。' }
 }

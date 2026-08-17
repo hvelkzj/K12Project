@@ -1,43 +1,49 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { authService } from '../services/authService';
-import type { UserSummary } from '@k12/shared';
+import { computed, ref } from 'vue'
+import type { UserSummary } from '@k12/shared'
+import { authService } from '../services/authService'
+
+const props = defineProps<{ notice?: string }>()
 
 const emit = defineEmits<{
-  (e: 'success', user: UserSummary): void;
-}>();
+  (e: 'success', user: UserSummary): void
+}>()
 
-const username = ref('student_101');
-const password = ref('K12Demo123!');
-const errorMessage = ref('');
-const isLoading = ref(false);
+const username = ref('student_101')
+const password = ref('K12Demo123!')
+const errorMessage = ref('')
+const isLoading = ref(false)
+const visibleMessage = computed(() => errorMessage.value || props.notice || '')
+const currentDate = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  weekday: 'long',
+}).format(new Date())
 
 const handleLogin = async () => {
-  errorMessage.value = '';
+  if (isLoading.value) return
+
+  errorMessage.value = ''
 
   if (!username.value.trim() || !password.value.trim()) {
-    errorMessage.value = '请输入账号和密码';
-    return;
+    errorMessage.value = '请输入账号和密码'
+    return
   }
 
-  isLoading.value = true;
+  isLoading.value = true
   try {
-    const { accessToken, user } = await authService.login(username.value, password.value);
-
-    if (user.role !== 'STUDENT') {
-      throw new Error('权限不足：非学生角色不能进入此端');
-    }
-
-    sessionStorage.setItem('k12AccessToken', accessToken);
-    emit('success', user);
-
+    const user = await authService.login(username.value, password.value)
+    emit('success', user)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '登录失败，请检查网络或后端状态';
-    sessionStorage.removeItem('k12AccessToken');
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : '登录失败，请检查网络或后端状态'
   } finally {
-    isLoading.value = false;
+    isLoading.value = false
   }
-};
+}
 </script>
 
 <template>
@@ -70,7 +76,7 @@ const handleLogin = async () => {
     <!-- 右侧内容区 -->
     <div class="main-content">
       <div class="top-header">
-        <span class="date-text">2026 年 8 月 15 日 · 星期六</span>
+        <span class="date-text">{{ currentDate }}</span>
       </div>
 
       <div class="page-title">
@@ -91,39 +97,41 @@ const handleLogin = async () => {
             </div>
           </div>
 
-          <div class="card-right form-area">
+          <form class="card-right form-area" @submit.prevent="handleLogin">
             <div class="input-group">
-              <label>学号 / 账号</label>
+              <label for="student-username">学号 / 账号</label>
               <input
+                id="student-username"
                 v-model="username"
                 type="text"
                 placeholder="请输入学号"
-                @keyup.enter="handleLogin"
+                autocomplete="username"
               />
             </div>
 
             <div class="input-group">
-              <label>密码</label>
+              <label for="student-password">密码</label>
               <input
+                id="student-password"
                 v-model="password"
                 type="password"
                 placeholder="••••••••"
-                @keyup.enter="handleLogin"
+                autocomplete="current-password"
               />
             </div>
 
-            <div class="error-message" v-if="errorMessage">
-              {{ errorMessage }}
+            <div v-if="visibleMessage" class="error-message" role="alert">
+              {{ visibleMessage }}
             </div>
 
             <button
               class="login-btn"
-              @click="handleLogin"
+              type="submit"
               :disabled="isLoading"
             >
               {{ isLoading ? '验证中...' : '登录并进入学习空间' }}
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

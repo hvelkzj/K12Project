@@ -1,74 +1,194 @@
 import type {
+  ApiError,
   CurrentUserResponse,
+  LoginRequest,
   LoginResponse,
   UserSummary,
 } from '@k12/shared'
 
-// 1. 读取统一的 API 地址，如果环境变量没配置，则使用默认的本地地址
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
-// 2. 严格遵循任务要求的 Token 键名
-const TOKEN_KEY = 'k12AccessToken';
+export const accessTokenStorageKey = 'k12AccessToken'
+export const defaultApiBaseUrl = 'http://127.0.0.1:3000'
 
-/**
- * 封装一个带有鉴权头和 401 拦截机制的 fetch 函数
- */
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  // 每次请求前，去 sessionStorage 里拿 Token
-  const token = sessionStorage.getItem(TOKEN_KEY);
+type AuthStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
-  const headers = new Headers(options.headers || {});
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-  if (!headers.has('Content-Type') && options.method !== 'GET') {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers
-  });
-
-  // 3. 核心拦截：收到 401 未授权时，必须立刻清除本地 Token
-  if (response.status === 401) {
-    sessionStorage.removeItem(TOKEN_KEY);
-    // 这里抛出错误，以便组件能捕获并跳转回登录页
-    throw new Error('认证已过期，请重新登录');
-  }
-
-  return response;
+export interface StudentAuthClientOptions {
+  apiBaseUrl?: string
+  fetchImpl?: typeof fetch
+  storage?: AuthStorage
 }
 
-/**
- * 导出的真实认证 API 服务
- */
-export const authService = {
-  // 登录接口：POST /auth/login
-  async login(username: string, password: string): Promise<LoginResponse> {
-    const res = await fetchWithAuth('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    });
+export interface StudentAuthClient {
+  login(username: string, password: string): Promise<UserSummary>
+  restoreCurrentUser(): Promise<UserSummary | null>
+  logout(): Promise<void>
+  getAccessToken(): string | null
+}
 
-    if (!res.ok) throw new Error('登录失败，请检查账号和密码');
-    return (await res.json()) as LoginResponse
-  },
+function createMemoryStorage(): AuthStorage {
+  const values = new Map<string, string>()
 
-  // 获取当前用户接口：GET /auth/me
-  async getMe(): Promise<UserSummary> {
-    const res = await fetchWithAuth('/auth/me');
-    if (!res.ok) throw new Error('获取用户信息失败');
-    const payload = (await res.json()) as CurrentUserResponse
-    return payload.user
-  },
+  return {
+    getItem(key) {
+      return values.get(key) ?? null
+    },
+    setItem(key, value) {
+      values.set(key, value)
+    },
+    removeItem(key) {
+      values.delete(key)
+    },
+  }
+}
 
-  // 退出登录接口：POST /auth/logout
-  async logout(): Promise<void> {
+function getDefaultStorage(): AuthStorage {
+  return typeof sessionStorage === 'undefined'
+    ? createMemoryStorage()
+    : sessionStorage
+}
+
+function normalizeApiBaseUrl(apiBaseUrl: string): string {
+  return apiBaseUrl.replace(/\/+$/, '')
+}
+
+function isApiError(value: unknown): value is ApiError {
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.code === 'string' &&
+    typeof candidate.message === 'string'
+  )
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as unknown
+    if (isApiError(body)) return body.message
+  } catch {
+    // Use the stable fallback below for empty or invalid response bodies.
+  }
+
+  return '认证服务暂时不可用'
+}
+
+function assertStudentRole(user: UserSummary): UserSummary {
+  if (user.role !== 'STUDENT') {
+    throw new Error('权限不足：非学生角色不能进入此端')
+  }
+
+  return user
+}
+
+export function createStudentAuthClient(
+  options: StudentAuthClientOptions = {},
+): StudentAuthClient {
+  const viteEnv = (
+    import.meta as ImportMeta & {
+      env?: Record<string, string | undefined>
+    }
+  ).env
+  const apiBaseUrl = normalizeApiBaseUrl(
+    options.apiBaseUrl ??
+      viteEnv?.VITE_API_BASE_URL ??
+      defaultApiBaseUrl,
+  )
+  const fetchImpl = options.fetchImpl ?? fetch
+  const storage = options.storage ?? getDefaultStorage()
+
+  function getAccessToken(): string | null {
+    return storage.getItem(accessTokenStorageKey)
+  }
+
+  function clearAccessToken(): void {
+    storage.removeItem(accessTokenStorageKey)
+  }
+
+  async function revokeSession(accessToken: string): Promise<void> {
     try {
-      await fetchWithAuth('/auth/logout', { method: 'POST' });
-    } finally {
-      // 4. 主动退出时必须清除本地 Token
-      sessionStorage.removeItem(TOKEN_KEY);
+      await fetchImpl(`${apiBaseUrl}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      // A role mismatch must never grant access, even if cleanup is unavailable.
     }
   }
-};
+
+  return {
+    async login(username, password) {
+      const body: LoginRequest = { username, password }
+      const response = await fetchImpl(`${apiBaseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response))
+      }
+
+      const login = (await response.json()) as LoginResponse
+
+      try {
+        const user = assertStudentRole(login.user)
+        storage.setItem(accessTokenStorageKey, login.accessToken)
+        return user
+      } catch (error) {
+        await revokeSession(login.accessToken)
+        clearAccessToken()
+        throw error
+      }
+    },
+
+    async restoreCurrentUser() {
+      const accessToken = getAccessToken()
+      if (!accessToken) return null
+
+      const response = await fetchImpl(`${apiBaseUrl}/auth/me`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      if (response.status === 401) {
+        clearAccessToken()
+        return null
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response))
+      }
+
+      const currentUser = (await response.json()) as CurrentUserResponse
+
+      try {
+        return assertStudentRole(currentUser.user)
+      } catch (error) {
+        clearAccessToken()
+        throw error
+      }
+    },
+
+    async logout() {
+      const accessToken = getAccessToken()
+
+      try {
+        if (!accessToken) return
+
+        const response = await fetchImpl(`${apiBaseUrl}/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+
+        if (!response.ok && response.status !== 401) {
+          throw new Error(await readErrorMessage(response))
+        }
+      } finally {
+        clearAccessToken()
+      }
+    },
+
+    getAccessToken,
+  }
+}
+
+export const authService = createStudentAuthClient()
