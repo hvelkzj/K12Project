@@ -380,7 +380,7 @@ button.danger {
   width: 100%;
 }
 
-.mock-tag,
+.count-tag,
 .status-pill,
 .scope-code {
   display: inline-flex;
@@ -393,7 +393,7 @@ button.danger {
   white-space: nowrap;
 }
 
-.mock-tag {
+.count-tag {
   color: #7c5a10;
   background: #fff3d2;
 }
@@ -1164,3 +1164,45 @@ td small {
     width: 100%;
   }
 }
+
+.loading-panel,
+.error-panel {
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.loading-panel strong {
+  font-size: 16px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgb(36 105 192 / 18%);
+  border-top-color: #2469c0;
+  border-radius: 50%;
+  animation: k12-spin 0.8s linear infinite;
+}
+
+@keyframes k12-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-panel h2 {
+  margin: 4px 0 0;
+}
+
+.error-panel p {
+  color: #667085;
+  margin: 0;
+}
+
+.error-panel .form-actions {
+  margin-top: 8px;
+}
+
