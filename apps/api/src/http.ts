@@ -19,7 +19,7 @@ export function setCorsHeaders(response: ServerResponse): void {
   response.setHeader('Access-Control-Allow-Origin', '*')
   response.setHeader(
     'Access-Control-Allow-Methods',
-    'GET, POST, OPTIONS',
+    'GET, POST, PUT, PATCH, OPTIONS',
   )
   response.setHeader(
     'Access-Control-Allow-Headers',
