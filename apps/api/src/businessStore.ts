@@ -456,6 +456,9 @@ export function createBusinessStore(
       if (schedule.classId !== binding.student.classId) {
         forbidden('只能为已绑定学生的课程提交请假')
       }
+      if (schedule.status !== 'SCHEDULED' && schedule.status !== 'CHANGED') {
+        conflict('当前课次状态不能提交请假')
+      }
       if (
         data.leaveRequests.some(
           (item) =>
@@ -594,6 +597,9 @@ export function createBusinessStore(
     saveAttendance(user, input) {
       const scheduleId = requirePositiveInteger(input, 'scheduleId')
       const schedule = ensureTeachingSchedule(user, scheduleId)
+      if (schedule.status === 'CANCELLED') {
+        conflict('已取消课次不能记录签到')
+      }
       const records = input.records
       if (!Array.isArray(records) || records.length === 0) {
         invalid('records 必须是非空数组')
@@ -676,6 +682,9 @@ export function createBusinessStore(
       ) {
         invalid('课次、班级和课程不一致')
       }
+      if (teachingSchedule.status === 'CANCELLED') {
+        conflict('已取消课次不能发布作业')
+      }
       if (Date.parse(dueAt) <= now()) invalid('作业截止时间必须晚于当前时间')
 
       const timestamp = currentIso()
@@ -732,6 +741,9 @@ export function createBusinessStore(
     sendFeedback(user, input) {
       const scheduleId = requirePositiveInteger(input, 'scheduleId')
       const schedule = ensureTeachingSchedule(user, scheduleId)
+      if (schedule.status === 'CANCELLED') {
+        conflict('已取消课次不能发送反馈')
+      }
       const studentId = requirePositiveInteger(input, 'studentId')
       const student = findStudent(studentId)
       if (student.classId !== schedule.classId) {
@@ -770,6 +782,9 @@ export function createBusinessStore(
     requestScheduleChange(user, input) {
       const scheduleId = requirePositiveInteger(input, 'scheduleId')
       const schedule = ensureTeachingSchedule(user, scheduleId)
+      if (schedule.status !== 'SCHEDULED' && schedule.status !== 'CHANGED') {
+        conflict('当前课次状态不能申请调课')
+      }
       if (
         data.scheduleChanges.some(
           (item) =>
@@ -860,6 +875,7 @@ export function createBusinessStore(
       const substitute = data.users.find((item) => item.id === substituteTeacherId)
       if (
         !substitute ||
+        !substitute.active ||
         (substitute.role !== 'TEACHER' &&
           substitute.role !== 'HOMEROOM_TEACHER')
       ) {
