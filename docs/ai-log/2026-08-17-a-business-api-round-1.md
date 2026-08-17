@@ -47,3 +47,13 @@ AI 按固定接口实现可注入内存仓库、业务路由、权限、状态�
 ## 下一轮问题
 
 等待 B、C、D、E 按已冻结接口接入前端。公共字段不足时由对应成员在 PR 中提出，由 A 审核后再修改。
+
+## 合并前补充
+
+用户提示词：
+
+```text
+合并进入develop。windows测试通过
+```
+
+人工确认 Windows 已完成 `npm ci`、`npm run check` 和 `npm run dev:api`。A 分支可以按项目规则合并到 `develop`。

@@ -59,6 +59,7 @@
 - 根目录 `npm ci`：通过。
 - 全仓 `npm run check`：在允许监听本机端口的环境通过；97/97 项测试通过，六个工作区类型检查和构建通过。
 - `npm run dev:api`：启动通过，`GET /health` 返回 `{"service":"k12-api","status":"ok"}`。
+- Windows：成员已确认 `npm ci`、`npm run check` 和 `npm run dev:api` 通过。
 
 ## 需要其他成员配合
 
@@ -66,4 +67,4 @@
 - C 按契约接入学生端 2 个接口。
 - D 按契约接入教师端 6 个接口并完成真实认证。
 - E 按契约接入后台 4 个接口。
-- Windows 成员在 PR 合并前运行 `npm ci`、`npm run check` 和 `npm run dev:api`。
+- B、C、D、E 按各自任务文档接入本轮业务接口。
