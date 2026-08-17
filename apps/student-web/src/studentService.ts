@@ -2,15 +2,12 @@ import {
   assignments,
   coursewareMaterials,
   initialSubmissions,
-  mockCredentials,
-  mockNow,
-  studentUser,
+  studentClassId,
 } from './mockData'
 import type {
   Assignment,
-  CoursewareMaterial,
+  Courseware,
   FileSummary,
-  StudentUser,
   Submission,
   SubmissionViewStatus,
 } from './types'
@@ -34,37 +31,23 @@ function cloneSubmissions(items: Submission[]): Submission[] {
 }
 
 function ensureCurrentStudent(studentId: number): void {
-  if (studentId !== studentUser.id) {
+  if (studentId !== 101) {
     throw new Error('学生只能查看和提交自己的作业')
   }
 }
 
-export function authenticateStudent(
-  account: string,
-  password: string,
-): StudentUser {
-  if (
-    account.trim() !== mockCredentials.account ||
-    password !== mockCredentials.password
-  ) {
-    throw new Error('账号或密码错误')
-  }
-
-  return { ...studentUser }
-}
-
-export function listCourseware(studentId: number): CoursewareMaterial[] {
+export function listCourseware(studentId: number): Courseware[] {
   ensureCurrentStudent(studentId)
   return coursewareMaterials.map((material) => ({
     ...material,
-    file: { ...material.file },
+    attachments: material.attachments.map((attachment) => ({ ...attachment })),
   }))
 }
 
 export function listAssignments(studentId: number): Assignment[] {
   ensureCurrentStudent(studentId)
   return assignments
-    .filter((assignment) => assignment.classId === studentUser.classId)
+    .filter((assignment) => assignment.classId === studentClassId)
     .map((assignment) => ({
       ...assignment,
       attachments: assignment.attachments.map((attachment) => ({
@@ -139,7 +122,7 @@ export function submitAssignment(input: {
 }): Submission {
   const assignment = getAssignment(input.assignmentId, input.studentId)
   const latestSubmission = getLatestSubmission(input.assignmentId, input.studentId)
-  const submittedAt = input.submittedAt ?? mockNow
+  const submittedAt = input.submittedAt ?? new Date().toISOString()
 
   if (!input.content.trim() && input.attachments.length === 0) {
     throw new Error('作业正文和附件不能同时为空')

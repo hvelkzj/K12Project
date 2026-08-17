@@ -11,7 +11,7 @@ import {
   isAssignmentSubmissionClosed,
 } from './assignmentPresentation'
 import { listAssignmentRows } from './assignmentListService'
-import { mockNow, studentUser } from './mockData'
+import { mockNow, studentId } from './mockData'
 import {
   resetMockSubmissions,
   submitAssignment,
@@ -55,7 +55,7 @@ test('成绩等级仅作为页面展示字段派生', () => {
 })
 
 test('截止状态与服务提交规则一致', () => {
-  const expiredAssignment = listAssignmentRows(studentUser.id).find(
+  const expiredAssignment = listAssignmentRows(studentId).find(
     ({ assignment }) => assignment.id === 304,
   )?.assignment
 
@@ -65,7 +65,7 @@ test('截止状态与服务提交规则一致', () => {
 
 test('提交后列表状态和全局完成率会回写', () => {
   resetMockSubmissions()
-  const beforeRows = listAssignmentRows(studentUser.id)
+  const beforeRows = listAssignmentRows(studentId)
 
   assert.equal(
     beforeRows.find(({ assignment }) => assignment.id === 301)?.status,
@@ -78,13 +78,13 @@ test('提交后列表状态和全局完成率会回写', () => {
 
   submitAssignment({
     assignmentId: 301,
-    studentId: studentUser.id,
+    studentId,
     content: '列表集成测试提交',
     attachments: [],
     submittedAt: mockNow,
   })
 
-  const afterRows = listAssignmentRows(studentUser.id)
+  const afterRows = listAssignmentRows(studentId)
   assert.equal(
     afterRows.find(({ assignment }) => assignment.id === 301)?.status,
     'SUBMITTED',

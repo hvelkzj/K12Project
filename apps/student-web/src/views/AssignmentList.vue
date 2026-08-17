@@ -171,81 +171,91 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
     </div>
 
     <div v-if="rows.length" class="c-assignment-grid">
-      <button
+      <article
         v-for="row in rows"
         :key="row.assignment.id"
         class="c-assignment-card"
-        type="button"
         :aria-label="assignmentAriaLabel(row)"
-        @click="emit('open', row.assignment.id)"
       >
-        <span class="c-card-body">
-          <span class="c-card-meta">
-            <span
-              :class="['c-course-tag', `course-${row.assignment.courseId}`]"
-              :title="courseName(row.assignment.courseId)"
-            >
-              <span class="c-course-icon" aria-hidden="true">
-                {{ courseIcon(row.assignment.courseId) }}
+        <div
+          class="c-card-clickable"
+          role="button"
+          tabindex="0"
+          @click="emit('open', row.assignment.id)"
+          @keydown.enter.space.prevent="emit('open', row.assignment.id)"
+        >
+          <div class="c-card-body">
+            <div class="c-card-meta">
+              <span
+                :class="['c-course-tag', `course-${row.assignment.courseId}`]"
+                :title="courseName(row.assignment.courseId)"
+              >
+                <span class="c-course-icon" aria-hidden="true">
+                  {{ courseIcon(row.assignment.courseId) }}
+                </span>
+                {{ courseCode(row.assignment.courseId) }}
               </span>
-              {{ courseCode(row.assignment.courseId) }}
+              <span
+                :class="['c-status-badge', statusClass(row.status)]"
+              >
+                <span aria-hidden="true">{{ statusIcons[row.status] }}</span>
+                {{ getSubmissionStatusLabel(row.status) }}
+              </span>
+            </div>
+
+            <strong class="c-assignment-title">{{ row.assignment.title }}</strong>
+            <span class="c-assignment-description">
+              {{ row.assignment.description }}
             </span>
+            <span class="c-time-row">
+              倒计时时间：
+              <b>{{ formatCountdown(row.assignment.dueAt, now) }}</b>
+            </span>
+            <span class="c-time-row">
+              截止时间：<b>{{ formatDateTime(row.assignment.dueAt) }}</b>
+            </span>
+            <span class="c-late-rule">
+              {{ row.assignment.allowLate ? '允许迟交' : '截止后不可提交' }}
+            </span>
+
             <span
-              :class="['c-status-badge', statusClass(row.status)]"
+              v-if="row.latestSubmission?.score != null"
+              class="c-score-card"
             >
-              <span aria-hidden="true">{{ statusIcons[row.status] }}</span>
-              {{ getSubmissionStatusLabel(row.status) }}
+              <span class="c-score-main">
+                <strong :style="{ color: scoreColor(row.latestSubmission.score) }">
+                  得分：{{ row.latestSubmission.score }}
+                </strong>
+                <b>{{ getScoreGrade(row.latestSubmission.score) }}</b>
+              </span>
+              <span v-if="row.latestSubmission.teacherComment" class="c-feedback">
+                老师评语：{{ row.latestSubmission.teacherComment }}
+              </span>
             </span>
-          </span>
+          </div>
+        </div>
 
-          <strong class="c-assignment-title">{{ row.assignment.title }}</strong>
-          <span class="c-assignment-description">
-            {{ row.assignment.description }}
-          </span>
-          <span class="c-time-row">
-            倒计时时间：
-            <b>{{ formatCountdown(row.assignment.dueAt, now) }}</b>
-          </span>
-          <span class="c-time-row">
-            截止时间：<b>{{ formatDateTime(row.assignment.dueAt) }}</b>
-          </span>
-          <span class="c-late-rule">
-            {{ row.assignment.allowLate ? '允许迟交' : '截止后不可提交' }}
-          </span>
-
-          <span
-            v-if="row.latestSubmission?.score !== undefined"
-            class="c-score-card"
-          >
-            <span class="c-score-main">
-              <strong :style="{ color: scoreColor(row.latestSubmission.score) }">
-                得分：{{ row.latestSubmission.score }}
-              </strong>
-              <b>{{ getScoreGrade(row.latestSubmission.score) }}</b>
-            </span>
-            <span v-if="row.latestSubmission.teacherComment" class="c-feedback">
-              老师评语：{{ row.latestSubmission.teacherComment }}
-            </span>
-          </span>
-        </span>
-
-        <span class="c-card-footer">
+        <div class="c-card-footer">
           <span class="c-card-progress">
-            <span>{{ getAssignmentProgress(row.status).text }}</span>
+            <span>{{ getAssignmentProgress(row.status)?.text || '未开始' }}</span>
             <span class="c-card-progress-track">
               <span
                 class="c-card-progress-fill"
                 :style="{
-                  width: `${getAssignmentProgress(row.status).percent}%`,
+                  width: `${getAssignmentProgress(row.status)?.percent || 0}%`,
                 }"
               ></span>
             </span>
           </span>
-          <span class="c-action-button">
+          <button
+            class="c-action-button"
+            type="button"
+            @click.stop="emit('open', row.assignment.id)"
+          >
             {{ actionLabel(row) }}
-          </span>
-        </span>
-      </button>
+          </button>
+        </div>
+      </article>
     </div>
 
     <p v-else class="c-empty-state">当前没有已发布的作业。</p>
@@ -398,9 +408,16 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
   box-shadow: 0 16px 38px rgb(38 51 75 / 13%);
 }
 
-.c-assignment-card:focus-visible {
+.c-card-clickable {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.c-card-clickable:focus-visible {
   outline: 3px solid rgb(98 91 207 / 25%);
-  outline-offset: 3px;
+  outline-offset: -3px;
 }
 
 .c-card-body {
@@ -550,12 +567,18 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
 }
 
 .c-action-button {
+  border: 0;
   border-radius: 10px;
   padding: 8px 16px;
   color: #fff;
   background: var(--c-primary);
   font-size: 13px;
   font-weight: 800;
+  cursor: pointer;
+}
+
+.c-action-button:hover {
+  opacity: 0.9;
 }
 
 .c-empty-state {

@@ -1,72 +1,58 @@
-import type {
-  Assignment,
-  CoursewareMaterial,
-  StudentUser,
-  Submission,
-} from './types'
+import type { Assignment, Courseware, Submission } from '@k12/shared'
 
 export const mockNow = '2026-08-07T10:00:00+08:00'
 
-export const mockCredentials = {
-  account: 'student01',
-  password: 'Student123',
-}
+export const studentId = 101
+export const studentClassId = 101
 
-export const studentUser: StudentUser = {
-  id: 1001,
-  displayName: '林小满',
-  role: 'STUDENT',
-  campusId: 1,
-  campusName: '中心校区',
-  classId: 101,
-  className: '六年级一班',
-}
-
-export const coursewareMaterials: CoursewareMaterial[] = [
+export const coursewareMaterials: Courseware[] = [
   {
     id: 201,
+    classId: studentClassId,
     courseId: 11,
-    courseName: '数学',
+    teacherId: 2001,
     title: '分数混合运算课堂讲义',
     description: '复习运算顺序，并完成讲义中的三个例题。',
-    file: {
+    attachments: [{
       id: 2001,
       originalName: '分数混合运算讲义.pdf',
       mimeType: 'application/pdf',
       byteSize: 1_248_900,
       createdAt: '2026-08-05T16:20:00+08:00',
-    },
+    }],
     publishedAt: '2026-08-05T16:20:00+08:00',
   },
   {
     id: 202,
+    classId: studentClassId,
     courseId: 12,
-    courseName: '语文',
+    teacherId: 2002,
     title: '《草原》阅读提示',
     description: '结合问题清单预习课文，标记不理解的句子。',
-    file: {
+    attachments: [{
       id: 2002,
       originalName: '草原阅读提示.docx',
       mimeType:
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       byteSize: 486_200,
       createdAt: '2026-08-06T18:00:00+08:00',
-    },
+    }],
     publishedAt: '2026-08-06T18:00:00+08:00',
   },
   {
     id: 203,
+    classId: studentClassId,
     courseId: 13,
-    courseName: '英语',
+    teacherId: 2003,
     title: 'Unit 2 单词表',
     description: '跟读单词，并在下次课前完成自测。',
-    file: {
+    attachments: [{
       id: 2003,
       originalName: 'unit-2-words.pdf',
       mimeType: 'application/pdf',
       byteSize: 820_400,
       createdAt: '2026-08-07T08:30:00+08:00',
-    },
+    }],
     publishedAt: '2026-08-07T08:30:00+08:00',
   },
 ]
@@ -150,7 +136,7 @@ export const initialSubmissions: Submission[] = [
   {
     id: 501,
     assignmentId: 302,
-    studentId: 1001,
+    studentId: studentId,
     attempt: 1,
     content: '清晨的湖面像一面银色的镜子，远处的小船慢慢划开水纹。',
     attachments: [],
@@ -165,7 +151,7 @@ export const initialSubmissions: Submission[] = [
   {
     id: 502,
     assignmentId: 303,
-    studentId: 1001,
+    studentId: studentId,
     attempt: 1,
     content: '第一次口语录音。',
     attachments: [
