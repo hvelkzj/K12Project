@@ -236,12 +236,14 @@ export default defineComponent({
           ]),
           h(
             'nav',
+            { 'aria-label': '家长端主导航' },
             tabs.map((tab) =>
               h(
                 'button',
                 {
                   class: { active: activeTab.value === tab },
                   type: 'button',
+                  'aria-current': activeTab.value === tab ? 'page' : undefined,
                   onClick: () => {
                     activeTab.value = tab
                   },

@@ -237,12 +237,12 @@ textarea:focus {
   color: #95a7bf;
 }
 
-nav {
+.sidebar nav {
   display: grid;
   gap: 4px;
 }
 
-nav button {
+.sidebar nav button {
   display: grid;
   grid-template-columns: 8px 1fr;
   align-items: center;
@@ -257,7 +257,7 @@ nav button {
   text-align: left;
 }
 
-nav button::before {
+.sidebar nav button::before {
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -265,13 +265,13 @@ nav button::before {
   content: "";
 }
 
-nav button.active,
-nav button:hover {
+.sidebar nav button.active,
+.sidebar nav button:hover {
   color: #fff;
   background: rgb(255 255 255 / 9%);
 }
 
-nav button.active::before {
+.sidebar nav button.active::before {
   background: #ffd778;
   box-shadow: 0 0 0 4px rgb(255 215 120 / 13%);
 }
@@ -527,13 +527,70 @@ nav button.active::before {
 
   .sidebar {
     position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
     width: auto;
     min-height: 0;
+    padding: 18px 16px;
+    overflow: visible;
+  }
+
+  .sidebar > div:first-child {
+    padding: 0;
+  }
+
+  .sidebar h1 {
+    font-size: 20px;
+  }
+
+  .sidebar nav {
+    position: fixed;
+    z-index: 10;
+    inset: auto 0 0;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2px;
+    padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+    background: #172c4a;
+    box-shadow: 0 -8px 24px rgb(19 43 76 / 15%);
+  }
+
+  .sidebar nav button {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    min-height: 50px;
+    place-items: center;
+    padding: 5px 2px;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .sidebar nav button::before {
+    width: 6px;
+    height: 6px;
+  }
+
+  .account-actions {
+    align-self: center;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .account-actions span {
+    display: none;
+  }
+
+  .logout-button {
+    min-height: 36px;
+    padding: 7px 11px;
+    text-align: center;
   }
 
   .content {
     margin-left: 0;
-    padding: 23px 16px 48px;
+    padding: 23px 16px 96px;
   }
 
   .topbar,
