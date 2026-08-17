@@ -61,7 +61,56 @@
 | `GET /auth/me` | 使用 Bearer 令牌读取当前用户 |
 | `POST /auth/logout` | 删除当前令牌对应的会话 |
 
-Mock 密码不进入用户响应。当前内存会话用于第一周演示，后续再接 `users` 和 `sessions` 表。
+Mock 密码不进入用户响应。当前内存会话用于课程项目运行，服务重启后会话失效。
+
+## 2026-08-17 共享业务 API
+
+本轮业务 API 使用进程内共享仓库。服务启动时根据公共账号和业务契约建立初始数据；服务重启后恢复初始状态。本轮不连接 PostgreSQL，不处理真实文件内容。
+
+所有业务接口要求 Bearer Token。`parentId`、`studentId`、`teacherId`、`requestedBy`、`reviewedBy`、`handlerId`、`gradedBy` 和 `recordedBy` 等身份字段由当前会话或后端关联生成，不接受请求体覆盖。
+
+### 概览响应
+
+概览响应组合现有公共类型，不增加同名公共实体。
+
+| 接口 | 响应字段 |
+|---|---|
+| `GET /parent/students` | `ParentStudentBinding[]` |
+| `GET /parent/students/:studentId/overview` | `student: StudentSummary`、`schedules: ScheduleSummary[]`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`leaveRequests: LeaveRequest[]`、`notifications: Notification[]`、`scheduleChangeNotices: ScheduleChangeNotice[]`、`feedback: StudentFeedback[]` |
+| `GET /student/overview` | `student: StudentSummary`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`courseware: Courseware[]`、`assignments: Assignment[]`、`submissions: Submission[]` |
+| `GET /teacher/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`students: StudentSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`attendance: AttendanceRecord[]`、`assignments: Assignment[]`、`submissions: Submission[]`、`feedback: StudentFeedback[]`、`scheduleChanges: ScheduleChange[]` |
+| `GET /admin/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`users: UserAccountSummary[]`、`teachers: UserSummary[]`、`scheduleChanges: ScheduleChange[]`、`feedbackWorkOrders: FeedbackWorkOrder[]` |
+
+### 写接口
+
+| 接口 | 请求字段 | 成功响应 |
+|---|---|---|
+| `POST /parent/leave-requests` | `studentId`、`scheduleId`、`reason`、`contactPhone` | `201 LeaveRequest` |
+| `PATCH /parent/feedback/:feedbackId` | `status: 'CONFIRMED' \| 'DISPUTED'`、`parentResponse` | `200 StudentFeedback` |
+| `POST /student/submissions` | `assignmentId`、`content`、`attachments: FileSummary[]` | `201 Submission` |
+| `PUT /teacher/attendance` | `scheduleId`、`records: { studentId, status, note }[]` | `200 AttendanceRecord[]` |
+| `POST /teacher/assignments` | `classId`、`courseId`、`scheduleId?`、`title`、`description`、`attachments`、`dueAt`、`allowLate` | `201 Assignment` |
+| `PATCH /teacher/submissions/:submissionId` | `score`、`teacherComment`、`correctionRequired` | `200 Submission` |
+| `POST /teacher/feedback` | `scheduleId`、`studentId`、`performance`、`strengths`、`improvements`、`suggestion` | `201 StudentFeedback` |
+| `POST /teacher/schedule-changes` | `scheduleId`、`reason`、`proposedDate`、`proposedStartTime`、`proposedEndTime` | `201 ScheduleChange` |
+| `PATCH /admin/schedule-changes/:changeId/review` | `decision: 'APPROVED' \| 'REJECTED'`、`decisionNote` | `200 ScheduleChange` |
+| `PATCH /admin/schedule-changes/:changeId/substitute` | `substituteTeacherId`、`substituteNote` | `200 ScheduleChange` |
+| `PATCH /admin/work-orders/:workOrderId` | `action: 'START' \| 'CLOSE'`、`result?` | `200 FeedbackWorkOrder` |
+
+### 错误和联动
+
+| HTTP 状态 | 错误代码 | 使用场景 |
+|---:|---|---|
+| `401` | `AUTH_REQUIRED`、`INVALID_SESSION` | Token 缺失、格式错误、未知或过期 |
+| `403` | `FORBIDDEN` | 角色不允许、未绑定学生、非本人课程或跨校区访问 |
+| `404` | `NOT_FOUND` | 学生、课程、课次或业务记录不存在 |
+| `409` | `CONFLICT` | 重复提交、重复签到、重复审批、状态不允许或代课时间冲突 |
+| `422` | `VALIDATION_ERROR` | 字段格式、必填值、时间、分数或业务规则错误 |
+
+- 教师发布作业后学生概览立即可见；学生提交后教师概览立即可见；教师批改后学生概览返回新状态、分数和评语。
+- 家长提出异议后创建 `OPEN` 反馈工单。
+- 安排代课后更新课次并为受影响班级的已绑定学生生成调课通知。
+- 业务写接口只接受 `application/json`；跨域预检允许 `GET`、`POST`、`PUT`、`PATCH` 和 `OPTIONS`。
 
 ## B：家长端和通知
 
