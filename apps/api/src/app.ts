@@ -8,6 +8,15 @@ import type {
 import { createAuthService } from './authService.js'
 import type { AuthService } from './authService.js'
 import {
+  handleBusinessRequest,
+  isBusinessPath,
+} from './businessRoutes.js'
+import {
+  BusinessError,
+  createBusinessStore,
+} from './businessStore.js'
+import type { BusinessStore } from './businessTypes.js'
+import {
   getBearerToken,
   isJsonRequest,
   readJsonBody,
@@ -66,7 +75,10 @@ function invalidSession(response: ServerResponse): void {
   sendError(response, 401, 'INVALID_SESSION', '登录已失效，请重新登录')
 }
 
-export function createRequestHandler(authService: AuthService): RequestHandler {
+export function createRequestHandler(
+  authService: AuthService,
+  businessStore: BusinessStore = createBusinessStore(),
+): RequestHandler {
   return async (request, response) => {
     setCorsHeaders(response)
 
@@ -77,9 +89,10 @@ export function createRequestHandler(authService: AuthService): RequestHandler {
         path === '/health' ||
         path === '/auth/login' ||
         path === '/auth/me' ||
-        path === '/auth/logout'
+        path === '/auth/logout' ||
+        isBusinessPath(path)
 
-      if (path.startsWith('/auth/')) {
+      if (path.startsWith('/auth/') || isBusinessPath(path)) {
         response.setHeader('Cache-Control', 'no-store')
       }
 
@@ -188,12 +201,30 @@ export function createRequestHandler(authService: AuthService): RequestHandler {
         return
       }
 
+      if (
+        await handleBusinessRequest(
+          request,
+          response,
+          path,
+          method,
+          authService,
+          businessStore,
+        )
+      ) {
+        return
+      }
+
       sendError(response, 404, 'NOT_FOUND', '接口不存在')
-    } catch {
+    } catch (error) {
+      if (error instanceof BusinessError) {
+        sendError(response, error.status, error.code, error.message)
+        return
+      }
       sendError(response, 500, 'INTERNAL_ERROR', '服务暂时不可用')
     }
   }
 }
 
 export const authService = createAuthService()
-export const requestHandler = createRequestHandler(authService)
+export const businessStore = createBusinessStore()
+export const requestHandler = createRequestHandler(authService, businessStore)
