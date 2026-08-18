@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { UserSummary } from '@k12/shared'
 
 import {
@@ -22,6 +22,10 @@ import type {
   WorkOrderStatus,
 } from './types'
 import type { AdminOverview } from './adminTypes'
+import {
+  chooseSubstituteTeacherId,
+  countSchedulesForBusinessDate,
+} from './adminViewHelpers'
 
 type PageKey =
   | 'login'
@@ -236,7 +240,7 @@ const selectedWorkOrder = computed(() =>
 const dashboardStats = computed(() => [
   {
     label: '今日排课',
-    value: visibleSchedules.value.length,
+    value: countSchedulesForBusinessDate(visibleSchedules.value, new Date()),
     helper: '当前数据范围',
   },
   {
@@ -275,6 +279,13 @@ const boardMetrics = computed(() =>
     ).length,
   })),
 )
+
+watch(availableSubstituteTeachers, (candidates) => {
+  selectedSubstituteTeacherId.value = chooseSubstituteTeacherId(
+    selectedSubstituteTeacherId.value,
+    candidates,
+  )
+})
 
 function resetScopedSelections() {
   selectedApprovalId.value = visibleScheduleChanges.value[0]?.id ?? null
@@ -323,7 +334,7 @@ function applyOverview(overview: AdminOverview) {
   users.value = overview.users.map((item) => ({ ...item }))
 }
 
-async function loadOverview() {
+async function loadOverview(): Promise<boolean> {
   isLoadingOverview.value = true
   overviewLoadFailed.value = false
   overviewError.value = ''
@@ -333,10 +344,12 @@ async function loadOverview() {
     applyOverview(overview)
     resetScopedSelections()
     showNotice(`后台数据已加载，共 ${overview.campuses.length} 个校区可见`)
+    return true
   } catch (error) {
     overviewLoadFailed.value = true
     overviewError.value =
       error instanceof Error ? error.message : '后台数据加载失败'
+    return false
   } finally {
     isLoadingOverview.value = false
   }
@@ -381,9 +394,8 @@ async function restoreSession() {
     currentUser.value = user
     currentRole.value = user.role
     homeCampusId.value = user.campusId
-    await loadOverview()
-    if (!overviewLoadFailed.value) {
-      goTo('dashboard')
+    goTo('dashboard')
+    if (await loadOverview()) {
       showNotice(
         `欢迎回来，${user.displayName}。数据范围：${scopeDescription.value}`,
       )
@@ -414,14 +426,11 @@ async function login() {
     currentUser.value = session.user
     currentRole.value = session.user.role
     homeCampusId.value = session.user.campusId
-    await loadOverview()
-
-    if (overviewLoadFailed.value) {
-      await clearSessionAndGoLogin(overviewError.value || '后台数据加载失败')
+    goTo('dashboard')
+    if (!(await loadOverview())) {
       return
     }
 
-    goTo('dashboard')
     showNotice(
       `已使用 ${session.user.displayName}（${roleLabels[session.user.role]}）登录，${scopeDescription.value}`,
     )

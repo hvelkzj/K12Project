@@ -37,7 +37,7 @@ export interface AdminApiClientOptions {
   apiBaseUrl: string
   fetchImpl?: typeof fetch
   storage?: Pick<Storage, 'getItem'>
-  onUnauthorized?: () => void
+  onUnauthorized?: () => void | Promise<void>
 }
 
 export function createAdminApiClient(
@@ -77,7 +77,7 @@ export function createAdminApiClient(
     }
 
     if (response.status === 401) {
-      onUnauthorized()
+      await onUnauthorized()
       throw new AdminApiError(401, 'AUTH_REQUIRED', '登录已失效，请重新登录')
     }
 
