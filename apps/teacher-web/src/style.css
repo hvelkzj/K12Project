@@ -9,6 +9,7 @@
 body { min-width: 320px; min-height: 100vh; margin: 0; }
 button, input, select, textarea { color: inherit; font: inherit; }
 button, select { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid rgb(31 122 99 / 22%);
   outline-offset: 2px;
@@ -70,6 +71,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .scope-card span { color: #a8c8bd; font-size: 12px; }
 .scope-card strong { margin-top: 6px; }
 .scope-card p { margin: 8px 0 0; color: #c8ddd6; font-size: 12px; line-height: 1.6; }
+.logout-button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 9px;
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+.logout-button:hover { background: rgb(255 255 255 / 14%); }
 
 .workspace {
   max-width: 1440px;
@@ -84,6 +95,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   gap: 24px;
 }
 .topbar { margin-bottom: 28px; }
+.user-card { text-align: right; }
+.user-card strong, .user-card span { display: block; }
+.user-card span { margin-top: 5px; color: #758079; font-size: 12px; }
 .eyebrow {
   margin: 0 0 7px;
   color: #758079;
@@ -213,6 +227,50 @@ td select { min-width: 110px; }
   align-items: center;
 }
 .compact-form { grid-template-columns: 1fr; }
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #eef4f0;
+}
+.auth-card {
+  width: min(440px, 100%);
+  padding: 38px;
+  border: 1px solid #dce6e0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgb(23 63 56 / 10%);
+}
+.auth-card h1 { margin-bottom: 12px; font-size: 30px; }
+.auth-form { display: grid; gap: 17px; margin-top: 28px; }
+.auth-form label > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #4d5b55;
+  font-size: 13px;
+  font-weight: 700;
+}
+.auth-form button { width: 100%; }
+.auth-message {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid #e4cf9c;
+  border-radius: 9px;
+  color: #705514;
+  background: #fff8e7;
+  font-size: 13px;
+}
+.request-list { display: grid; gap: 10px; margin-top: 24px; }
+.request-list article {
+  display: grid;
+  gap: 5px;
+  padding: 15px;
+  border: 1px solid #dfe7e2;
+  border-radius: 10px;
+  background: #f7faf8;
+}
+.request-list span, .request-list small { color: #6f7b75; }
 .mobile-nav { display: none; }
 
 @media (max-width: 1050px) {
