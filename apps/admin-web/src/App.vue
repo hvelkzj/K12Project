@@ -1,40 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { UserSummary } from '@k12/shared'
 
 import {
-  assignSubstitute,
-  availableSubstituteTeachers as availableSubstituteTeachersFor,
-  closeWorkOrder,
-  ensureCampusAccess,
-  filterByScope,
-  reviewScheduleChange,
-  startWorkOrder,
-} from './adminService'
+  createAdminApiClient,
+} from './adminApiClient'
 import {
   canAccessAdminPage,
   createAuthClient,
-  getAdminActorId,
   isAuthenticatedAdmin,
   isAdminRole,
 } from './authService'
-import {
-  campuses,
-  classGroups,
-  courses,
-  initialScheduleChanges,
-  initialSchedules,
-  initialUsers,
-  initialWorkOrders,
-  teachers,
-} from './mockData'
 import type {
   AdminRole,
+  FeedbackWorkOrder,
+  Schedule,
   ScheduleChange,
   ScheduleChangeStatus,
+  UserAccount,
   UserRole,
   WorkOrderStatus,
 } from './types'
+import type { AdminOverview } from './adminTypes'
 
 type PageKey =
   | 'login'
@@ -101,17 +88,25 @@ const notice = ref('')
 const errorMessage = ref('')
 const scheduleCampusFilter = ref(0)
 
-const schedules = ref(initialSchedules.map((item) => ({ ...item })))
-const scheduleChanges = ref(initialScheduleChanges.map((item) => ({ ...item })))
-const workOrders = ref(initialWorkOrders.map((item) => ({ ...item })))
-const users = ref(initialUsers.map((item) => ({ ...item })))
+const isLoadingOverview = ref(false)
+const overviewLoadFailed = ref(false)
+const overviewError = ref('')
 
-const selectedApprovalId = ref<number | null>(3001)
+const campuses = ref<AdminOverview['campuses']>([])
+const classGroups = ref<AdminOverview['classes']>([])
+const courses = ref<AdminOverview['courses']>([])
+const teachers = ref<AdminOverview['teachers']>([])
+const schedules = ref<Schedule[]>([])
+const scheduleChanges = ref<ScheduleChange[]>([])
+const workOrders = ref<FeedbackWorkOrder[]>([])
+const users = ref<UserAccount[]>([])
+
+const selectedApprovalId = ref<number | null>(null)
 const decisionNote = ref('')
-const selectedSubstituteChangeId = ref<number | null>(3002)
-const selectedSubstituteTeacherId = ref<number | null>(302)
+const selectedSubstituteChangeId = ref<number | null>(null)
+const selectedSubstituteTeacherId = ref<number | null>(null)
 const substituteNote = ref('已与代课教师确认，无课程冲突')
-const selectedWorkOrderId = ref<number | null>(4001)
+const selectedWorkOrderId = ref<number | null>(null)
 const workOrderResult = ref('')
 
 const currentPage = computed(
@@ -129,6 +124,15 @@ const apiBaseUrl =
 
 const authClient = createAuthClient({ apiBaseUrl })
 
+function handleUnauthorized() {
+  void clearSessionAndGoLogin('登录已失效，请重新登录')
+}
+
+const adminApiClient = createAdminApiClient({
+  apiBaseUrl,
+  onUnauthorized: handleUnauthorized,
+})
+
 const currentRoleLabel = computed(() =>
   currentUser.value && isAdminRole(currentUser.value.role)
     ? roleLabels[currentUser.value.role]
@@ -143,12 +147,16 @@ const scopeDescription = computed(() =>
 
 const visibleCampuses = computed(() =>
   currentRole.value === 'SYSTEM_ADMIN'
-    ? campuses
-    : campuses.filter((campus) => campus.id === homeCampusId.value),
+    ? campuses.value
+    : campuses.value.filter((campus) => campus.id === homeCampusId.value),
 )
 
 const visibleSchedules = computed(() =>
-  filterByScope(schedules.value, currentRole.value, homeCampusId.value),
+  currentRole.value === 'SYSTEM_ADMIN'
+    ? schedules.value
+    : schedules.value.filter(
+        (schedule) => schedule.campusId === homeCampusId.value,
+      ),
 )
 
 const displayedSchedules = computed(() => {
@@ -162,15 +170,25 @@ const displayedSchedules = computed(() => {
 })
 
 const visibleScheduleChanges = computed(() =>
-  filterByScope(scheduleChanges.value, currentRole.value, homeCampusId.value),
+  currentRole.value === 'SYSTEM_ADMIN'
+    ? scheduleChanges.value
+    : scheduleChanges.value.filter(
+        (change) => change.campusId === homeCampusId.value,
+      ),
 )
 
 const visibleWorkOrders = computed(() =>
-  filterByScope(workOrders.value, currentRole.value, homeCampusId.value),
+  currentRole.value === 'SYSTEM_ADMIN'
+    ? workOrders.value
+    : workOrders.value.filter(
+        (workOrder) => workOrder.campusId === homeCampusId.value,
+      ),
 )
 
 const visibleUsers = computed(() =>
-  filterByScope(users.value, currentRole.value, homeCampusId.value),
+  currentRole.value === 'SYSTEM_ADMIN'
+    ? users.value
+    : users.value.filter((user) => user.campusId === homeCampusId.value),
 )
 
 const selectedApproval = computed(() =>
@@ -189,9 +207,18 @@ const selectedSubstituteChange = computed(() =>
   ),
 )
 
-const availableSubstituteTeachers = computed(() =>
-  availableSubstituteTeachersFor(selectedSubstituteChange.value, teachers),
-)
+const availableSubstituteTeachers = computed(() => {
+  const selected = selectedSubstituteChange.value
+  if (!selected) {
+    return []
+  }
+
+  return teachers.value.filter(
+    (teacher) =>
+      teacher.campusId === selected.campusId &&
+      teacher.id !== selected.originalTeacherId,
+  )
+})
 
 const assignedChanges = computed(() =>
   visibleScheduleChanges.value.filter(
@@ -209,9 +236,7 @@ const selectedWorkOrder = computed(() =>
 const dashboardStats = computed(() => [
   {
     label: '今日排课',
-    value: visibleSchedules.value.filter(
-      (schedule) => schedule.lessonDate === '2026-08-10',
-    ).length,
+    value: visibleSchedules.value.length,
     helper: '当前数据范围',
   },
   {
@@ -238,7 +263,9 @@ const dashboardStats = computed(() => [
 const boardMetrics = computed(() =>
   visibleCampuses.value.map((campus) => ({
     campus,
-    schedules: schedules.value.filter((item) => item.campusId === campus.id).length,
+    schedules: schedules.value.filter(
+      (item) => item.campusId === campus.id,
+    ).length,
     users: users.value.filter((item) => item.campusId === campus.id).length,
     pendingApprovals: scheduleChanges.value.filter(
       (item) => item.campusId === campus.id && item.status === 'PENDING',
@@ -248,18 +275,6 @@ const boardMetrics = computed(() =>
     ).length,
   })),
 )
-
-watch(currentRole, () => {
-  scheduleCampusFilter.value = 0
-  resetScopedSelections()
-  clearMessages()
-  notice.value = `已切换为${roleLabels[currentRole.value]}视角：${scopeDescription.value}`
-})
-
-watch(selectedSubstituteChangeId, () => {
-  selectedSubstituteTeacherId.value =
-    availableSubstituteTeachers.value[0]?.id ?? null
-})
 
 function resetScopedSelections() {
   selectedApprovalId.value = visibleScheduleChanges.value[0]?.id ?? null
@@ -297,6 +312,62 @@ function goTo(page: PageKey) {
   clearMessages()
 }
 
+function applyOverview(overview: AdminOverview) {
+  campuses.value = overview.campuses.map((item) => ({ ...item }))
+  classGroups.value = overview.classes.map((item) => ({ ...item }))
+  courses.value = overview.courses.map((item) => ({ ...item }))
+  teachers.value = overview.teachers.map((item) => ({ ...item }))
+  schedules.value = overview.schedules.map((item) => ({ ...item }))
+  scheduleChanges.value = overview.scheduleChanges.map((item) => ({ ...item }))
+  workOrders.value = overview.feedbackWorkOrders.map((item) => ({ ...item }))
+  users.value = overview.users.map((item) => ({ ...item }))
+}
+
+async function loadOverview() {
+  isLoadingOverview.value = true
+  overviewLoadFailed.value = false
+  overviewError.value = ''
+
+  try {
+    const overview = await adminApiClient.loadOverview()
+    applyOverview(overview)
+    resetScopedSelections()
+    showNotice(`后台数据已加载，共 ${overview.campuses.length} 个校区可见`)
+  } catch (error) {
+    overviewLoadFailed.value = true
+    overviewError.value =
+      error instanceof Error ? error.message : '后台数据加载失败'
+  } finally {
+    isLoadingOverview.value = false
+  }
+}
+
+async function clearSessionAndGoLogin(message: string) {
+  try {
+    await authClient.logout()
+  } catch {
+    // 忽略退出异常
+  } finally {
+    currentUser.value = null
+    currentRole.value = 'ACADEMIC_ADMIN'
+    homeCampusId.value = 1
+    loginUsername.value = 'academic_901'
+    loginPassword.value = 'K12Demo123!'
+    campuses.value = []
+    classGroups.value = []
+    courses.value = []
+    teachers.value = []
+    schedules.value = []
+    scheduleChanges.value = []
+    workOrders.value = []
+    users.value = []
+    resetScopedSelections()
+    clearMessages()
+    goTo('login')
+    showError(new Error(message))
+  }
+}
+
 async function restoreSession() {
   try {
     const user = await authClient.getCurrentUser()
@@ -310,11 +381,13 @@ async function restoreSession() {
     currentUser.value = user
     currentRole.value = user.role
     homeCampusId.value = user.campusId
-    resetScopedSelections()
-    goTo('dashboard')
-    showNotice(
-      `欢迎回来，${user.displayName}。数据范围：${scopeDescription.value}`,
-    )
+    await loadOverview()
+    if (!overviewLoadFailed.value) {
+      goTo('dashboard')
+      showNotice(
+        `欢迎回来，${user.displayName}。数据范围：${scopeDescription.value}`,
+      )
+    }
   } catch (error) {
     showError(error)
   }
@@ -341,7 +414,13 @@ async function login() {
     currentUser.value = session.user
     currentRole.value = session.user.role
     homeCampusId.value = session.user.campusId
-    resetScopedSelections()
+    await loadOverview()
+
+    if (overviewLoadFailed.value) {
+      await clearSessionAndGoLogin(overviewError.value || '后台数据加载失败')
+      return
+    }
+
     goTo('dashboard')
     showNotice(
       `已使用 ${session.user.displayName}（${roleLabels[session.user.role]}）登录，${scopeDescription.value}`,
@@ -354,42 +433,29 @@ async function login() {
 }
 
 async function logout() {
-  try {
-    await authClient.logout()
-  } catch {
-    // 即使退出接口异常，本地令牌也必须清除
-  } finally {
-    currentUser.value = null
-    currentRole.value = 'ACADEMIC_ADMIN'
-    homeCampusId.value = 1
-    loginUsername.value = 'academic_901'
-    loginPassword.value = 'K12Demo123!'
-    resetScopedSelections()
-    clearMessages()
-    goTo('login')
-  }
+  await clearSessionAndGoLogin('')
 }
 
 onMounted(restoreSession)
 
 function campusName(campusId: number) {
-  return campuses.find((campus) => campus.id === campusId)?.name ?? '未知校区'
+  return campuses.value.find((campus) => campus.id === campusId)?.name ?? '未知校区'
 }
 
 function className(classId: number) {
-  return classGroups.find((item) => item.id === classId)?.name ?? '未知班级'
+  return classGroups.value.find((item) => item.id === classId)?.name ?? '未知班级'
 }
 
 function courseName(courseId: number) {
-  return courses.find((course) => course.id === courseId)?.name ?? '未知课程'
+  return courses.value.find((course) => course.id === courseId)?.name ?? '未知课程'
 }
 
 function teacherName(teacherId: number | null | undefined) {
-  if (teacherId === undefined) {
+  if (teacherId === undefined || teacherId === null) {
     return '未安排'
   }
 
-  return teachers.find((teacher) => teacher.id === teacherId)?.displayName ?? '未知教师'
+  return teachers.value.find((teacher) => teacher.id === teacherId)?.displayName ?? '未知教师'
 }
 
 function scheduleFor(change: ScheduleChange) {
@@ -424,23 +490,24 @@ function viewApproval(changeId: number) {
   clearMessages()
 }
 
-function submitReview(decision: 'APPROVED' | 'REJECTED') {
+async function submitReview(decision: 'APPROVED' | 'REJECTED') {
   const selected = selectedApproval.value
   if (!selected) {
     showError(new Error('请先查看一条调课申请'))
     return
   }
 
+  if (decision === 'REJECTED' && !decisionNote.value.trim()) {
+    showError(new Error('拒绝调课时必须填写拒绝原因'))
+    return
+  }
+
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
-    const reviewedAt = new Date().toISOString()
-    const reviewed = reviewScheduleChange(
-      selected,
+    const reviewed = await adminApiClient.reviewScheduleChange({
+      changeId: selected.id,
       decision,
-      decisionNote.value,
-      getAdminActorId(currentUser.value),
-      reviewedAt,
-    )
+      decisionNote: decisionNote.value,
+    })
     const index = scheduleChanges.value.findIndex((item) => item.id === selected.id)
     scheduleChanges.value[index] = reviewed
     decisionNote.value = ''
@@ -461,29 +528,35 @@ function openSubstitute(changeId: number) {
   goTo('substitute')
 }
 
-function submitSubstitute() {
+async function submitSubstitute() {
   const selected = selectedSubstituteChange.value
   if (!selected) {
     showError(new Error('当前没有可安排代课的已通过申请'))
     return
   }
 
-  try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
-    const selectedTeacher = teachers.find(
-      (teacher) => teacher.id === selectedSubstituteTeacherId.value,
-    )
-    if (!selectedTeacher || selectedTeacher.campusId !== selected.campusId) {
-      throw new Error('请选择申请所在校区的代课教师')
-    }
+  const selectedTeacher = teachers.value.find(
+    (teacher) => teacher.id === selectedSubstituteTeacherId.value,
+  )
+  if (!selectedTeacher) {
+    showError(new Error('请选择代课教师'))
+    return
+  }
+  if (selectedTeacher.campusId !== selected.campusId) {
+    showError(new Error('请选择申请所在校区的代课教师'))
+    return
+  }
+  if (selectedTeacher.id === selected.originalTeacherId) {
+    showError(new Error('代课教师不能是原教师'))
+    return
+  }
 
-    const updatedAt = new Date().toISOString()
-    const assigned = assignSubstitute(
-      selected,
-      selectedTeacher.id,
-      substituteNote.value,
-      updatedAt,
-    )
+  try {
+    const assigned = await adminApiClient.assignSubstitute({
+      changeId: selected.id,
+      substituteTeacherId: selectedTeacher.id,
+      substituteNote: substituteNote.value,
+    })
     const index = scheduleChanges.value.findIndex((item) => item.id === selected.id)
     scheduleChanges.value[index] = assigned
 
@@ -496,9 +569,9 @@ function submitSubstitute() {
         schedules.value[scheduleIndex] = {
           ...currentSchedule,
           teacherId: selectedTeacher.id,
-          lessonDate: selected.proposedDate,
-          startTime: selected.proposedStartTime,
-          endTime: selected.proposedEndTime,
+          lessonDate: assigned.proposedDate,
+          startTime: assigned.proposedStartTime,
+          endTime: assigned.proposedEndTime,
           status: 'CHANGED',
         }
       }
@@ -518,17 +591,15 @@ function viewWorkOrder(workOrderId: number) {
   clearMessages()
 }
 
-function beginSelectedWorkOrder() {
+async function beginSelectedWorkOrder() {
   const selected = selectedWorkOrder.value
   if (!selected) return
 
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
-    const updated = startWorkOrder(
-      selected,
-      getAdminActorId(currentUser.value),
-      new Date().toISOString(),
-    )
+    const updated = await adminApiClient.updateWorkOrder({
+      workOrderId: selected.id,
+      action: 'START',
+    })
     const index = workOrders.value.findIndex((item) => item.id === selected.id)
     workOrders.value[index] = updated
     showNotice('工单已进入处理中状态')
@@ -537,21 +608,24 @@ function beginSelectedWorkOrder() {
   }
 }
 
-function closeSelectedWorkOrder() {
+async function closeSelectedWorkOrder() {
   const selected = selectedWorkOrder.value
   if (!selected) {
     showError(new Error('请先查看一条反馈工单'))
     return
   }
 
+  if (!workOrderResult.value.trim()) {
+    showError(new Error('关闭工单前必须填写处理结果'))
+    return
+  }
+
   try {
-    ensureCampusAccess(selected.campusId, currentRole.value, homeCampusId.value)
-    const closed = closeWorkOrder(
-      selected,
-      workOrderResult.value,
-      getAdminActorId(currentUser.value),
-      new Date().toISOString(),
-    )
+    const closed = await adminApiClient.updateWorkOrder({
+      workOrderId: selected.id,
+      action: 'CLOSE',
+      result: workOrderResult.value,
+    })
     const index = workOrders.value.findIndex((item) => item.id === selected.id)
     workOrders.value[index] = closed
     workOrderResult.value = ''
@@ -561,18 +635,8 @@ function closeSelectedWorkOrder() {
   }
 }
 
-function toggleUser(userId: number) {
-  const user = visibleUsers.value.find((item) => item.id === userId)
-  if (!user) return
-
-  try {
-    ensureCampusAccess(user.campusId, currentRole.value, homeCampusId.value)
-    const index = users.value.findIndex((item) => item.id === user.id)
-    users.value[index] = { ...user, active: !user.active }
-    showNotice(`${user.displayName}账号已${user.active ? '停用' : '启用'}`)
-  } catch (error) {
-    showError(error)
-  }
+function retryLoadOverview() {
+  void loadOverview()
 }
 </script>
 
@@ -617,7 +681,7 @@ function toggleUser(userId: number) {
     <main class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">教务 / 系统后台 · 真实认证接入</p>
+          <p class="eyebrow">教务 / 系统后台 · 业务 API 接入</p>
           <h1>{{ currentPage?.label }}</h1>
         </div>
         <div class="topbar-user">
@@ -645,7 +709,7 @@ function toggleUser(userId: number) {
 
       <section v-if="activePage === 'login'" class="panel login-panel">
         <div class="login-copy">
-          <span class="feature-kicker">权限演示</span>
+          <span class="feature-kicker">后台登录</span>
           <h2>进入教务后台</h2>
           <p>
             使用真实认证接口登录。教务仅能访问所属校区，系统管理员可访问
@@ -680,6 +744,30 @@ function toggleUser(userId: number) {
         </form>
       </section>
 
+      <section
+        v-else-if="isLoadingOverview"
+        class="panel loading-panel"
+        role="status"
+      >
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <strong>正在加载后台数据…</strong>
+      </section>
+
+      <section
+        v-else-if="overviewLoadFailed"
+        class="panel error-panel"
+        role="alert"
+      >
+        <span class="feature-kicker">数据加载失败</span>
+        <h2>无法加载后台数据</h2>
+        <p>{{ overviewError }}</p>
+        <div class="form-actions">
+          <button class="primary" type="button" @click="retryLoadOverview">
+            重试
+          </button>
+        </div>
+      </section>
+
       <template v-else-if="activePage === 'dashboard'">
         <section class="scope-banner">
           <div>
@@ -705,7 +793,6 @@ function toggleUser(userId: number) {
                 <p class="eyebrow">今日优先处理</p>
                 <h2>待办事项</h2>
               </div>
-              <span class="mock-tag">Mock 数据</span>
             </div>
             <div class="task-list">
               <button type="button" @click="goTo('approval')">
@@ -729,13 +816,13 @@ function toggleUser(userId: number) {
           <article class="panel compact-panel">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">数据准备</p>
-                <h2>演示范围</h2>
+                <p class="eyebrow">数据概览</p>
+                <h2>数据范围</h2>
               </div>
             </div>
             <dl class="detail-list">
-              <div><dt>校区</dt><dd>2 个</dd></div>
-              <div><dt>班级</dt><dd>3 个</dd></div>
+              <div><dt>校区</dt><dd>{{ campuses.length }} 个</dd></div>
+              <div><dt>班级</dt><dd>{{ classGroups.length }} 个</dd></div>
               <div><dt>排课</dt><dd>{{ schedules.length }} 条</dd></div>
               <div><dt>当前用户</dt><dd>{{ currentUser?.displayName ?? '未登录' }}</dd></div>
             </dl>
@@ -766,17 +853,13 @@ function toggleUser(userId: number) {
                 </option>
               </select>
             </label>
-            <button
-              class="secondary"
-              type="button"
-              @click="showNotice('冲突检查完成：当前 Mock 排课无教室或教师冲突')"
-            >
-              冲突检查
-            </button>
           </div>
         </div>
         <p class="scope-inline">{{ scopeDescription }}</p>
-        <div class="table-wrap">
+        <div v-if="displayedSchedules.length === 0" class="empty-state">
+          <strong>当前范围内没有排课</strong>
+        </div>
+        <div v-else class="table-wrap">
           <table>
             <thead>
               <tr>
@@ -815,9 +898,12 @@ function toggleUser(userId: number) {
               <p class="eyebrow">查看申请 → 作出决策</p>
               <h2>调课申请</h2>
             </div>
-            <span class="mock-tag">{{ visibleScheduleChanges.length }} 条</span>
+            <span class="count-tag">{{ visibleScheduleChanges.length }} 条</span>
           </div>
-          <div class="request-list">
+          <div v-if="visibleScheduleChanges.length === 0" class="empty-state">
+            <strong>当前范围内没有调课申请</strong>
+          </div>
+          <div v-else class="request-list">
             <button
               v-for="change in visibleScheduleChanges"
               :key="change.id"
@@ -923,7 +1009,7 @@ function toggleUser(userId: number) {
               <p class="eyebrow">审批通过后安排</p>
               <h2>选择代课教师</h2>
             </div>
-            <span class="mock-tag">同校区校验</span>
+            <span class="count-tag">同校区校验</span>
           </div>
 
           <div v-if="substituteCandidates.length" class="substitute-form">
@@ -983,7 +1069,10 @@ function toggleUser(userId: number) {
               <h2>已安排代课</h2>
             </div>
           </div>
-          <div class="table-wrap">
+          <div v-if="assignedChanges.length === 0" class="empty-state">
+            <strong>暂无已安排的代课记录</strong>
+          </div>
+          <div v-else class="table-wrap">
             <table>
               <thead><tr><th>申请</th><th>校区</th><th>时间</th><th>原教师</th><th>代课教师</th><th>状态</th></tr></thead>
               <tbody>
@@ -1008,9 +1097,12 @@ function toggleUser(userId: number) {
               <p class="eyebrow">家长异议</p>
               <h2>反馈工单</h2>
             </div>
-            <span class="mock-tag">{{ visibleWorkOrders.length }} 条</span>
+            <span class="count-tag">{{ visibleWorkOrders.length }} 条</span>
           </div>
-          <div class="request-list">
+          <div v-if="visibleWorkOrders.length === 0" class="empty-state">
+            <strong>当前范围内没有反馈工单</strong>
+          </div>
+          <div v-else class="request-list">
             <button
               v-for="workOrder in visibleWorkOrders"
               :key="workOrder.id"
@@ -1043,7 +1135,6 @@ function toggleUser(userId: number) {
           <div class="issue-card">
             <span>家长异议</span>
             <p>{{ selectedWorkOrder.issue }}</p>
-            <small>来源：关联反馈的 parentResponse</small>
           </div>
 
           <template v-if="selectedWorkOrder.status !== 'CLOSED'">
@@ -1083,11 +1174,14 @@ function toggleUser(userId: number) {
             <p class="eyebrow">账号、角色与权限</p>
             <h2>用户清单</h2>
           </div>
-          <span class="mock-tag">{{ scopeDescription }}</span>
+          <span class="count-tag">{{ scopeDescription }}</span>
         </div>
-        <div class="table-wrap">
+        <div v-if="visibleUsers.length === 0" class="empty-state">
+          <strong>当前范围内没有用户</strong>
+        </div>
+        <div v-else class="table-wrap">
           <table>
-            <thead><tr><th>用户</th><th>账号</th><th>校区</th><th>角色</th><th>账号状态</th><th>操作</th></tr></thead>
+            <thead><tr><th>用户</th><th>账号</th><th>校区</th><th>角色</th><th>账号状态</th></tr></thead>
             <tbody>
               <tr v-for="user in visibleUsers" :key="user.id">
                 <td><strong>{{ user.displayName }}</strong><small>ID {{ user.id }}</small></td>
@@ -1098,11 +1192,6 @@ function toggleUser(userId: number) {
                   <span class="status-pill" :class="user.active ? 'tone-success' : 'tone-danger'">
                     {{ user.active ? '已启用' : '已停用' }}
                   </span>
-                </td>
-                <td>
-                  <button class="table-action" type="button" @click="toggleUser(user.id)">
-                    {{ user.active ? '停用' : '启用' }}
-                  </button>
                 </td>
               </tr>
             </tbody>
@@ -1132,9 +1221,11 @@ function toggleUser(userId: number) {
               <p class="eyebrow">按校区汇总</p>
               <h2>运营数据</h2>
             </div>
-            <span class="mock-tag">仅作第一周演示</span>
           </div>
-          <div class="metric-grid">
+          <div v-if="boardMetrics.length === 0" class="empty-state">
+            <strong>当前范围内没有可汇总的校区</strong>
+          </div>
+          <div v-else class="metric-grid">
             <article v-for="metric in boardMetrics" :key="metric.campus.id" class="metric-card">
               <div class="metric-heading">
                 <span class="campus-index">{{ metric.campus.id }}</span>
