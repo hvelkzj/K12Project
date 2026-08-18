@@ -33,8 +33,20 @@
 
 - `npm.cmd run test --workspace @k12/parent-web`：22/22 通过。
 - `npm.cmd run typecheck --workspace @k12/parent-web`：通过。
+- `npm.cmd run build --workspace @k12/parent-web`：通过。
+- `npm.cmd run check`：通过，PR 合并前全仓 114/114 项测试通过。
 
 ## 仍需 A 配合
 
 - 联调时保持家长端 4 个业务接口路径、状态码和错误体 `{ code, message }` 稳定。
 - 若后续需要展示更多课程/教师详情，由 A 裁决是否扩展公共类型或 API 响应。
+
+## PR #13 评审与合并后修复
+
+- PR #13 已完成评审并同意合并到 `develop`。
+- 合并提交：`bdb7c98ec4b51e13ff55907a8be0076f2f12b6fe`。
+- 当前学生概览失败后，重试会保留所选学生，不再固定回到第一个学生。
+- 首页“待看反馈”只统计 `PENDING_PARENT`，确认或异议成功后数字同步变化。
+- 补齐本轮 AI 记录和交付验证记录。
+- 合并后家长端测试 24/24 通过，根目录 `npm run check` 通过，116/116 项测试通过。
+- 浏览器回归通过：失败重试前后均保持林晓晨；确认反馈后“待看反馈”显示 `0`。
