@@ -1,23 +1,37 @@
 import { computed, defineComponent, h, onMounted, ref } from 'vue'
-import type { UserSummary } from '@k12/shared'
+import type {
+  LeaveRequest,
+  Notification,
+  ParentStudentBinding,
+  ScheduleChangeNotice,
+  ScheduleSummary,
+  StudentFeedback,
+  UserSummary,
+} from '@k12/shared'
+import { MOCK_ACCOUNT_PASSWORD } from '@k12/shared/mock-accounts'
 import { parentAuthClient } from './authClient'
-import { mockParentCredentials, parentProfile, parentUser } from './mockData'
 import {
-  getBoundStudents,
-  getFeedbackByStudent,
-  getParentContactPhone,
-  getNoticesByStudent,
-  getSchedulesByStudent,
-  listLeaveRequests,
-  submitLeaveRequest,
-  updateFeedbackStatus,
-} from './parentService'
+  parentBusinessClient,
+  ParentBusinessError,
+} from './parentBusinessClient'
+import type { ParentOverview } from './parentBusinessClient'
 
 const tabs = ['首页', '学生切换', '课表', '请假', '通知', '反馈'] as const
 type TabName = (typeof tabs)[number]
 
+const mockParentCredentials = {
+  username: 'parent_201',
+  password: MOCK_ACCOUNT_PASSWORD,
+} as const
+
 function formatLessonTime(time: string): string {
   return time.slice(0, 5)
+}
+
+function isScheduleChangeNotice(
+  notice: Notification | ScheduleChangeNotice,
+): notice is ScheduleChangeNotice {
+  return 'notification' in notice
 }
 
 export default defineComponent({
@@ -25,39 +39,132 @@ export default defineComponent({
   setup() {
     const isAuthenticated = ref(false)
     const isRestoringSession = ref(true)
+    const isLoadingStudents = ref(false)
+    const isLoadingOverview = ref(false)
+    const isSubmittingLeave = ref(false)
+    const isSavingFeedback = ref(false)
     const currentUser = ref<UserSummary | null>(null)
     const username = ref<string>(mockParentCredentials.username)
     const password = ref<string>(mockParentCredentials.password)
     const loginMessage = ref('')
     const activeTab = ref<TabName>('首页')
-    const boundStudents = getBoundStudents()
-    const selectedStudentId = ref<number | null>(boundStudents[0]?.id ?? null)
+    const bindings = ref<ParentStudentBinding[]>([])
+    const overview = ref<ParentOverview | null>(null)
+    const selectedStudentId = ref<number | null>(null)
     const selectedScheduleId = ref<number | null>(null)
+    const contactPhone = ref('13800000001')
     const leaveReason = ref('发烧需要休息')
     const disputeReason = ref('希望核对本周课堂记录')
     const message = ref('')
+    const loadError = ref('')
 
-    const selectedStudent = computed(() =>
-      boundStudents.find((student) => student.id === selectedStudentId.value),
+    const boundStudents = computed(() =>
+      bindings.value.map((binding) => binding.student),
     )
-    const schedules = computed(() =>
-      selectedStudentId.value === null
-        ? []
-        : getSchedulesByStudent(selectedStudentId.value),
+    const selectedStudent = computed(() => {
+      if (overview.value?.student) return overview.value.student
+      return boundStudents.value.find(
+        (student) => student.id === selectedStudentId.value,
+      )
+    })
+    const schedules = computed(() => overview.value?.schedules ?? [])
+    const notices = computed<(Notification | ScheduleChangeNotice)[]>(() => [
+      ...(overview.value?.scheduleChangeNotices ?? []),
+      ...(overview.value?.notifications ?? []),
+    ])
+    const feedback = computed(() => overview.value?.feedback ?? [])
+    const leaveRequests = computed(() => overview.value?.leaveRequests ?? [])
+    const courseNames = computed(
+      () =>
+        new Map(
+          (overview.value?.courses ?? []).map((course) => [
+            course.id,
+            course.name,
+          ]),
+        ),
     )
-    const notices = computed(() =>
-      selectedStudentId.value === null
-        ? []
-        : getNoticesByStudent(selectedStudentId.value),
+    const teacherNames = computed(
+      () =>
+        new Map(
+          (overview.value?.teachers ?? []).map((teacher) => [
+            teacher.id,
+            teacher.displayName,
+          ]),
+        ),
     )
-    const feedback = computed(() =>
-      selectedStudentId.value === null
-        ? []
-        : getFeedbackByStudent(selectedStudentId.value),
+    const displayUser = computed(
+      () => currentUser.value ?? { displayName: '家长', campusName: '' },
     )
-    const leaveRequests = computed(() => listLeaveRequests())
 
-    const displayUser = computed(() => currentUser.value ?? parentUser)
+    function resetBusinessState(): void {
+      bindings.value = []
+      overview.value = null
+      selectedStudentId.value = null
+      selectedScheduleId.value = null
+      loadError.value = ''
+      message.value = ''
+    }
+
+    function forceLogin(messageText: string): void {
+      parentAuthClient.clearAccessToken()
+      currentUser.value = null
+      isAuthenticated.value = false
+      activeTab.value = '首页'
+      loginMessage.value = messageText
+      resetBusinessState()
+    }
+
+    function businessErrorMessage(error: unknown, fallback: string): string {
+      if (error instanceof ParentBusinessError) {
+        if (error.status === 401) {
+          forceLogin('登录已失效，请重新登录')
+        }
+        return error.message
+      }
+
+      return error instanceof Error ? error.message : fallback
+    }
+
+    async function loadOverview(studentId: number): Promise<void> {
+      selectedStudentId.value = studentId
+      selectedScheduleId.value = null
+      overview.value = null
+      loadError.value = ''
+      isLoadingOverview.value = true
+
+      try {
+        overview.value = await parentBusinessClient.getOverview(studentId)
+        message.value = '学生概览已更新'
+      } catch (error) {
+        loadError.value = businessErrorMessage(error, '学生概览加载失败')
+      } finally {
+        isLoadingOverview.value = false
+      }
+    }
+
+    async function loadStudentsAndDefaultOverview(): Promise<void> {
+      isLoadingStudents.value = true
+      loadError.value = ''
+
+      try {
+        const nextBindings = await parentBusinessClient.listStudents()
+        bindings.value = nextBindings
+
+        const firstStudentId = nextBindings[0]?.student.id
+        if (firstStudentId === undefined) {
+          overview.value = null
+          selectedStudentId.value = null
+          message.value = '当前账号暂无绑定学生'
+          return
+        }
+
+        await loadOverview(firstStudentId)
+      } catch (error) {
+        loadError.value = businessErrorMessage(error, '绑定学生加载失败')
+      } finally {
+        isLoadingStudents.value = false
+      }
+    }
 
     async function restoreSession() {
       try {
@@ -65,7 +172,7 @@ export default defineComponent({
         currentUser.value = user
         isAuthenticated.value = user !== null
         loginMessage.value = user ? '' : '请使用家长账号登录'
-        message.value = user ? `已恢复 ${user.displayName} 的登录状态` : ''
+        if (user) await loadStudentsAndDefaultOverview()
       } catch (error) {
         currentUser.value = null
         isAuthenticated.value = false
@@ -89,6 +196,7 @@ export default defineComponent({
         activeTab.value = '首页'
         loginMessage.value = ''
         message.value = `已使用 ${user.displayName} 的真实认证账号登录`
+        await loadStudentsAndDefaultOverview()
       } catch (error) {
         loginMessage.value =
           error instanceof Error ? error.message : '登录失败，请稍后重试'
@@ -106,9 +214,8 @@ export default defineComponent({
         isAuthenticated.value = false
         password.value = ''
         activeTab.value = '首页'
-        selectedScheduleId.value = null
-        message.value = ''
         loginMessage.value = '已退出家长端'
+        resetBusinessState()
       }
     }
 
@@ -184,12 +291,27 @@ export default defineComponent({
     }
 
     function switchStudent(studentId: number) {
-      selectedStudentId.value = studentId
-      selectedScheduleId.value = null
-      message.value = '已切换学生'
+      void loadOverview(studentId)
+      message.value = '正在切换学生...'
     }
 
-    function createLeaveRequest() {
+    function scheduleCourseName(schedule: ScheduleSummary): string {
+      return courseNames.value.get(schedule.courseId) ?? `课程 #${schedule.courseId}`
+    }
+
+    function teacherName(teacherId: number): string {
+      return teacherNames.value.get(teacherId) ?? `教师 #${teacherId}`
+    }
+
+    function feedbackTitle(item: StudentFeedback): string {
+      const schedule = schedules.value.find(
+        (candidate) => candidate.id === item.scheduleId,
+      )
+      const courseName = schedule ? scheduleCourseName(schedule) : '课程反馈'
+      return `${courseName} · ${teacherName(item.teacherId)}`
+    }
+
+    async function createLeaveRequest() {
       const firstScheduleId = selectedScheduleId.value ?? schedules.value[0]?.id
 
       if (selectedStudentId.value === null || firstScheduleId === undefined) {
@@ -197,42 +319,109 @@ export default defineComponent({
         return
       }
 
+      isSubmittingLeave.value = true
       try {
-        const request = submitLeaveRequest({
+        const request = await parentBusinessClient.submitLeaveRequest({
           studentId: selectedStudentId.value,
           scheduleId: firstScheduleId,
           reason: leaveReason.value,
-          contactPhone: getParentContactPhone(),
+          contactPhone: contactPhone.value,
         })
 
+        if (overview.value) {
+          overview.value = {
+            ...overview.value,
+            leaveRequests: [...overview.value.leaveRequests, request],
+          }
+        }
         message.value = `请假已提交，状态：${request.status}`
       } catch (error) {
-        message.value =
-          error instanceof Error ? error.message : '请假提交失败，请稍后重试'
+        message.value = businessErrorMessage(error, '请假提交失败，请稍后重试')
+      } finally {
+        isSubmittingLeave.value = false
       }
     }
 
-    function markFeedback(
+    async function markFeedback(
       feedbackId: number,
       status: 'CONFIRMED' | 'DISPUTED',
     ) {
-      updateFeedbackStatus(
-        feedbackId,
-        status,
-        status === 'DISPUTED' ? disputeReason.value : '',
-      )
-      message.value =
-        status === 'CONFIRMED' ? '已确认反馈' : '已提交异议，等待教务处理'
+      if (status === 'DISPUTED' && !disputeReason.value.trim()) {
+        message.value = '提出异议时必须填写异议内容'
+        return
+      }
+
+      isSavingFeedback.value = true
+      try {
+        const updated = await parentBusinessClient.respondToFeedback(feedbackId, {
+          status,
+          parentResponse: status === 'DISPUTED' ? disputeReason.value : '',
+        })
+
+        if (overview.value) {
+          overview.value = {
+            ...overview.value,
+            feedback: overview.value.feedback.map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
+          }
+        }
+        message.value =
+          updated.status === 'CONFIRMED'
+            ? '已确认反馈'
+            : '已提交异议，等待教务处理'
+      } catch (error) {
+        message.value = businessErrorMessage(error, '反馈处理失败，请稍后重试')
+      } finally {
+        isSavingFeedback.value = false
+      }
     }
 
-    return () =>
-      isAuthenticated.value
-        ? h('main', { class: 'shell' }, [
+    function renderPanelState() {
+      if (isLoadingStudents.value || isLoadingOverview.value) {
+        return h('section', { class: 'panel state-panel' }, [
+          h('h3', '正在加载数据'),
+          h('p', { class: 'muted' }, '正在从业务 API 获取最新家长端数据。'),
+        ])
+      }
+
+      if (loadError.value) {
+        return h('section', { class: 'panel state-panel' }, [
+          h('h3', '数据加载失败'),
+          h('p', { class: 'error-message' }, loadError.value),
+          h(
+            'button',
+            {
+              class: 'primary',
+              type: 'button',
+              onClick: () => void loadStudentsAndDefaultOverview(),
+            },
+            '重试',
+          ),
+        ])
+      }
+
+      if (bindings.value.length === 0) {
+        return h('section', { class: 'panel state-panel' }, [
+          h('h3', '暂无绑定学生'),
+          h('p', { class: 'muted' }, '当前家长账号还没有绑定学生。'),
+        ])
+      }
+
+      return null
+    }
+
+    return () => {
+      if (!isAuthenticated.value) return renderLogin()
+
+      const panelState = renderPanelState()
+
+      return h('main', { class: 'shell' }, [
         h('aside', { class: 'sidebar' }, [
           h('div', [
             h('p', { class: 'eyebrow' }, '家长端'),
             h('h1', displayUser.value.displayName),
-            h('p', { class: 'muted' }, parentProfile.phone),
+            h('p', { class: 'muted' }, currentUser.value?.campusName ?? ''),
           ]),
           h(
             'nav',
@@ -252,7 +441,7 @@ export default defineComponent({
               ),
             ),
           ),
-        h('div', { class: 'account-actions' }, [
+          h('div', { class: 'account-actions' }, [
             h('span', '真实认证登录状态'),
             h(
               'button',
@@ -267,12 +456,17 @@ export default defineComponent({
               h('p', { class: 'eyebrow' }, '当前学生'),
               h(
                 'h2',
-                `${selectedStudent.value?.displayName} · ${selectedStudent.value?.className}`,
+                selectedStudent.value
+                  ? `${selectedStudent.value.displayName} · ${selectedStudent.value.className}`
+                  : '未选择学生',
               ),
             ]),
-            h('p', { class: 'status' }, message.value),
+            message.value
+              ? h('p', { class: 'status' }, message.value)
+              : null,
           ]),
-          activeTab.value === '首页'
+          panelState,
+          !panelState && activeTab.value === '首页'
             ? h('section', { class: 'panel' }, [
                 h('h3', '今日概览'),
                 h('div', { class: 'summary-grid' }, [
@@ -285,13 +479,13 @@ export default defineComponent({
                 ]),
               ])
             : null,
-          activeTab.value === '学生切换'
+          !panelState && activeTab.value === '学生切换'
             ? h('section', { class: 'panel' }, [
                 h('h3', '学生切换'),
                 h(
                   'div',
                   { class: 'list' },
-                  boundStudents.map((student) =>
+                  boundStudents.value.map((student) =>
                     h(
                       'button',
                       {
@@ -308,28 +502,30 @@ export default defineComponent({
                 ),
               ])
             : null,
-          activeTab.value === '课表'
+          !panelState && activeTab.value === '课表'
             ? h('section', { class: 'panel' }, [
                 h('h3', '课表'),
-                h(
-                  'div',
-                  { class: 'list' },
-                  schedules.value.map((item) =>
-                    h('article', { class: 'row', key: item.id }, [
-                      h('div', [
-                        h('strong', item.courseName),
-                        h(
-                          'p',
-                          `${item.lessonDate} ${formatLessonTime(item.startTime)}-${formatLessonTime(item.endTime)}`,
-                        ),
-                      ]),
-                      h('span', `${item.teacherName} · ${item.room}`),
-                    ]),
-                  ),
-                ),
+                schedules.value.length === 0
+                  ? h('p', { class: 'empty-state' }, '当前学生暂无课表')
+                  : h(
+                      'div',
+                      { class: 'list' },
+                      schedules.value.map((item) =>
+                        h('article', { class: 'row', key: item.id }, [
+                          h('div', [
+                            h('strong', scheduleCourseName(item)),
+                            h(
+                              'p',
+                              `${item.lessonDate} ${formatLessonTime(item.startTime)}-${formatLessonTime(item.endTime)}`,
+                            ),
+                          ]),
+                          h('span', `${teacherName(item.teacherId)} · ${item.room}`),
+                        ]),
+                      ),
+                    ),
               ])
             : null,
-          activeTab.value === '请假'
+          !panelState && activeTab.value === '请假'
             ? h('section', { class: 'panel' }, [
                 h('h3', '提交请假'),
                 h('label', [
@@ -349,7 +545,7 @@ export default defineComponent({
                         h(
                           'option',
                           { key: item.id, value: item.id },
-                          `${item.courseName} · ${item.lessonDate} ${formatLessonTime(item.startTime)}`,
+                          `${scheduleCourseName(item)} · ${item.lessonDate} ${formatLessonTime(item.startTime)}`,
                         ),
                       ),
                     ],
@@ -365,96 +561,128 @@ export default defineComponent({
                     },
                   }),
                 ]),
+                h('label', [
+                  '联系电话',
+                  h('input', {
+                    value: contactPhone.value,
+                    onInput: (event: Event) => {
+                      contactPhone.value = (event.target as HTMLInputElement).value
+                    },
+                  }),
+                ]),
                 h(
                   'button',
-                  { class: 'primary', type: 'button', onClick: createLeaveRequest },
-                  '提交请假',
+                  {
+                    class: 'primary',
+                    disabled: isSubmittingLeave.value,
+                    type: 'button',
+                    onClick: () => void createLeaveRequest(),
+                  },
+                  isSubmittingLeave.value ? '提交中...' : '提交请假',
                 ),
-                h(
-                  'div',
-                  { class: 'list compact' },
-                  leaveRequests.value.map((item) =>
-                    h('article', { class: 'row', key: item.id }, [
-                      h('strong', item.reason),
-                      h('span', item.status),
-                    ]),
-                  ),
-                ),
+                leaveRequests.value.length === 0
+                  ? h('p', { class: 'empty-state' }, '当前学生暂无请假记录')
+                  : h(
+                      'div',
+                      { class: 'list compact' },
+                      leaveRequests.value.map((item: LeaveRequest) =>
+                        h('article', { class: 'row', key: item.id }, [
+                          h('strong', item.reason),
+                          h('span', item.status),
+                        ]),
+                      ),
+                    ),
               ])
             : null,
-          activeTab.value === '通知'
+          !panelState && activeTab.value === '通知'
             ? h('section', { class: 'panel' }, [
                 h('h3', '通知'),
-                h(
-                  'div',
-                  { class: 'list' },
-                  notices.value.map((notice) =>
-                    h('article', { class: 'row notice', key: 'notification' in notice ? notice.notification.id : notice.id }, [
-                      h('div', [
-                        h('strong', 'notification' in notice ? notice.notification.title : notice.title),
-                        h('p', 'notification' in notice ? notice.notification.content : notice.content),
-                        'notification' in notice
-                          ? h(
-                              'p',
-                              `原时间：${notice.originalDate} ${formatLessonTime(notice.originalStartTime)}-${formatLessonTime(notice.originalEndTime)}；新时间：${notice.newDate} ${formatLessonTime(notice.newStartTime)}-${formatLessonTime(notice.newEndTime)}；代课：${notice.substituteTeacherName ?? '待确认'}`,
-                            )
-                          : null
-                      ]),
-                      h('span', ('notification' in notice ? notice.notification.readAt : notice.readAt) ? '已读' : '未读'),
-                    ]),
-                  ),
-                ),
+                notices.value.length === 0
+                  ? h('p', { class: 'empty-state' }, '当前学生暂无通知')
+                  : h(
+                      'div',
+                      { class: 'list' },
+                      notices.value.map((notice) => {
+                        const notification = isScheduleChangeNotice(notice)
+                          ? notice.notification
+                          : notice
+
+                        return h('article', { class: 'row notice', key: notification.id }, [
+                          h('div', [
+                            h('strong', notification.title),
+                            h('p', notification.content),
+                            isScheduleChangeNotice(notice)
+                              ? h(
+                                  'p',
+                                  `原时间：${notice.originalDate} ${formatLessonTime(notice.originalStartTime)}-${formatLessonTime(notice.originalEndTime)}；新时间：${notice.newDate} ${formatLessonTime(notice.newStartTime)}-${formatLessonTime(notice.newEndTime)}；原教师：${notice.originalTeacherName}；代课：${notice.substituteTeacherName ?? '待确认'}`,
+                                )
+                              : null,
+                          ]),
+                          h('span', notification.readAt ? '已读' : '未读'),
+                        ])
+                      }),
+                    ),
               ])
             : null,
-          activeTab.value === '反馈'
+          !panelState && activeTab.value === '反馈'
             ? h('section', { class: 'panel' }, [
                 h('h3', '学生反馈'),
-                h(
-                  'div',
-                  { class: 'list' },
-                  feedback.value.map((item) =>
-                    h('article', { class: 'feedback-card', key: item.id }, [
-                      h('strong', `${item.courseName} · ${item.teacherName}`),
-                      h('p', `优点：${item.strengths}`),
-                      h('p', `改进：${item.improvements}`),
-                      h('p', `建议：${item.suggestion}`),
-                      h('label', [
-                        '异议说明',
-                        h('textarea', {
-                          rows: 2,
-                          value: disputeReason.value,
-                          onInput: (event: Event) => {
-                            disputeReason.value = (
-                              event.target as HTMLTextAreaElement
-                            ).value
-                          },
-                        }),
-                      ]),
-                      h('div', { class: 'actions' }, [
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            onClick: () => markFeedback(item.id, 'CONFIRMED'),
-                          },
-                          '确认',
-                        ),
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            onClick: () => markFeedback(item.id, 'DISPUTED'),
-                          },
-                          '提出异议',
-                        ),
-                      ]),
-                    ]),
-                  ),
-                ),
+                feedback.value.length === 0
+                  ? h('p', { class: 'empty-state' }, '当前学生暂无反馈')
+                  : h(
+                      'div',
+                      { class: 'list' },
+                      feedback.value.map((item: StudentFeedback) =>
+                        h('article', { class: 'feedback-card', key: item.id }, [
+                          h('strong', feedbackTitle(item)),
+                          h('p', `表现：${item.performance}`),
+                          h('p', `优点：${item.strengths}`),
+                          h('p', `改进：${item.improvements}`),
+                          h('p', `建议：${item.suggestion}`),
+                          h('p', `状态：${item.status}`),
+                          h('label', [
+                            '异议说明',
+                            h('textarea', {
+                              rows: 2,
+                              value: disputeReason.value,
+                              onInput: (event: Event) => {
+                                disputeReason.value = (
+                                  event.target as HTMLTextAreaElement
+                                ).value
+                              },
+                            }),
+                          ]),
+                          h('div', { class: 'actions' }, [
+                            h(
+                              'button',
+                              {
+                                disabled:
+                                  isSavingFeedback.value ||
+                                  item.status !== 'PENDING_PARENT',
+                                type: 'button',
+                                onClick: () => void markFeedback(item.id, 'CONFIRMED'),
+                              },
+                              '确认',
+                            ),
+                            h(
+                              'button',
+                              {
+                                disabled:
+                                  isSavingFeedback.value ||
+                                  item.status !== 'PENDING_PARENT',
+                                type: 'button',
+                                onClick: () => void markFeedback(item.id, 'DISPUTED'),
+                              },
+                              '提出异议',
+                            ),
+                          ]),
+                        ]),
+                      ),
+                    ),
               ])
-            : null
-        ])
+            : null,
+        ]),
       ])
-        : renderLogin()
+    }
   },
 })

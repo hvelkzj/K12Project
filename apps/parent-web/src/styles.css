@@ -194,6 +194,17 @@ textarea:focus {
   font-weight: 650;
 }
 
+.error-message {
+  margin: 0;
+  padding: 12px 15px;
+  border: 1px solid #edc0bd;
+  border-radius: 10px;
+  color: #96372f;
+  background: #fff0ef;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .login-submit {
   width: 100%;
 }
@@ -370,6 +381,19 @@ textarea:focus {
   font-size: 22px;
 }
 
+.state-panel {
+  align-content: start;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 15px;
+  border-radius: 9px;
+  color: #67768b;
+  background: #f6f8fb;
+  font-size: 13px;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -498,6 +522,11 @@ textarea:focus {
 .actions button:hover {
   border-color: #aebdd0;
   background: #f7f9fc;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 @media (max-width: 940px) {

@@ -20,6 +20,7 @@ export interface ParentAuthClient {
   restoreCurrentUser(): Promise<UserSummary | null>
   logout(): Promise<void>
   getAccessToken(): string | null
+  clearAccessToken(): void
 }
 
 function createMemoryStorage(): Pick<
@@ -187,6 +188,7 @@ export function createParentAuthClient(
     },
 
     getAccessToken,
+    clearAccessToken,
   }
 }
 
