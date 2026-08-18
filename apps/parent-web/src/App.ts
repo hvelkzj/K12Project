@@ -15,6 +15,10 @@ import {
   ParentBusinessError,
 } from './parentBusinessClient'
 import type { ParentOverview } from './parentBusinessClient'
+import {
+  countPendingParentFeedback,
+  overviewRetryStudentId,
+} from './parentViewHelpers'
 
 const tabs = ['首页', '学生切换', '课表', '请假', '通知', '反馈'] as const
 type TabName = (typeof tabs)[number]
@@ -73,6 +77,9 @@ export default defineComponent({
       ...(overview.value?.notifications ?? []),
     ])
     const feedback = computed(() => overview.value?.feedback ?? [])
+    const pendingFeedbackCount = computed(() =>
+      countPendingParentFeedback(feedback.value),
+    )
     const leaveRequests = computed(() => overview.value?.leaveRequests ?? [])
     const courseNames = computed(
       () =>
@@ -394,7 +401,17 @@ export default defineComponent({
             {
               class: 'primary',
               type: 'button',
-              onClick: () => void loadStudentsAndDefaultOverview(),
+              onClick: () => {
+                const studentId = overviewRetryStudentId(
+                  bindings.value,
+                  selectedStudentId.value,
+                )
+                if (studentId === null) {
+                  void loadStudentsAndDefaultOverview()
+                } else {
+                  void loadOverview(studentId)
+                }
+              },
             },
             '重试',
           ),
@@ -473,7 +490,7 @@ export default defineComponent({
                   h('article', [h('strong', String(schedules.value.length)), h('span', '课程')]),
                   h('article', [h('strong', String(notices.value.length)), h('span', '通知')]),
                   h('article', [
-                    h('strong', String(feedback.value.length)),
+                    h('strong', String(pendingFeedbackCount.value)),
                     h('span', '待看反馈'),
                   ]),
                 ]),
