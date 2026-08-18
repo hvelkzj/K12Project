@@ -170,12 +170,22 @@ test('无令牌时抛出 AUTH_REQUIRED', async () => {
 
 test('401 时触发未授权回调', async () => {
   let unauthorizedCalled = 0
-  const { client, storage } = setup(() => {
-    unauthorizedCalled += 1
-    return jsonResponse(401, {
+  const storage = createMemoryStorage()
+  storage.setItem(ACCESS_TOKEN_KEY, 'token-academic')
+  const { fetchImpl } = createFetchMock(() =>
+    jsonResponse(401, {
       code: 'INVALID_SESSION',
       message: '登录已失效，请重新登录',
-    })
+    }),
+  )
+  const client = createAdminApiClient({
+    apiBaseUrl: 'http://api.test',
+    fetchImpl,
+    storage,
+    onUnauthorized() {
+      unauthorizedCalled += 1
+      storage.removeItem(ACCESS_TOKEN_KEY)
+    },
   })
 
   await assert.rejects(
@@ -187,7 +197,7 @@ test('401 时触发未授权回调', async () => {
     },
   )
   assert.equal(unauthorizedCalled, 1)
-  assert.equal(storage.getItem(ACCESS_TOKEN_KEY), 'token-academic')
+  assert.equal(storage.getItem(ACCESS_TOKEN_KEY), null)
 })
 
 test('403 返回服务端业务错误且不修改本地状态', async () => {
