@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { Assignment, FileSummary, Submission, UserSummary } from '@k12/shared'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { Assignment, CourseSummary, FileSummary, Submission, UserSummary } from '@k12/shared'
 import { listAssignmentRows } from '../assignmentListService'
-import { getSubmissionHistory, studentDataService } from '../studentService'
+import { getSubmissionHistory } from '../studentService'
 import { isAssignmentSubmissionClosed } from '../assignmentPresentation'
 import type { AssignmentListRow } from '../assignmentPresentation'
+import { assignmentDrafts } from '../assignmentDrafts'
+import { draftSubmissionFlow } from '../draftSubmission'
 import { StudentBusinessError } from '../studentBusinessClient'
 import type { StudentOverview } from '../studentBusinessClient'
 import AssignmentList from './AssignmentList.vue'
@@ -13,6 +15,7 @@ const props = withDefaults(
   defineProps<{
     currentUser: UserSummary
     overview: StudentOverview | null
+    courses: CourseSummary[]
     initialAssignmentId?: number | null
   }>(),
   { initialAssignmentId: null },
@@ -56,6 +59,17 @@ const revisionCount = computed(() => rows.value.filter((row) => row.status === '
 const pendingCount = computed(() => rows.value.filter((row) => row.status === 'NOT_SUBMITTED').length)
 const completionPercent = computed(() => rows.value.length === 0 ? 0 : Math.round((completedCount.value / rows.value.length) * 100))
 
+watch(
+  [content, attachments],
+  () => {
+    if (page.value !== 'submit' || !assignment.value) return
+    assignmentDrafts.save(assignment.value.id, {
+      content: content.value,
+      attachments: attachments.value,
+    })
+  },
+)
+
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
 }
@@ -64,7 +78,14 @@ function handlePlaceholder(featureName: string): void {
   if (featureName === '作业统计') activePanel.value = 'statistics'
   if (featureName === '个人中心') activePanel.value = 'profile'
 }
-function beginSubmission(): void { if (!canSubmit.value) return; content.value = ''; attachments.value = []; errorMessage.value = ''; page.value = 'submit' }
+function beginSubmission(): void {
+  if (!canSubmit.value || !assignment.value) return
+  const draft = assignmentDrafts.load(assignment.value.id)
+  content.value = draft?.content ?? ''
+  attachments.value = draft ? [...draft.attachments] : []
+  errorMessage.value = ''
+  page.value = 'submit'
+}
 function handleFileChange(event: Event): void {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
   attachments.value = files.map((file, index) => ({ id: Date.now() + index, originalName: file.name, mimeType: file.type || 'application/octet-stream', byteSize: file.size, createdAt: new Date().toISOString() }))
@@ -75,7 +96,7 @@ async function submit(): Promise<void> {
   isSubmitting.value = true
   errorMessage.value = ''
   try {
-    await studentDataService.submitWork({
+    await draftSubmissionFlow.submitWork({
       assignmentId: assignment.value.id,
       content: content.value,
       attachments: attachments.value,
@@ -95,7 +116,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <AssignmentList v-if="page === 'list'" :rows="rows" :now="currentNow" @open="openAssignment" @placeholder="handlePlaceholder" />
+  <AssignmentList v-if="page === 'list'" :rows="rows" :now="currentNow" :courses="props.courses" @open="openAssignment" @placeholder="handlePlaceholder" />
   <section v-else-if="assignment" class="assignment-workspace">
     <button class="back-button" type="button" @click="page = 'list'">← 返回作业列表</button>
     <article v-if="page === 'detail'" class="panel">
