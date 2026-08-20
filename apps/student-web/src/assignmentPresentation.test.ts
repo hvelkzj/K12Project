@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
+import type { Submission } from '@k12/shared'
+
 import {
   calculateGlobalProgress,
   formatCountdown,
@@ -11,11 +13,15 @@ import {
   isAssignmentSubmissionClosed,
 } from './assignmentPresentation'
 import { listAssignmentRows } from './assignmentListService'
-import { mockNow, studentId } from './mockData'
-import {
-  resetMockSubmissions,
-  submitAssignment,
-} from './studentService'
+import { createStudentOverviewFixture, mockNow, studentId } from './mockData'
+import type { StudentOverview } from './studentBusinessClient'
+
+function withSubmission(
+  overview: StudentOverview,
+  item: Submission,
+): StudentOverview {
+  return { ...overview, submissions: [...overview.submissions, item] }
+}
 
 test('全局完成率由公共提交状态动态计算', () => {
   assert.equal(
@@ -55,20 +61,27 @@ test('成绩等级仅作为页面展示字段派生', () => {
 })
 
 test('截止状态与服务提交规则一致', () => {
-  const expiredAssignment = listAssignmentRows(studentId).find(
-    ({ assignment }) => assignment.id === 304,
+  const rows = listAssignmentRows(createStudentOverviewFixture())
+
+  const expiredAssignment = rows.find(
+    ({ assignment }) => assignment.id === 3004,
+  )?.assignment
+  const openAssignment = rows.find(
+    ({ assignment }) => assignment.id === 3001,
   )?.assignment
 
   assert.ok(expiredAssignment)
   assert.equal(isAssignmentSubmissionClosed(expiredAssignment, mockNow), true)
+  assert.ok(openAssignment)
+  assert.equal(isAssignmentSubmissionClosed(openAssignment, mockNow), false)
 })
 
 test('提交后列表状态和全局完成率会回写', () => {
-  resetMockSubmissions()
-  const beforeRows = listAssignmentRows(studentId)
+  const before = createStudentOverviewFixture()
+  const beforeRows = listAssignmentRows(before)
 
   assert.equal(
-    beforeRows.find(({ assignment }) => assignment.id === 301)?.status,
+    beforeRows.find(({ assignment }) => assignment.id === 3001)?.status,
     'NOT_SUBMITTED',
   )
   assert.equal(
@@ -76,17 +89,25 @@ test('提交后列表状态和全局完成率会回写', () => {
     25,
   )
 
-  submitAssignment({
-    assignmentId: 301,
+  const after = withSubmission(before, {
+    id: 4004,
+    assignmentId: 3001,
     studentId,
+    attempt: 1,
     content: '列表集成测试提交',
     attachments: [],
+    status: 'SUBMITTED',
     submittedAt: mockNow,
+    score: null,
+    teacherComment: '',
+    gradedBy: null,
+    gradedAt: null,
+    updatedAt: mockNow,
   })
+  const afterRows = listAssignmentRows(after)
 
-  const afterRows = listAssignmentRows(studentId)
   assert.equal(
-    afterRows.find(({ assignment }) => assignment.id === 301)?.status,
+    afterRows.find(({ assignment }) => assignment.id === 3001)?.status,
     'SUBMITTED',
   )
   assert.equal(

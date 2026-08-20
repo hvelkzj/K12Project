@@ -284,3 +284,18 @@ test('没有本地令牌时退出不会发送请求', async () => {
   await client.logout()
   assert.equal(calls.length, 0)
 })
+
+test('clearAccessToken 移除本地访问令牌', () => {
+  const storage = createStorage()
+  storage.setItem(accessTokenStorageKey, 'token-101')
+  const client = createStudentAuthClient({
+    apiBaseUrl: 'http://api.test',
+    fetchImpl: () => Promise.resolve(new Response(null, { status: 204 })),
+    storage,
+  })
+
+  client.clearAccessToken()
+
+  assert.equal(client.getAccessToken(), null)
+  assert.equal(storage.getItem(accessTokenStorageKey), null)
+})
