@@ -9,7 +9,8 @@ import type {
 import { isTeacherUser, type TeacherUser } from './teacherAccess'
 
 export const ACCESS_TOKEN_STORAGE_KEY = 'k12AccessToken'
-export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:3000'
+//export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:3000'
+export const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 type TokenStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
