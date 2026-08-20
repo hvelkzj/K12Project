@@ -15,6 +15,7 @@ export interface AuthService {
   login(username: string, password: string): LoginResponse | null
   getCurrentUser(accessToken: string): UserSummary | null
   logout(accessToken: string): boolean
+  setAccountActive(userId: number, active: boolean): void
   reset(): void
 }
 
@@ -41,6 +42,7 @@ export function createAuthService(
   const sessionDurationMs =
     options.sessionDurationMs ?? defaultSessionDurationMs
   const sessions = new Map<string, SessionRecord>()
+  const accountActiveOverrides = new Map<number, boolean>()
 
   if (!Number.isFinite(sessionDurationMs) || sessionDurationMs <= 0) {
     throw new TypeError('sessionDurationMs must be a positive number')
@@ -69,6 +71,16 @@ export function createAuthService(
     }
   }
 
+  function isAccountActive(userId: number, initialActive: boolean): boolean {
+    return accountActiveOverrides.get(userId) ?? initialActive
+  }
+
+  function revokeUserSessions(userId: number): void {
+    for (const [tokenHash, session] of sessions) {
+      if (session.userId === userId) sessions.delete(tokenHash)
+    }
+  }
+
   return {
     login(username, password) {
       const currentTime = now()
@@ -78,7 +90,11 @@ export function createAuthService(
         (candidate) => candidate.username === username,
       )
 
-      if (!account || !account.active || account.password !== password) {
+      if (
+        !account ||
+        !isAccountActive(account.user.id, account.active) ||
+        account.password !== password
+      ) {
         return null
       }
 
@@ -116,7 +132,11 @@ export function createAuthService(
       const account = MOCK_ACCOUNTS.find(
         (candidate) => candidate.user.id === session.userId,
       )
-      return account ? cloneUser(account.user) : null
+      if (!account || !isAccountActive(account.user.id, account.active)) {
+        sessions.delete(tokenHash)
+        return null
+      }
+      return cloneUser(account.user)
     },
 
     logout(accessToken) {
@@ -129,8 +149,14 @@ export function createAuthService(
       return session.expiresAtMs > now()
     },
 
+    setAccountActive(userId, active) {
+      accountActiveOverrides.set(userId, active)
+      if (!active) revokeUserSessions(userId)
+    },
+
     reset() {
       sessions.clear()
+      accountActiveOverrides.clear()
     },
   }
 }
