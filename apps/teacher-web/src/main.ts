@@ -1,5 +1,5 @@
 
-/*import { createApp } from 'vue'
+import { createApp } from 'vue'
 import App from './App.vue'
 import './style.css'
 import router from './router' //新增：导入路由
@@ -7,7 +7,8 @@ import router from './router' //新增：导入路由
 createApp(App)
   .use(router) //新增：挂载路由
   .mount('#app')
-  */
+  
+ 
  import { createTeacherAuthClient } from './authClient'
 import { TeacherApiClient } from './teacherApiClient'
 
