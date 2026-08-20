@@ -1,30 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import type {
-  Assignment,
-  AttendanceRecord,
-  AttendanceStatus,
-  ScheduleChange,
-  ScheduleSummary,
-  StudentFeedback,
-  StudentSummary,
-  Submission,
-} from '@k12/shared'
-import { MOCK_ACCOUNT_PASSWORD } from '@k12/shared/mock-accounts'
+import type { AttendanceStatus, ScheduleSummary, Submission } from '@k12/shared'
 
 import { teacherAuthClient } from './authClient'
 import {
   canUseHomeroomScope,
   canWriteSchedule,
   teacherRoleName,
-  visibleSchedulesForTeacher,
   type TeacherUser,
 } from './teacherAccess'
 import {
-  createAttendanceRecords,
-  createScheduleChange,
-  type AttendanceDraft,
-} from './teacherWorkflow'
+  teacherBusinessClient,
+  TeacherBusinessError,
+  type TeacherOverview,
+} from './teacherBusinessClient'
+import {
+  assignmentInput,
+  feedbackInput,
+  gradeInput,
+  scheduleChangeInput,
+} from './teacherFormRules'
+import type { AttendanceDraft } from './teacherWorkflow'
 
 type PageKey =
   | 'today'
@@ -34,6 +30,12 @@ type PageKey =
   | 'feedback'
   | 'schedule-change'
 
+interface GradeDraft {
+  score: number | null
+  teacherComment: string
+  correctionRequired: boolean
+}
+
 const pages: Array<{ key: PageKey; label: string; shortLabel: string }> = [
   { key: 'today', label: '今日课程', shortLabel: '课程' },
   { key: 'attendance', label: '课堂签到', shortLabel: '签到' },
@@ -42,6 +44,7 @@ const pages: Array<{ key: PageKey; label: string; shortLabel: string }> = [
   { key: 'feedback', label: '课后反馈', shortLabel: '反馈' },
   { key: 'schedule-change', label: '调课申请', shortLabel: '调课' },
 ]
+
 const attendanceStatuses: AttendanceStatus[] = [
   'PRESENT',
   'LATE',
@@ -49,126 +52,66 @@ const attendanceStatuses: AttendanceStatus[] = [
   'LEAVE',
 ]
 
-const allSchedules: ScheduleSummary[] = [
-  {
-    id: 1001,
-    campusId: 1,
-    classId: 101,
-    courseId: 11,
-    teacherId: 301,
-    lessonDate: '2026-08-19',
-    startTime: '09:00:00',
-    endTime: '10:30:00',
-    room: 'A-302',
-    status: 'SCHEDULED',
-  },
-  {
-    id: 1002,
-    campusId: 1,
-    classId: 102,
-    courseId: 12,
-    teacherId: 303,
-    lessonDate: '2026-08-19',
-    startTime: '14:00:00',
-    endTime: '15:30:00',
-    room: 'B-205',
-    status: 'SCHEDULED',
-  },
-  {
-    id: 1003,
-    campusId: 1,
-    classId: 101,
-    courseId: 12,
-    teacherId: 302,
-    lessonDate: '2026-08-20',
-    startTime: '14:00:00',
-    endTime: '15:30:00',
-    room: 'B-102',
-    status: 'SCHEDULED',
-  },
-  {
-    id: 1004,
-    campusId: 1,
-    classId: 102,
-    courseId: 12,
-    teacherId: 302,
-    lessonDate: '2026-08-20',
-    startTime: '16:30:00',
-    endTime: '18:00:00',
-    room: 'B-203',
-    status: 'SCHEDULED',
-  },
-]
-
-const students: StudentSummary[] = [
-  {
-    id: 101,
-    displayName: '林晓雨',
-    classId: 101,
-    className: '六年级 1 班',
-    campusId: 1,
-    campusName: '滨江校区',
-  },
-  {
-    id: 104,
-    displayName: '周明轩',
-    classId: 101,
-    className: '六年级 1 班',
-    campusId: 1,
-    campusName: '滨江校区',
-  },
-  {
-    id: 102,
-    displayName: '林晓晨',
-    classId: 102,
-    className: '六年级 2 班',
-    campusId: 1,
-    campusName: '滨江校区',
-  },
-]
-
-const courseNames = new Map<number, string>([
-  [11, '数学提高班'],
-  [12, '英语阅读班'],
-])
-const classNames = new Map<number, string>([
-  [101, '六年级 1 班'],
-  [102, '六年级 2 班'],
-])
-const homeroomClassIdsByTeacher = new Map<number, number[]>([[302, [101]]])
-
 const activePage = ref<PageKey>('today')
 const currentUser = ref<TeacherUser | null>(null)
+const overview = ref<TeacherOverview | null>(null)
 const isRestoringSession = ref(true)
 const isAuthenticating = ref(false)
-const username = ref('teacher_301')
-const password = ref(MOCK_ACCOUNT_PASSWORD)
+const isOverviewLoading = ref(false)
+const pendingAction = ref<string | null>(null)
+const overviewLoadError = ref('')
+const username = ref('')
+const password = ref('')
 const authMessage = ref('')
 const notice = ref('')
 const selectedScheduleId = ref<number | null>(null)
 
-const visibleSchedules = computed(() => {
-  const user = currentUser.value
-  if (!user) return []
-  return visibleSchedulesForTeacher(
-    user,
-    allSchedules,
-    homeroomClassIdsByTeacher.get(user.id) ?? [],
-  )
+const attendanceDrafts = ref<AttendanceDraft[]>([])
+const gradeDrafts = reactive<Record<number, GradeDraft>>({})
+
+const assignmentDraft = reactive({
+  title: '',
+  description: '',
+  dueAt: '',
+  allowLate: false,
 })
+
+const feedbackDraft = reactive({
+  studentId: 0,
+  performance: '',
+  strengths: '',
+  improvements: '',
+  suggestion: '',
+})
+
+const scheduleChangeDraft = reactive({
+  proposedDate: '',
+  proposedStartTime: '',
+  proposedEndTime: '',
+  reason: '',
+})
+
+const visibleSchedules = computed(() => overview.value?.schedules ?? [])
+const attendanceRecords = computed(() => overview.value?.attendance ?? [])
+const scheduleChanges = computed(() => overview.value?.scheduleChanges ?? [])
+const assignments = computed(() => overview.value?.assignments ?? [])
+const submissions = computed(() => overview.value?.submissions ?? [])
+
 const selectedSchedule = computed(
   () =>
     visibleSchedules.value.find(
       (schedule) => schedule.id === selectedScheduleId.value,
     ) ?? null,
 )
-const selectedStudents = computed(() =>
-  selectedSchedule.value
-    ? students.filter(
-        (student) => student.classId === selectedSchedule.value?.classId,
-      )
-    : [],
-)
+
+const selectedStudents = computed(() => {
+  const schedule = selectedSchedule.value
+  if (!schedule) return []
+  return (overview.value?.students ?? []).filter(
+    (student) => student.classId === schedule.classId,
+  )
+})
+
 const roleName = computed(() =>
   currentUser.value ? teacherRoleName(currentUser.value.role) : '',
 )
@@ -186,100 +129,95 @@ const scopeDescription = computed(() => {
     : '仅显示并操作本人授课课次'
 })
 
-const attendanceDrafts = ref<AttendanceDraft[]>([])
-const attendanceRecords = ref<AttendanceRecord[]>([])
+const recordedStudentIds = computed(
+  () =>
+    new Set(
+      attendanceRecords.value
+        .filter((item) => item.scheduleId === selectedScheduleId.value)
+        .map((item) => item.studentId),
+    ),
+)
 
-const assignment = reactive<Assignment>({
-  id: 3001,
-  campusId: 1,
-  classId: 101,
-  courseId: 11,
-  scheduleId: 1001,
-  teacherId: 301,
-  title: '分数乘法巩固练习',
-  description: '完成练习册第 18—20 页，写出计算过程。',
-  attachments: [],
-  dueAt: '2026-08-21T20:00:00+08:00',
-  allowLate: false,
-  publishedAt: '2026-08-18T09:00:00+08:00',
-  createdAt: '2026-08-18T09:00:00+08:00',
-  updatedAt: '2026-08-18T09:00:00+08:00',
+const unrecordedAttendanceCount = computed(
+  () =>
+    selectedStudents.value.filter(
+      (student) => !recordedStudentIds.value.has(student.id),
+    ).length,
+)
+
+const ownAssignmentIds = computed(() => {
+  const userId = currentUser.value?.id
+  return new Set(
+    assignments.value
+      .filter((item) => item.teacherId === userId)
+      .map((item) => item.id),
+  )
 })
-const assignmentDeadline = ref('2026-08-21T20:00')
 
-const submissions = ref<Submission[]>([
-  {
-    id: 4001,
-    assignmentId: 3001,
-    studentId: 101,
-    attempt: 1,
-    content: '已完成全部练习。',
-    attachments: [],
-    status: 'SUBMITTED',
-    submittedAt: '2026-08-18T19:24:00+08:00',
-    score: 92,
-    teacherComment: '计算过程清晰。',
-    gradedBy: 301,
-    gradedAt: '2026-08-18T21:00:00+08:00',
-    updatedAt: '2026-08-18T21:00:00+08:00',
-  },
-  {
-    id: 4002,
-    assignmentId: 3001,
-    studentId: 104,
-    attempt: 1,
-    content: '已提交练习。',
-    attachments: [],
-    status: 'REVISION_REQUIRED',
-    submittedAt: '2026-08-18T20:03:00+08:00',
-    score: 78,
-    teacherComment: '请订正第 4 题。',
-    gradedBy: 301,
-    gradedAt: '2026-08-18T21:05:00+08:00',
-    updatedAt: '2026-08-18T21:05:00+08:00',
-  },
-])
-
-const feedbackDraft = reactive({
-  studentId: 101,
-  performance: '课堂专注，能主动回答问题。',
-  strengths: '分数乘法计算准确。',
-  improvements: '应用题的单位换算需要更细心。',
-  suggestion: '本周复习练习册中的单位换算题。',
-})
-const feedbackRecords = ref<StudentFeedback[]>([])
-
-const scheduleChangeDraft = reactive({
-  proposedDate: '2026-08-22',
-  proposedStartTime: '10:00',
-  proposedEndTime: '11:30',
-  reason: '参加学校教研活动',
-})
-const scheduleChanges = ref<ScheduleChange[]>([])
+const visibleSubmissions = computed(() =>
+  submissions.value.filter((item) => ownAssignmentIds.value.has(item.assignmentId)),
+)
 
 function courseName(courseId: number): string {
-  return courseNames.get(courseId) ?? `课程 #${courseId}`
+  return overview.value?.courses.find((item) => item.id === courseId)?.name ?? `课程 #${courseId}`
 }
 
 function className(classId: number): string {
-  return classNames.get(classId) ?? `班级 #${classId}`
+  return overview.value?.classes.find((item) => item.id === classId)?.name ?? `班级 #${classId}`
 }
 
 function studentName(studentId: number): string {
-  return students.find((student) => student.id === studentId)?.displayName ?? `学生 #${studentId}`
+  return overview.value?.students.find((student) => student.id === studentId)?.displayName ?? `学生 #${studentId}`
 }
 
-function selectDefaultSchedule(): void {
-  selectedScheduleId.value = visibleSchedules.value[0]?.id ?? null
-  resetAttendanceDrafts()
+function assignmentTitle(assignmentId: number): string {
+  return assignments.value.find((item) => item.id === assignmentId)?.title ?? `作业 #${assignmentId}`
+}
+
+function resetGradeDrafts(): void {
+  for (const key of Object.keys(gradeDrafts)) delete gradeDrafts[Number(key)]
+  for (const item of visibleSubmissions.value) {
+    gradeDrafts[item.id] = {
+      score: item.score ?? null,
+      teacherComment: item.teacherComment,
+      correctionRequired: item.status === 'REVISION_REQUIRED',
+    }
+  }
 }
 
 function resetAttendanceDrafts(): void {
+  const existing = new Map(
+    attendanceRecords.value
+      .filter((item) => item.scheduleId === selectedScheduleId.value)
+      .map((item) => [item.studentId, item]),
+  )
   attendanceDrafts.value = selectedStudents.value.map((student) => ({
     studentId: student.id,
-    status: 'PRESENT',
-    note: '',
+    status: existing.get(student.id)?.status ?? 'PRESENT',
+    note: existing.get(student.id)?.note ?? '',
   }))
+  if (!selectedStudents.value.some((student) => student.id === feedbackDraft.studentId)) {
+    feedbackDraft.studentId = selectedStudents.value[0]?.id ?? 0
+  }
+}
+
+function selectDefaultSchedule(): void {
+  const userId = currentUser.value?.id
+  selectedScheduleId.value =
+    visibleSchedules.value.find((item) => item.teacherId === userId)?.id ??
+    visibleSchedules.value[0]?.id ??
+    null
+  resetAttendanceDrafts()
+}
+
+function applyOverview(value: TeacherOverview): void {
+  overview.value = value
+  if (!value.schedules.some((item) => item.id === selectedScheduleId.value)) {
+    selectDefaultSchedule()
+  } else {
+    resetAttendanceDrafts()
+  }
+  resetGradeDrafts()
 }
 
 function goTo(page: PageKey): void {
@@ -293,22 +231,46 @@ function selectSchedule(scheduleId: number, page: PageKey): void {
   goTo(page)
 }
 
+function handleBusinessError(error: unknown, fallback: string): void {
+  if (error instanceof TeacherBusinessError && error.status === 401) {
+    currentUser.value = null
+    overview.value = null
+    selectedScheduleId.value = null
+    authMessage.value = '登录已失效，请重新登录'
+    return
+  }
+  notice.value = error instanceof Error ? error.message : fallback
+}
+
+async function loadOverview(): Promise<void> {
+  isOverviewLoading.value = true
+  overviewLoadError.value = ''
+  try {
+    applyOverview(await teacherBusinessClient.loadOverview())
+  } catch (error) {
+    if (error instanceof TeacherBusinessError && error.status === 401) {
+      handleBusinessError(error, '教师数据加载失败')
+      return
+    }
+    overviewLoadError.value = error instanceof Error ? error.message : '教师数据加载失败'
+    if (overview.value) notice.value = overviewLoadError.value
+  } finally {
+    isOverviewLoading.value = false
+  }
+}
+
 async function login(): Promise<void> {
   if (!username.value.trim() || !password.value) {
     authMessage.value = '账号和密码不能为空'
     return
   }
-
   isAuthenticating.value = true
   authMessage.value = ''
   try {
-    currentUser.value = await teacherAuthClient.login(
-      username.value.trim(),
-      password.value,
-    )
+    currentUser.value = await teacherAuthClient.login(username.value.trim(), password.value)
     activePage.value = 'today'
     notice.value = `已使用 ${currentUser.value.displayName} 的真实账号登录`
-    selectDefaultSchedule()
+    await loadOverview()
   } catch (error) {
     authMessage.value = error instanceof Error ? error.message : '登录失败'
   } finally {
@@ -326,6 +288,7 @@ async function logout(): Promise<void> {
       : '退出接口失败，本地会话已清除'
   } finally {
     currentUser.value = null
+    overview.value = null
     selectedScheduleId.value = null
     attendanceDrafts.value = []
     notice.value = ''
@@ -334,131 +297,110 @@ async function logout(): Promise<void> {
   }
 }
 
-function requireWritableSchedule(): {
-  user: TeacherUser
-  schedule: ScheduleSummary
-} {
+function requireWritableSchedule(): ScheduleSummary {
   const user = currentUser.value
   const schedule = selectedSchedule.value
   if (!user || !schedule) throw new Error('请先选择课次')
   if (!canWriteSchedule(user, schedule)) {
     throw new Error('班主任只能查看该课次，不能代替任课教师操作')
   }
-  return { user, schedule }
+  return schedule
 }
 
-function saveAttendance(): void {
+async function saveAttendance(): Promise<void> {
   try {
-    const { user, schedule } = requireWritableSchedule()
-    const records = createAttendanceRecords({
-      user,
-      schedule,
-      drafts: attendanceDrafts.value,
-      existing: attendanceRecords.value,
-      recordedAt: new Date().toISOString(),
-    })
-    attendanceRecords.value.push(...records)
-    notice.value = `已保存 ${records.length} 条签到记录`
+    const schedule = requireWritableSchedule()
+    const records = attendanceDrafts.value.filter((item) => !recordedStudentIds.value.has(item.studentId))
+    if (records.length === 0) throw new Error('当前课次没有待保存签到')
+    pendingAction.value = 'attendance'
+    const created = await teacherBusinessClient.saveAttendance({ scheduleId: schedule.id, records })
+    if (overview.value) overview.value.attendance.push(...created)
+    resetAttendanceDrafts()
+    notice.value = `已保存 ${created.length} 条签到记录`
   } catch (error) {
-    notice.value = error instanceof Error ? error.message : '签到保存失败'
+    handleBusinessError(error, '签到保存失败')
+  } finally {
+    pendingAction.value = null
   }
 }
 
-function publishAssignment(): void {
+async function publishAssignment(): Promise<void> {
   try {
-    const { user, schedule } = requireWritableSchedule()
-    if (!assignment.title.trim() || !assignment.description.trim()) {
-      throw new Error('作业标题和内容不能为空')
+    const schedule = requireWritableSchedule()
+    pendingAction.value = 'assignment'
+    const created = await teacherBusinessClient.publishAssignment(
+      assignmentInput(schedule, assignmentDraft),
+    )
+    if (overview.value) overview.value.assignments.push(created)
+    assignmentDraft.title = ''
+    assignmentDraft.description = ''
+    notice.value = `作业 #${created.id} 已发布`
+  } catch (error) {
+    handleBusinessError(error, '作业发布失败')
+  } finally {
+    pendingAction.value = null
+  }
+}
+
+function replaceSubmission(updated: Submission): void {
+  const list = overview.value?.submissions
+  if (!list) return
+  const index = list.findIndex((item) => item.id === updated.id)
+  if (index >= 0) list[index] = updated
+}
+
+async function saveGrade(item: Submission): Promise<void> {
+  const draft = gradeDrafts[item.id]
+  try {
+    if (!draft) throw new Error('批改表单不存在')
+    pendingAction.value = `grade-${item.id}`
+    const updated = await teacherBusinessClient.gradeSubmission(
+      item.id,
+      gradeInput(draft),
+    )
+    replaceSubmission(updated)
+    gradeDrafts[item.id] = {
+      score: updated.score ?? null,
+      teacherComment: updated.teacherComment,
+      correctionRequired: updated.status === 'REVISION_REQUIRED',
     }
-    assignment.classId = schedule.classId
-    assignment.courseId = schedule.courseId
-    assignment.scheduleId = schedule.id
-    assignment.teacherId = user.id
-    assignment.dueAt = `${assignmentDeadline.value}:00+08:00`
-    assignment.updatedAt = new Date().toISOString()
-    notice.value = `作业已保存，截止时间 ${assignment.dueAt}`
+    notice.value = `提交 #${updated.id} 已完成批改`
   } catch (error) {
-    notice.value = error instanceof Error ? error.message : '作业保存失败'
+    handleBusinessError(error, '批改保存失败')
+  } finally {
+    pendingAction.value = null
   }
 }
 
-function saveGrades(): void {
+async function sendFeedback(): Promise<void> {
   try {
-    const { user } = requireWritableSchedule()
-    if (
-      submissions.value.some(
-        (item) =>
-          item.score === null ||
-          item.score === undefined ||
-          item.score < 0 ||
-          item.score > 100,
-      )
-    ) {
-      throw new Error('分数必须在 0 到 100 之间')
-    }
-    const now = new Date().toISOString()
-    submissions.value = submissions.value.map((item) => ({
-      ...item,
-      status: item.status === 'REVISION_REQUIRED' ? 'REVISION_REQUIRED' : 'GRADED',
-      gradedBy: user.id,
-      gradedAt: now,
-      updatedAt: now,
-    }))
-    notice.value = '批改结果已保存'
+    const schedule = requireWritableSchedule()
+    pendingAction.value = 'feedback'
+    const created = await teacherBusinessClient.sendFeedback(
+      feedbackInput(schedule.id, feedbackDraft),
+    )
+    if (overview.value) overview.value.feedback.push(created)
+    notice.value = `反馈 #${created.id} 已发送给家长`
   } catch (error) {
-    notice.value = error instanceof Error ? error.message : '批改保存失败'
+    handleBusinessError(error, '反馈发送失败')
+  } finally {
+    pendingAction.value = null
   }
 }
 
-function sendFeedback(): void {
+async function submitScheduleChange(): Promise<void> {
   try {
-    const { user, schedule } = requireWritableSchedule()
-    if (
-      !feedbackDraft.performance.trim() ||
-      !feedbackDraft.strengths.trim() ||
-      !feedbackDraft.improvements.trim() ||
-      !feedbackDraft.suggestion.trim()
-    ) {
-      throw new Error('课后反馈字段不能为空')
-    }
-    const now = new Date().toISOString()
-    feedbackRecords.value.push({
-      id: feedbackRecords.value.length + 1,
-      campusId: schedule.campusId,
-      scheduleId: schedule.id,
-      studentId: feedbackDraft.studentId,
-      teacherId: user.id,
-      performance: feedbackDraft.performance.trim(),
-      strengths: feedbackDraft.strengths.trim(),
-      improvements: feedbackDraft.improvements.trim(),
-      suggestion: feedbackDraft.suggestion.trim(),
-      status: 'PENDING_PARENT',
-      parentResponse: '',
-      respondedBy: null,
-      respondedAt: null,
-      sentAt: now,
-      updatedAt: now,
-    })
-    notice.value = '课后反馈已发送给家长'
+    const schedule = requireWritableSchedule()
+    pendingAction.value = 'schedule-change'
+    const created = await teacherBusinessClient.requestScheduleChange(
+      scheduleChangeInput(schedule.id, scheduleChangeDraft),
+    )
+    if (overview.value) overview.value.scheduleChanges.push(created)
+    notice.value = `调课申请 #${created.id} 已提交，状态：${created.status}`
   } catch (error) {
-    notice.value = error instanceof Error ? error.message : '反馈发送失败'
-  }
-}
-
-function submitScheduleChange(): void {
-  try {
-    const { user, schedule } = requireWritableSchedule()
-    const request = createScheduleChange({
-      user,
-      schedule,
-      draft: scheduleChangeDraft,
-      existing: scheduleChanges.value,
-      createdAt: new Date().toISOString(),
-    })
-    scheduleChanges.value.push(request)
-    notice.value = `调课申请 #${request.id} 已提交，状态：${request.status}`
-  } catch (error) {
-    notice.value = error instanceof Error ? error.message : '调课申请提交失败'
+    handleBusinessError(error, '调课申请提交失败')
+  } finally {
+    pendingAction.value = null
   }
 }
 
@@ -467,7 +409,7 @@ onMounted(async () => {
     currentUser.value = await teacherAuthClient.restoreCurrentUser()
     if (currentUser.value) {
       notice.value = `已恢复 ${currentUser.value.displayName} 的登录状态`
-      selectDefaultSchedule()
+      await loadOverview()
     } else {
       authMessage.value = '请使用教师或班主任账号登录'
     }
@@ -488,38 +430,24 @@ onMounted(async () => {
     <section class="auth-card">
       <p class="eyebrow">真实认证</p>
       <h1>K12 教师登录</h1>
-      <p class="muted">任课教师 teacher_301，班主任 teacher_302。</p>
+      <p class="muted">请使用任课教师或班主任账号登录。</p>
       <form class="auth-form" @submit.prevent="login">
         <label><span>账号</span><input v-model="username" autocomplete="username" /></label>
         <label><span>密码</span><input v-model="password" type="password" autocomplete="current-password" /></label>
         <p v-if="authMessage" class="auth-message" role="status">{{ authMessage }}</p>
-        <button class="primary" type="submit" :disabled="isAuthenticating">
-          {{ isAuthenticating ? '登录中…' : '登录' }}
-        </button>
+        <button class="primary" type="submit" :disabled="isAuthenticating">{{ isAuthenticating ? '登录中…' : '登录' }}</button>
       </form>
     </section>
   </main>
 
   <div v-else class="app-shell">
     <aside class="sidebar">
-      <div class="brand">
-        <span class="brand-mark">K</span>
-        <div><strong>K12 教学台</strong><small>教师 / 班主任端</small></div>
-      </div>
-
+      <div class="brand"><span class="brand-mark">K</span><div><strong>K12 教学台</strong><small>教师 / 班主任端</small></div></div>
       <nav aria-label="教师端页面">
-        <button
-          v-for="page in pages"
-          :key="page.key"
-          class="nav-item"
-          :class="{ active: activePage === page.key }"
-          type="button"
-          @click="goTo(page.key)"
-        >
+        <button v-for="page in pages" :key="page.key" class="nav-item" :class="{ active: activePage === page.key }" type="button" @click="goTo(page.key)">
           <span class="nav-dot" aria-hidden="true"></span><span>{{ page.label }}</span>
         </button>
       </nav>
-
       <div class="scope-card">
         <span>当前数据范围</span><strong>{{ roleName }}</strong><p>{{ scopeDescription }}</p>
         <button class="logout-button" type="button" @click="logout">退出登录</button>
@@ -534,90 +462,105 @@ onMounted(async () => {
 
       <div v-if="notice" class="notice" role="status">{{ notice }}</div>
 
-      <template v-if="activePage === 'today'">
-        <section class="summary-grid" aria-label="今日概览">
-          <article><span>可见课程</span><strong>{{ visibleSchedules.length }}</strong><small>按真实角色范围过滤</small></article>
-          <article><span>本人授课</span><strong>{{ ownScheduleCount }}</strong><small>可执行教学写操作</small></article>
-          <article><span>签到记录</span><strong>{{ attendanceRecords.length }}</strong><small>数字学生 ID</small></article>
-          <article><span>调课申请</span><strong>{{ scheduleChanges.length }}</strong><small>可查看处理状态</small></article>
+      <section v-if="isOverviewLoading" class="panel empty-state">
+        <h2>正在加载教师业务数据</h2><p class="muted">正在读取课表、学生、作业、签到和调课信息。</p>
+      </section>
+      <section v-else-if="overviewLoadError && !overview" class="panel empty-state">
+        <h2>教师业务数据加载失败</h2><p class="muted">{{ overviewLoadError }}</p>
+        <button class="primary" type="button" @click="loadOverview">重新加载</button>
+      </section>
+
+      <template v-else-if="overview">
+        <template v-if="activePage === 'today'">
+          <section class="summary-grid" aria-label="今日概览">
+            <article><span>可见课程</span><strong>{{ visibleSchedules.length }}</strong><small>由服务端按角色过滤</small></article>
+            <article><span>本人授课</span><strong>{{ ownScheduleCount }}</strong><small>可执行教学写操作</small></article>
+            <article><span>签到记录</span><strong>{{ attendanceRecords.length }}</strong><small>服务端保存结果</small></article>
+            <article><span>调课申请</span><strong>{{ scheduleChanges.length }}</strong><small>实时处理状态</small></article>
+          </section>
+          <section class="panel">
+            <div class="section-heading"><div><p class="eyebrow">课程日程</p><h2>可见课次</h2></div><button class="secondary" type="button" @click="loadOverview">刷新数据</button></div>
+            <p v-if="visibleSchedules.length === 0" class="muted empty-state">当前没有可见课次。</p>
+            <div v-else class="course-list">
+              <article v-for="schedule in visibleSchedules" :key="schedule.id" class="course-card">
+                <time>{{ schedule.lessonDate }}<br />{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</time>
+                <div class="course-main"><h3>{{ courseName(schedule.courseId) }}</h3><p>{{ className(schedule.classId) }} · {{ schedule.room }} · 课次 #{{ schedule.id }}</p></div>
+                <span class="status">{{ schedule.teacherId === currentUser.id ? '本人授课' : '班主任可见' }}</span>
+                <div class="card-actions">
+                  <button class="secondary" type="button" :disabled="!canWriteSchedule(currentUser, schedule)" @click="selectSchedule(schedule.id, 'schedule-change')">申请调课</button>
+                  <button class="primary" type="button" :disabled="!canWriteSchedule(currentUser, schedule)" @click="selectSchedule(schedule.id, 'attendance')">进入签到</button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </template>
+
+        <section v-else-if="activePage === 'attendance'" class="panel">
+          <div class="section-heading"><div><p class="eyebrow">课次 #{{ selectedSchedule?.id ?? '—' }}</p><h2>{{ selectedSchedule ? className(selectedSchedule.classId) : '请先选择课次' }}课堂签到</h2></div><span class="status">{{ selectedStudents.length }} 名学生</span></div>
+          <p v-if="selectedStudents.length === 0" class="muted empty-state">当前课次没有可签到学生。</p>
+          <div v-else class="table-wrap">
+            <table><thead><tr><th>学生</th><th>签到状态</th><th>备注</th></tr></thead>
+              <tbody><tr v-for="draft in attendanceDrafts" :key="draft.studentId">
+                <td><strong>{{ studentName(draft.studentId) }}</strong><small>ID {{ draft.studentId }}</small></td>
+                <td><select v-model="draft.status" :disabled="recordedStudentIds.has(draft.studentId)"><option v-for="status in attendanceStatuses" :key="status" :value="status">{{ status }}</option></select></td>
+                <td><input v-model="draft.note" :disabled="recordedStudentIds.has(draft.studentId)" placeholder="可选备注" /></td>
+              </tr></tbody>
+            </table>
+          </div>
+          <div class="panel-footer"><p class="muted">已保存学生将被锁定，避免重复签到。</p><button class="primary" type="button" :disabled="pendingAction !== null || unrecordedAttendanceCount === 0" @click="saveAttendance">{{ pendingAction === 'attendance' ? '保存中…' : '保存签到' }}</button></div>
         </section>
 
-        <section class="panel">
-          <div class="section-heading"><div><p class="eyebrow">课程日程</p><h2>可见课次</h2></div><span class="mock-tag">业务 Mock · 认证真实</span></div>
-          <div class="course-list">
-            <article v-for="schedule in visibleSchedules" :key="schedule.id" class="course-card">
-              <time>{{ schedule.lessonDate }}<br />{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</time>
-              <div class="course-main"><h3>{{ courseName(schedule.courseId) }}</h3><p>{{ className(schedule.classId) }} · {{ schedule.room }} · 课次 #{{ schedule.id }}</p></div>
-              <span class="status">{{ schedule.teacherId === currentUser.id ? '本人授课' : '班主任可见' }}</span>
-              <div class="card-actions">
-                <button class="secondary" type="button" :disabled="!canWriteSchedule(currentUser, schedule)" @click="selectSchedule(schedule.id, 'schedule-change')">申请调课</button>
-                <button class="primary" type="button" :disabled="!canWriteSchedule(currentUser, schedule)" @click="selectSchedule(schedule.id, 'attendance')">进入签到</button>
-              </div>
-            </article>
-          </div>
+        <section v-else-if="activePage === 'publish'" class="panel">
+          <div class="section-heading"><div><p class="eyebrow">教师发布</p><h2>新建作业</h2></div><span class="status">服务端 Assignment</span></div>
+          <form class="form-grid" @submit.prevent="publishAssignment">
+            <label class="full"><span>当前课次</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · #${selectedSchedule.id}` : '请先选择课次'" readonly /></label>
+            <label class="full"><span>作业标题</span><input v-model="assignmentDraft.title" required /></label>
+            <label class="full"><span>作业内容</span><textarea v-model="assignmentDraft.description" rows="4" required></textarea></label>
+            <label><span>截止时间</span><input v-model="assignmentDraft.dueAt" type="datetime-local" required /></label>
+            <label class="check-field"><input v-model="assignmentDraft.allowLate" type="checkbox" /><span>允许截止后提交</span></label>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null">{{ pendingAction === 'assignment' ? '发布中…' : '发布作业' }}</button></div>
+          </form>
+        </section>
+
+        <section v-else-if="activePage === 'grading'" class="panel">
+          <div class="section-heading"><div><p class="eyebrow">真实提交记录</p><h2>学生提交与批改</h2></div><span class="status">{{ visibleSubmissions.length }} 份提交</span></div>
+          <p v-if="visibleSubmissions.length === 0" class="muted empty-state">当前没有可批改提交。</p>
+          <div v-else class="table-wrap"><table><thead><tr><th>作业 / 学生</th><th>分数与评语</th><th>订正</th><th>操作</th></tr></thead>
+            <tbody><tr v-for="item in visibleSubmissions" :key="item.id">
+              <td><strong>{{ assignmentTitle(item.assignmentId) }}</strong><small>{{ studentName(item.studentId) }} · attempt {{ item.attempt }} · {{ item.status }}</small></td>
+              <td><input v-model.number="gradeDrafts[item.id]!.score" class="score-input" type="number" min="0" max="100" :disabled="item.status !== 'SUBMITTED'" /><input v-model="gradeDrafts[item.id]!.teacherComment" placeholder="教师评语" :disabled="item.status !== 'SUBMITTED'" /></td>
+              <td><label class="inline-check"><input v-model="gradeDrafts[item.id]!.correctionRequired" type="checkbox" :disabled="item.status !== 'SUBMITTED'" />需要订正</label></td>
+              <td><button class="primary" type="button" :disabled="item.status !== 'SUBMITTED' || pendingAction !== null" @click="saveGrade(item)">{{ pendingAction === `grade-${item.id}` ? '保存中…' : '保存批改' }}</button></td>
+            </tr></tbody>
+          </table></div>
+        </section>
+
+        <section v-else-if="activePage === 'feedback'" class="panel">
+          <div class="section-heading"><div><p class="eyebrow">课后家校沟通</p><h2>发送学生反馈</h2></div><span class="status">PENDING_PARENT</span></div>
+          <form class="form-grid" @submit.prevent="sendFeedback">
+            <label><span>课次</span><input :value="selectedSchedule?.id ?? ''" readonly /></label>
+            <label><span>学生</span><select v-model.number="feedbackDraft.studentId"><option v-for="student in selectedStudents" :key="student.id" :value="student.id">{{ student.displayName }} · {{ student.id }}</option></select></label>
+            <label class="full"><span>课堂表现</span><textarea v-model="feedbackDraft.performance" rows="2" required></textarea></label>
+            <label><span>优点</span><textarea v-model="feedbackDraft.strengths" rows="3" required></textarea></label>
+            <label><span>待提升</span><textarea v-model="feedbackDraft.improvements" rows="3" required></textarea></label>
+            <label class="full"><span>学习建议</span><textarea v-model="feedbackDraft.suggestion" rows="3" required></textarea></label>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedStudents.length === 0">{{ pendingAction === 'feedback' ? '发送中…' : '发送给家长' }}</button></div>
+          </form>
+        </section>
+
+        <section v-else class="panel">
+          <div class="section-heading"><div><p class="eyebrow">课次 #{{ selectedSchedule?.id ?? '—' }}</p><h2>提交调课申请</h2></div><span class="status">服务端 ScheduleChange</span></div>
+          <form class="form-grid" @submit.prevent="submitScheduleChange">
+            <label class="full"><span>课程</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · ${selectedSchedule.room}` : '请先选择课次'" readonly /></label>
+            <label><span>申请日期</span><input v-model="scheduleChangeDraft.proposedDate" type="date" required /></label>
+            <div class="time-fields"><label><span>开始时间</span><input v-model="scheduleChangeDraft.proposedStartTime" type="time" required /></label><label><span>结束时间</span><input v-model="scheduleChangeDraft.proposedEndTime" type="time" required /></label></div>
+            <label class="full"><span>调课原因</span><textarea v-model="scheduleChangeDraft.reason" rows="4" required></textarea></label>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null">{{ pendingAction === 'schedule-change' ? '提交中…' : '提交调课申请' }}</button></div>
+          </form>
+          <div v-if="scheduleChanges.length" class="request-list"><article v-for="item in scheduleChanges" :key="item.id"><strong>申请 #{{ item.id }} · {{ item.status }}</strong><span>{{ item.proposedDate }} {{ item.proposedStartTime }}–{{ item.proposedEndTime }}</span><small>{{ item.reason }}</small></article></div>
+          <p v-else class="muted empty-state">当前没有调课申请。</p>
         </section>
       </template>
-
-      <section v-else-if="activePage === 'attendance'" class="panel">
-        <div class="section-heading"><div><p class="eyebrow">课次 #{{ selectedSchedule?.id ?? '—' }}</p><h2>{{ selectedSchedule ? className(selectedSchedule.classId) : '请先选择课次' }}课堂签到</h2></div><span class="status">{{ selectedStudents.length }} 名学生</span></div>
-        <div class="table-wrap">
-          <table><thead><tr><th>学生</th><th>签到状态</th><th>备注</th></tr></thead>
-            <tbody><tr v-for="draft in attendanceDrafts" :key="draft.studentId">
-              <td><strong>{{ studentName(draft.studentId) }}</strong><small>ID {{ draft.studentId }}</small></td>
-              <td><select v-model="draft.status"><option v-for="status in attendanceStatuses" :key="status" :value="status">{{ status }}</option></select></td>
-              <td><input v-model="draft.note" placeholder="可选备注" /></td>
-            </tr></tbody>
-          </table>
-        </div>
-        <div class="panel-footer"><p class="muted">同一课次、同一学生不能重复签到。</p><button class="primary" type="button" @click="saveAttendance">保存签到</button></div>
-      </section>
-
-      <section v-else-if="activePage === 'publish'" class="panel">
-        <div class="section-heading"><div><p class="eyebrow">教师发布</p><h2>新建作业</h2></div><span class="status">公共 Assignment</span></div>
-        <form class="form-grid" @submit.prevent="publishAssignment">
-          <label class="full"><span>当前课次</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · #${selectedSchedule.id}` : '请先选择课次'" readonly /></label>
-          <label class="full"><span>作业标题</span><input v-model="assignment.title" required /></label>
-          <label class="full"><span>作业内容</span><textarea v-model="assignment.description" rows="4" required></textarea></label>
-          <label><span>截止时间</span><input v-model="assignmentDeadline" type="datetime-local" required /></label>
-          <label class="check-field"><input v-model="assignment.allowLate" type="checkbox" /><span>允许截止后提交</span></label>
-          <div class="full form-actions"><button class="primary" type="submit">保存作业</button></div>
-        </form>
-      </section>
-
-      <section v-else-if="activePage === 'grading'" class="panel">
-        <div class="section-heading"><div><p class="eyebrow">作业 #{{ assignment.id }}</p><h2>学生提交与批改</h2></div><span class="status">{{ submissions.length }} 份提交</span></div>
-        <div class="table-wrap"><table><thead><tr><th>学生</th><th>提交时间</th><th>分数</th><th>状态</th></tr></thead>
-          <tbody><tr v-for="item in submissions" :key="item.id"><td><strong>{{ studentName(item.studentId) }}</strong><small>ID {{ item.studentId }}</small></td><td>{{ item.submittedAt }}</td><td><input v-model.number="item.score" class="score-input" type="number" min="0" max="100" /></td><td>{{ item.status }}</td></tr></tbody>
-        </table></div>
-        <div class="panel-footer"><p class="muted">评语和订正状态保留在公共 Submission 字段。</p><button class="primary" type="button" @click="saveGrades">保存批改</button></div>
-      </section>
-
-      <section v-else-if="activePage === 'feedback'" class="panel">
-        <div class="section-heading"><div><p class="eyebrow">课后家校沟通</p><h2>发送学生反馈</h2></div><span class="status">PENDING_PARENT</span></div>
-        <form class="form-grid" @submit.prevent="sendFeedback">
-          <label><span>课次</span><input :value="selectedSchedule?.id ?? ''" readonly /></label>
-          <label><span>学生</span><select v-model.number="feedbackDraft.studentId"><option v-for="student in selectedStudents" :key="student.id" :value="student.id">{{ student.displayName }} · {{ student.id }}</option></select></label>
-          <label class="full"><span>课堂表现</span><textarea v-model="feedbackDraft.performance" rows="2" required></textarea></label>
-          <label><span>优点</span><textarea v-model="feedbackDraft.strengths" rows="3" required></textarea></label>
-          <label><span>待提升</span><textarea v-model="feedbackDraft.improvements" rows="3" required></textarea></label>
-          <label class="full"><span>学习建议</span><textarea v-model="feedbackDraft.suggestion" rows="3" required></textarea></label>
-          <div class="full form-actions"><button class="primary" type="submit">发送给家长</button></div>
-        </form>
-      </section>
-
-      <section v-else class="panel">
-        <div class="section-heading"><div><p class="eyebrow">课次 #{{ selectedSchedule?.id ?? '—' }}</p><h2>提交调课申请</h2></div><span class="status">公共 ScheduleChange</span></div>
-        <form class="form-grid" @submit.prevent="submitScheduleChange">
-          <label class="full"><span>课程</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · ${selectedSchedule.room}` : '请先选择课次'" readonly /></label>
-          <label><span>申请日期</span><input v-model="scheduleChangeDraft.proposedDate" type="date" required /></label>
-          <div class="time-fields"><label><span>开始时间</span><input v-model="scheduleChangeDraft.proposedStartTime" type="time" required /></label><label><span>结束时间</span><input v-model="scheduleChangeDraft.proposedEndTime" type="time" required /></label></div>
-          <label class="full"><span>调课原因</span><textarea v-model="scheduleChangeDraft.reason" rows="4" required></textarea></label>
-          <div class="full form-actions"><button class="primary" type="submit">提交调课申请</button></div>
-        </form>
-        <div v-if="scheduleChanges.length" class="request-list">
-          <article v-for="item in scheduleChanges" :key="item.id"><strong>申请 #{{ item.id }} · {{ item.status }}</strong><span>{{ item.proposedDate }} {{ item.proposedStartTime }}–{{ item.proposedEndTime }}</span><small>{{ item.reason }}</small></article>
-        </div>
-      </section>
     </main>
 
     <nav class="mobile-nav" aria-label="移动端教师端页面">
