@@ -22,6 +22,7 @@ export interface StudentAuthClient {
   restoreCurrentUser(): Promise<UserSummary | null>
   logout(): Promise<void>
   getAccessToken(): string | null
+  clearAccessToken(): void
 }
 
 function createMemoryStorage(): AuthStorage {
@@ -188,6 +189,8 @@ export function createStudentAuthClient(
     },
 
     getAccessToken,
+
+    clearAccessToken,
   }
 }
 
