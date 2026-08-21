@@ -658,8 +658,11 @@ export function createBusinessStore(
       return clone(feedback)
     },
 
-    markNotificationRead(user, notificationId) {
+    markNotificationRead(user, notificationId, input) {
       requireRole(user, ['PARENT'])
+      if (!requireBoolean(input, 'read')) {
+        invalid('read 只能是 true')
+      }
       const notification = data.notifications.find(
         (item) => item.id === notificationId,
       )
@@ -1172,37 +1175,46 @@ export function createBusinessStore(
       if (schedule.status === 'COMPLETED') {
         conflict('已完成课次不能修改')
       }
-      if (
-        ![
-          'campusId',
-          'classId',
-          'courseId',
-          'teacherId',
-          'lessonDate',
-          'startTime',
-          'endTime',
-          'room',
-        ].some((field) => Object.hasOwn(input, field))
-      ) {
+
+      const editableFields = [
+        'teacherId',
+        'lessonDate',
+        'startTime',
+        'endTime',
+        'room',
+        'status',
+      ] as const
+      const unsupportedFields = Object.keys(input).filter(
+        (field) =>
+          !editableFields.includes(
+            field as (typeof editableFields)[number],
+          ),
+      )
+      if (unsupportedFields.length > 0) {
+        invalid(`课次字段不可修改：${unsupportedFields.join('、')}`)
+      }
+      if (!editableFields.some((field) => Object.hasOwn(input, field))) {
         invalid('至少提供一个可修改的课次字段')
       }
-      const candidate = normalizedSchedule(input, schedule)
-      ensureAdminCampus(user, candidate.campusId)
-      Object.assign(schedule, candidate, { status: 'CHANGED' as const })
-      return clone(schedule)
-    },
 
-    cancelSchedule(user, scheduleId) {
-      ensureAdmin(user)
-      const schedule = findSchedule(scheduleId)
-      ensureAdminCampus(user, schedule.campusId)
-      if (schedule.status === 'CANCELLED') {
-        conflict('该课次已经取消')
+      let requestedStatus: 'SCHEDULED' | 'CANCELLED' | undefined
+      if (Object.hasOwn(input, 'status')) {
+        const status = requireText(input, 'status')
+        if (status !== 'SCHEDULED' && status !== 'CANCELLED') {
+          invalid('status 只能是 SCHEDULED 或 CANCELLED')
+        }
+        requestedStatus = status
       }
-      if (schedule.status === 'COMPLETED') {
-        conflict('已完成课次不能取消')
+
+      const hasScheduleChanges = editableFields
+        .filter((field) => field !== 'status')
+        .some((field) => Object.hasOwn(input, field))
+      if (hasScheduleChanges) {
+        const candidate = normalizedSchedule(input, schedule)
+        Object.assign(schedule, candidate)
       }
-      schedule.status = 'CANCELLED'
+
+      schedule.status = requestedStatus ?? 'CHANGED'
       return clone(schedule)
     },
 

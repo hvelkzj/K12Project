@@ -25,7 +25,6 @@ const adminWorkOrderPattern = /^\/admin\/work-orders\/(\d+)$/
 const adminLeaveReviewPattern =
   /^\/admin\/leave-requests\/(\d+)\/review$/
 const adminSchedulePattern = /^\/admin\/schedules\/(\d+)$/
-const adminScheduleCancelPattern = /^\/admin\/schedules\/(\d+)\/cancel$/
 const adminUserPattern = /^\/admin\/users\/(\d+)$/
 
 const exactBusinessPaths = new Set([
@@ -53,7 +52,6 @@ function dynamicPathMatches(path: string): boolean {
     adminWorkOrderPattern,
     adminLeaveReviewPattern,
     adminSchedulePattern,
-    adminScheduleCancelPattern,
     adminUserPattern,
   ].some((pattern) => pattern.test(path))
 }
@@ -185,14 +183,18 @@ export async function handleBusinessRequest(
   if (parentNotificationReadMatch) {
     if (method !== 'PATCH') methodNotAllowed(response, ['PATCH'])
     else {
-      sendJson(
-        response,
-        200,
-        store.markNotificationRead(
-          user,
-          pathId(parentNotificationReadMatch),
-        ),
-      )
+      const input = await readBusinessInput(request, response)
+      if (input) {
+        sendJson(
+          response,
+          200,
+          store.markNotificationRead(
+            user,
+            pathId(parentNotificationReadMatch),
+            input,
+          ),
+        )
+      }
     }
     return true
   }
@@ -281,19 +283,6 @@ export async function handleBusinessRequest(
     else {
       const input = await readBusinessInput(request, response)
       if (input) sendJson(response, 201, store.createSchedule(user, input))
-    }
-    return true
-  }
-
-  const adminScheduleCancelMatch = path.match(adminScheduleCancelPattern)
-  if (adminScheduleCancelMatch) {
-    if (method !== 'PATCH') methodNotAllowed(response, ['PATCH'])
-    else {
-      sendJson(
-        response,
-        200,
-        store.cancelSchedule(user, pathId(adminScheduleCancelMatch)),
-      )
     }
     return true
   }

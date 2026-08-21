@@ -116,6 +116,7 @@ test('对应家长可以标记通知已读，越权和其他角色被拒绝', as
   const read = await authorizedCall(handler, parent, {
     method: 'PATCH',
     url: '/parent/notifications/8001/read',
+    jsonBody: { read: true },
   })
   assert.equal(read.status, 200)
   const notification = parseJsonBody<Notification>(read)
@@ -126,20 +127,30 @@ test('对应家长可以标记通知已读，越权和其他角色被拒绝', as
   const repeated = await authorizedCall(handler, parent, {
     method: 'PATCH',
     url: '/parent/notifications/8001/read',
+    jsonBody: { read: true },
   })
   assert.equal(parseJsonBody<Notification>(repeated).readAt, notification.readAt)
 
   const otherParentNotification = await authorizedCall(handler, parent, {
     method: 'PATCH',
     url: '/parent/notifications/8002/read',
+    jsonBody: { read: true },
   })
   assert.equal(otherParentNotification.status, 403)
 
   const wrongRole = await authorizedCall(handler, student, {
     method: 'PATCH',
     url: '/parent/notifications/8001/read',
+    jsonBody: { read: true },
   })
   assert.equal(wrongRole.status, 403)
+
+  const invalidRead = await authorizedCall(handler, parent, {
+    method: 'PATCH',
+    url: '/parent/notifications/8001/read',
+    jsonBody: { read: false },
+  })
+  assert.equal(invalidRead.status, 422)
 })
 
 test('请假进入教师和后台概览，并支持通过、拒绝和跨校区校验', async () => {
@@ -356,9 +367,17 @@ test('排课新增、修改和取消校验校区、时间与资源冲突', async
   assert.equal(updated.status, 'CHANGED')
   assert.equal(updated.room, 'A-305')
 
+  const immutableIdentity = await authorizedCall(handler, academic, {
+    method: 'PATCH',
+    url: `/admin/schedules/${created.id}`,
+    jsonBody: { classId: 102 },
+  })
+  assert.equal(immutableIdentity.status, 422)
+
   const cancelledResponse = await authorizedCall(handler, academic, {
     method: 'PATCH',
-    url: `/admin/schedules/${created.id}/cancel`,
+    url: `/admin/schedules/${created.id}`,
+    jsonBody: { status: 'CANCELLED' },
   })
   assert.equal(
     parseJsonBody<ScheduleSummary>(cancelledResponse).status,
@@ -367,7 +386,8 @@ test('排课新增、修改和取消校验校区、时间与资源冲突', async
 
   const repeatedCancel = await authorizedCall(handler, academic, {
     method: 'PATCH',
-    url: `/admin/schedules/${created.id}/cancel`,
+    url: `/admin/schedules/${created.id}`,
+    jsonBody: { status: 'CANCELLED' },
   })
   assert.equal(repeatedCancel.status, 409)
 
@@ -484,6 +504,7 @@ test('六角色对第二轮管理接口执行后端权限校验', async () => {
   const parentRead = await authorizedCall(handler, tokens.parent, {
     method: 'PATCH',
     url: '/parent/notifications/8001/read',
+    jsonBody: { read: true },
   })
   assert.equal(parentRead.status, 200)
   for (const token of [
@@ -496,6 +517,7 @@ test('六角色对第二轮管理接口执行后端权限校验', async () => {
     const denied = await authorizedCall(handler, token, {
       method: 'PATCH',
       url: '/parent/notifications/8001/read',
+      jsonBody: { read: true },
     })
     assert.equal(denied.status, 403)
   }

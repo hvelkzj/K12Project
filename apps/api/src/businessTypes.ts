@@ -79,6 +79,7 @@ export interface BusinessStore {
   markNotificationRead(
     user: UserSummary,
     notificationId: number,
+    input: BusinessInput,
   ): Notification
   getStudentOverview(user: UserSummary): StudentOverview
   submitStudentWork(user: UserSummary, input: BusinessInput): Submission
@@ -125,7 +126,6 @@ export interface BusinessStore {
     scheduleId: number,
     input: BusinessInput,
   ): ScheduleSummary
-  cancelSchedule(user: UserSummary, scheduleId: number): ScheduleSummary
   updateUserAccount(
     user: UserSummary,
     userId: number,
