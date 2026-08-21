@@ -50,6 +50,7 @@ export interface TeacherOverview {
   submissions: Submission[]
   feedback: StudentFeedback[]
   scheduleChanges: ScheduleChange[]
+  leaveRequests: LeaveRequest[]
 }
 
 export interface AdminOverview {
@@ -61,6 +62,7 @@ export interface AdminOverview {
   teachers: UserSummary[]
   scheduleChanges: ScheduleChange[]
   feedbackWorkOrders: FeedbackWorkOrder[]
+  leaveRequests: LeaveRequest[]
 }
 
 export type BusinessInput = Record<string, unknown>
@@ -74,6 +76,10 @@ export interface BusinessStore {
     feedbackId: number,
     input: BusinessInput,
   ): StudentFeedback
+  markNotificationRead(
+    user: UserSummary,
+    notificationId: number,
+  ): Notification
   getStudentOverview(user: UserSummary): StudentOverview
   submitStudentWork(user: UserSummary, input: BusinessInput): Submission
   getTeacherOverview(user: UserSummary): TeacherOverview
@@ -108,5 +114,22 @@ export interface BusinessStore {
     workOrderId: number,
     input: BusinessInput,
   ): FeedbackWorkOrder
+  reviewLeaveRequest(
+    user: UserSummary,
+    leaveRequestId: number,
+    input: BusinessInput,
+  ): LeaveRequest
+  createSchedule(user: UserSummary, input: BusinessInput): ScheduleSummary
+  updateSchedule(
+    user: UserSummary,
+    scheduleId: number,
+    input: BusinessInput,
+  ): ScheduleSummary
+  cancelSchedule(user: UserSummary, scheduleId: number): ScheduleSummary
+  updateUserAccount(
+    user: UserSummary,
+    userId: number,
+    input: BusinessInput,
+  ): UserAccountSummary
   reset(): void
 }
