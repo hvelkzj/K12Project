@@ -3,6 +3,7 @@ import type {
   ClassSummary,
   CourseSummary,
   FeedbackWorkOrder,
+  LeaveRequest,
   ScheduleChange,
   ScheduleSummary,
   UserAccountSummary,
@@ -18,4 +19,25 @@ export interface AdminOverview {
   teachers: UserSummary[]
   scheduleChanges: ScheduleChange[]
   feedbackWorkOrders: FeedbackWorkOrder[]
+  leaveRequests: LeaveRequest[]
+}
+
+export interface CreateScheduleInput {
+  campusId: number
+  classId: number
+  courseId: number
+  teacherId: number
+  lessonDate: string
+  startTime: string
+  endTime: string
+  room: string
+}
+
+export interface UpdateScheduleInput {
+  teacherId?: number
+  lessonDate?: string
+  startTime?: string
+  endTime?: string
+  room?: string
+  status?: 'SCHEDULED' | 'CANCELLED'
 }
