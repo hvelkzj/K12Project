@@ -61,3 +61,10 @@
 2. A 确认 `GET /admin/overview` 的 `leaveRequests` 返回结构和排课新增/修改接口的输入校验。
 3. 排课冲突（教师时间、教室冲突）由服务端 `409` 处理，前端展示服务端错误。
 4. 建议发起 `feature/E-admin-management-round-2` → `develop` 的 PR。
+
+## 2026-08-21 接口状态复核
+
+- 上述第 1、2、4 项已经完成：PR #16 和 PR #21 均已合并到 `develop`。
+- 排课取消接口已统一为 `PATCH /admin/schedules/:scheduleId`，请求 `status: 'CANCELLED'`。
+- 真实 HTTP 复核通过后台概览、请假审批、排课新增和取消流程。
+- 排课冲突继续由服务端返回 `409`，该规则没有变化。
