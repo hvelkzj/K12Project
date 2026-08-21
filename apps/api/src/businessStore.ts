@@ -761,6 +761,15 @@ export function createBusinessStore(
         if (!ATTENDANCE_STATUSES.includes(status as AttendanceStatus)) {
           invalid('签到状态不合法')
         }
+        const hasApprovedLeave = data.leaveRequests.some(
+          (leaveRequest) =>
+            leaveRequest.scheduleId === scheduleId &&
+            leaveRequest.studentId === studentId &&
+            leaveRequest.status === 'APPROVED',
+        )
+        if (hasApprovedLeave && status !== 'LEAVE') {
+          invalid('已批准请假的学生只能登记为 LEAVE')
+        }
         if (
           data.attendance.some(
             (record) =>
@@ -1149,6 +1158,14 @@ export function createBusinessStore(
       leaveRequest.reviewedBy = user.id
       leaveRequest.reviewedAt = timestamp
       leaveRequest.updatedAt = timestamp
+      if (decision === 'APPROVED') {
+        const attendance = data.attendance.find(
+          (record) =>
+            record.scheduleId === leaveRequest.scheduleId &&
+            record.studentId === leaveRequest.studentId,
+        )
+        if (attendance) attendance.status = 'LEAVE'
+      }
       return clone(leaveRequest)
     },
 

@@ -253,6 +253,78 @@ test('请假进入教师和后台概览，并支持通过、拒绝和跨校区�
   assert.equal(systemApproved.status, 200)
 })
 
+test('批准请假强制 LEAVE，并纠正审批前已有签到', async () => {
+  const pendingSeed = createBusinessSeed(fixedNow)
+  pendingSeed.leaveRequests.push(pendingLeave(9300, 101, 1001))
+  pendingSeed.attendance.push({
+    id: 10_100,
+    scheduleId: 1001,
+    studentId: 101,
+    status: 'PRESENT',
+    note: '',
+    recordedBy: 301,
+    recordedAt: '2026-08-17T01:30:00.000Z',
+  })
+  const pendingSetup = setup({ seed: pendingSeed })
+  const academic = await login(pendingSetup.handler, 'academic_901')
+  const teacher = await login(pendingSetup.handler, 'teacher_301')
+
+  const reviewed = await authorizedCall(pendingSetup.handler, academic, {
+    method: 'PATCH',
+    url: '/admin/leave-requests/9300/review',
+    jsonBody: { decision: 'APPROVED', reviewNote: '' },
+  })
+  assert.equal(reviewed.status, 200)
+  const teacherOverviewResponse = await authorizedCall(
+    pendingSetup.handler,
+    teacher,
+    { method: 'GET', url: '/teacher/overview' },
+  )
+  const correctedAttendance = parseJsonBody<TeacherOverview>(
+    teacherOverviewResponse,
+  ).attendance.find(
+    (item) => item.scheduleId === 1001 && item.studentId === 101,
+  )
+  assert.equal(correctedAttendance?.status, 'LEAVE')
+
+  const approvedSeed = createBusinessSeed(fixedNow)
+  approvedSeed.leaveRequests.push({
+    ...pendingLeave(9301, 101, 1001),
+    status: 'APPROVED',
+    reviewedBy: 901,
+    reviewedAt: '2026-08-17T01:45:00.000Z',
+  })
+  const approvedSetup = setup({ seed: approvedSeed })
+  const approvedTeacher = await login(approvedSetup.handler, 'teacher_301')
+  const invalidAttendance = await authorizedCall(
+    approvedSetup.handler,
+    approvedTeacher,
+    {
+      method: 'PUT',
+      url: '/teacher/attendance',
+      jsonBody: {
+        scheduleId: 1001,
+        records: [{ studentId: 101, status: 'PRESENT', note: '' }],
+      },
+    },
+  )
+  assert.equal(invalidAttendance.status, 422)
+
+  const leaveAttendance = await authorizedCall(
+    approvedSetup.handler,
+    approvedTeacher,
+    {
+      method: 'PUT',
+      url: '/teacher/attendance',
+      jsonBody: {
+        scheduleId: 1001,
+        records: [{ studentId: 101, status: 'LEAVE', note: '' }],
+      },
+    },
+  )
+  assert.equal(leaveAttendance.status, 200)
+})
+
 test('排课新增、修改和取消校验校区、时间与资源冲突', async () => {
   const { handler } = setup()
   const academic = await login(handler, 'academic_901')
