@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import type { CourseSummary } from '@k12/shared'
 
 import {
   calculateGlobalProgress,
@@ -11,17 +12,38 @@ import {
   isAssignmentSubmissionClosed,
 } from '../assignmentPresentation'
 import type { AssignmentListRow } from '../assignmentPresentation'
+import {
+  assignmentStatusFilters,
+  filterAssignmentRows,
+  listCourseFilterOptions,
+} from '../assignmentFilters'
+import type { AssignmentStatusFilter } from '../assignmentFilters'
 import type { SubmissionViewStatus } from '../types'
 
 const props = defineProps<{
   rows: AssignmentListRow[]
   now: string
+  courses: CourseSummary[]
 }>()
 
 const emit = defineEmits<{
   open: [assignmentId: number]
   placeholder: [featureName: string]
 }>()
+
+const statusFilter = ref<AssignmentStatusFilter>('ALL')
+const courseFilter = ref<number | 'ALL'>('ALL')
+
+const courseOptions = computed(() =>
+  listCourseFilterOptions(props.rows, props.courses),
+)
+
+const filteredRows = computed(() =>
+  filterAssignmentRows(props.rows, {
+    status: statusFilter.value,
+    courseId: courseFilter.value,
+  }),
+)
 
 const courseCodes: Record<number, string> = {
   11: 'MATH',
@@ -69,6 +91,10 @@ function courseIcon(courseId: number): string {
 
 function statusClass(status: SubmissionViewStatus): string {
   return status.toLowerCase().replace(/_/g, '-')
+}
+
+function statusFilterLabel(filter: AssignmentStatusFilter): string {
+  return filter === 'ALL' ? '全部' : getSubmissionStatusLabel(filter)
 }
 
 function formatDateTime(value: string): string {
@@ -170,9 +196,42 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
       <b>{{ globalProgressPercent }}%</b>
     </div>
 
-    <div v-if="rows.length" class="c-assignment-grid">
+    <div class="c-filter-bar">
+      <div class="c-status-filters" role="group" aria-label="按状态筛选作业">
+        <button
+          v-for="filter in assignmentStatusFilters"
+          :key="filter"
+          type="button"
+          :class="['c-filter-chip', { active: statusFilter === filter }]"
+          @click="statusFilter = filter"
+        >
+          {{ statusFilterLabel(filter) }}
+        </button>
+      </div>
+      <label class="c-course-filter">
+        <span class="c-filter-label">课程</span>
+        <select v-model="courseFilter" aria-label="按课程筛选作业">
+          <option :value="'ALL'">全部课程</option>
+          <option
+            v-for="option in courseOptions"
+            :key="option.courseId"
+            :value="option.courseId"
+          >
+            {{ option.name }}
+          </option>
+        </select>
+      </label>
+    </div>
+
+    <p v-if="rows.length === 0" class="c-empty-state">
+      当前没有已发布的作业。
+    </p>
+    <p v-else-if="filteredRows.length === 0" class="c-empty-state">
+      没有符合筛选条件的作业，试试其他筛选。
+    </p>
+    <div v-else class="c-assignment-grid">
       <article
-        v-for="row in rows"
+        v-for="row in filteredRows"
         :key="row.assignment.id"
         class="c-assignment-card"
         :aria-label="assignmentAriaLabel(row)"
@@ -257,8 +316,6 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
         </div>
       </article>
     </div>
-
-    <p v-else class="c-empty-state">当前没有已发布的作业。</p>
   </section>
 </template>
 
@@ -589,6 +646,71 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
   color: var(--c-muted);
   background: #fff;
   text-align: center;
+}
+
+.c-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 14px 18px;
+  border: 1px solid #e7e9f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--c-shadow);
+}
+
+.c-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.c-filter-chip {
+  border: 1px solid #e3e6ee;
+  border-radius: 999px;
+  padding: 6px 14px;
+  color: #5d6880;
+  background: #f7f8fb;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.c-filter-chip:hover {
+  background: #eeeff8;
+}
+
+.c-filter-chip.active {
+  color: #fff;
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+}
+
+.c-course-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.c-filter-label {
+  color: var(--c-muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.c-course-filter select {
+  border: 1px solid #d7dce8;
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: #3f4a60;
+  background: #fbfcfe;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
 }
 
 @media (max-width: 760px) {

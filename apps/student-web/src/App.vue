@@ -4,6 +4,7 @@ import type { UserSummary } from '@k12/shared'
 
 import { listAssignmentRows } from './assignmentListService'
 import { getSubmissionStatusLabel } from './assignmentPresentation'
+import { filterCoursewareByTitle } from './coursewareSearch'
 import { authService } from './services/authService'
 import { studentBusinessClient, StudentBusinessError } from './studentBusinessClient'
 import type { StudentOverview } from './studentBusinessClient'
@@ -30,6 +31,7 @@ const assignmentViewKey = ref(0)
 const overview = ref<StudentOverview | null>(null)
 const isOverviewLoading = ref(false)
 const overviewError = ref('')
+const coursewareQuery = ref('')
 
 onMounted(async () => {
   const hadStoredSession = Boolean(authService.getAccessToken())
@@ -57,7 +59,9 @@ const assignmentRows = computed(() =>
   overview.value ? listAssignmentRows(overview.value) : [],
 )
 const materials = computed(() =>
-  overview.value ? listCourseware(overview.value) : [],
+  overview.value
+    ? filterCoursewareByTitle(listCourseware(overview.value), coursewareQuery.value)
+    : [],
 )
 const pendingCount = computed(
   () =>
@@ -140,10 +144,6 @@ function openAssignment(assignmentId: number): void {
 
 function handleOverviewChanged(): void {
   void loadOverview()
-}
-
-function showDownload(fileName: string): void {
-  notice.value = `Mock 下载已准备：${fileName}`
 }
 
 function courseName(courseId: number): string {
@@ -313,7 +313,19 @@ function formatBytes(byteSize: number): string {
                 <p>按课程查看老师最新发布的课件与附件。</p>
               </div>
             </div>
-            <p v-if="materials.length === 0" class="state-message">
+            <label class="courseware-search">
+              <span>搜索课件标题</span>
+              <input
+                v-model="coursewareQuery"
+                type="search"
+                placeholder="输入关键字，例如：分数、Unit"
+                aria-label="搜索课件标题"
+              />
+            </label>
+            <p v-if="materials.length === 0 && coursewareQuery.trim()" class="state-message">
+              没有匹配的课件，换个关键字试试。
+            </p>
+            <p v-else-if="materials.length === 0" class="state-message">
               暂无课件，老师发布后会自动显示。
             </p>
             <div v-else class="card-grid">
@@ -328,16 +340,14 @@ function formatBytes(byteSize: number): string {
                   <h3>{{ material.title }}</h3>
                   <p>{{ material.description }}</p>
                   <div class="material-files">
-                    <button
+                    <div
                       v-for="file in material.attachments"
                       :key="file.id"
                       class="material-file"
-                      type="button"
-                      @click="showDownload(file.originalName)"
                     >
                       <span>{{ file.originalName }}</span>
                       <small>{{ formatBytes(file.byteSize) }}</small>
-                    </button>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -349,6 +359,7 @@ function formatBytes(byteSize: number): string {
             :key="assignmentViewKey"
             :current-user="currentUser"
             :overview="overview"
+            :courses="overview.courses"
             :initial-assignment-id="requestedAssignmentId"
             @submitted="handleOverviewChanged"
             @session-expired="handleSessionExpired"
@@ -442,5 +453,28 @@ function formatBytes(byteSize: number): string {
   padding: 18px 0;
   color: #8991a0;
   text-align: center;
+}
+
+.courseware-search {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+  margin-bottom: 16px;
+  color: #3e4960;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.courseware-search input {
+  border: 1px solid #d7dce8;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.courseware-search input:focus {
+  outline: 3px solid rgb(98 91 207 / 15%);
+  border-color: #746de2;
 }
 </style>
