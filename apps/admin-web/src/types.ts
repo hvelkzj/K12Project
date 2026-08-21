@@ -3,6 +3,7 @@ import type {
   ClassSummary,
   CourseSummary,
   FeedbackWorkOrder,
+  LeaveRequest,
   ScheduleChange,
   ScheduleChangeStatus,
   ScheduleStatus,
@@ -25,6 +26,7 @@ export type UserAccount = UserAccountSummary
 
 export type {
   FeedbackWorkOrder,
+  LeaveRequest,
   ScheduleChange,
   ScheduleChangeStatus,
   ScheduleStatus,
