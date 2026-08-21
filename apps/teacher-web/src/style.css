@@ -156,6 +156,16 @@ input[readonly] { color: #66736d; background: #f6f8f7; }
   font-weight: 700;
 }
 .status { color: #22644f; background: #e9f5ee; }
+.leave-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.leave-approved { color: #17614f; background: #e8f4ed; }
+.leave-pending { color: #705514; background: #fff8e7; }
 .course-list { display: grid; gap: 12px; }
 .course-card {
   display: grid;

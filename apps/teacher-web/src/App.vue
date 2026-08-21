@@ -20,6 +20,15 @@ import {
   gradeInput,
   scheduleChangeInput,
 } from './teacherFormRules'
+import {
+  assertApprovedLeavesUseLeave,
+  assertScheduleActive,
+  buildAttendanceDrafts,
+  isScheduleCancelled,
+  leaveBadgeText,
+  saveAttendanceAndApply,
+  visibleLeaveForStudent,
+} from './teacherLeaveRules'
 import type { AttendanceDraft } from './teacherWorkflow'
 
 type PageKey =
@@ -137,7 +146,27 @@ const recordedStudentIds = computed(
         .map((item) => item.studentId),
     ),
 )
+const currentScheduleLeaveRequests = computed(() => {
+  const schedule = selectedSchedule.value
+  if (!overview.value || !schedule) return []
+  return overview.value.leaveRequests.filter(
+    (leaveRequest) => leaveRequest.scheduleId === schedule.id,
+  )
+})
 
+function getStudentLeave(studentId: number) {
+  const scheduleId = selectedScheduleId.value
+  if (scheduleId === null) return undefined
+  return visibleLeaveForStudent(
+    currentScheduleLeaveRequests.value,
+    scheduleId,
+    studentId,
+  )
+}
+
+const selectedScheduleCancelled = computed(() =>
+  isScheduleCancelled(selectedSchedule.value),
+)
 const unrecordedAttendanceCount = computed(
   () =>
     selectedStudents.value.filter(
@@ -186,16 +215,15 @@ function resetGradeDrafts(): void {
 }
 
 function resetAttendanceDrafts(): void {
-  const existing = new Map(
-    attendanceRecords.value
-      .filter((item) => item.scheduleId === selectedScheduleId.value)
-      .map((item) => [item.studentId, item]),
-  )
-  attendanceDrafts.value = selectedStudents.value.map((student) => ({
-    studentId: student.id,
-    status: existing.get(student.id)?.status ?? 'PRESENT',
-    note: existing.get(student.id)?.note ?? '',
-  }))
+  const scheduleId = selectedScheduleId.value
+  attendanceDrafts.value = scheduleId === null
+    ? []
+    : buildAttendanceDrafts({
+        students: selectedStudents.value,
+        scheduleId,
+        attendance: attendanceRecords.value,
+        leaveRequests: currentScheduleLeaveRequests.value,
+      })
   if (!selectedStudents.value.some((student) => student.id === feedbackDraft.studentId)) {
     feedbackDraft.studentId = selectedStudents.value[0]?.id ?? 0
   }
@@ -304,6 +332,7 @@ function requireWritableSchedule(): ScheduleSummary {
   if (!canWriteSchedule(user, schedule)) {
     throw new Error('班主任只能查看该课次，不能代替任课教师操作')
   }
+  assertScheduleActive(schedule)
   return schedule
 }
 
@@ -312,9 +341,17 @@ async function saveAttendance(): Promise<void> {
     const schedule = requireWritableSchedule()
     const records = attendanceDrafts.value.filter((item) => !recordedStudentIds.value.has(item.studentId))
     if (records.length === 0) throw new Error('当前课次没有待保存签到')
+    assertApprovedLeavesUseLeave({
+      drafts: records,
+      leaveRequests: currentScheduleLeaveRequests.value,
+      scheduleId: schedule.id,
+    })
     pendingAction.value = 'attendance'
-    const created = await teacherBusinessClient.saveAttendance({ scheduleId: schedule.id, records })
-    if (overview.value) overview.value.attendance.push(...created)
+    const created = await saveAttendanceAndApply({
+      save: () =>
+        teacherBusinessClient.saveAttendance({ scheduleId: schedule.id, records }),
+      apply: (savedRecords) => overview.value?.attendance.push(...savedRecords),
+    })
     resetAttendanceDrafts()
     notice.value = `已保存 ${created.length} 条签到记录`
   } catch (error) {
@@ -485,10 +522,10 @@ onMounted(async () => {
               <article v-for="schedule in visibleSchedules" :key="schedule.id" class="course-card">
                 <time>{{ schedule.lessonDate }}<br />{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</time>
                 <div class="course-main"><h3>{{ courseName(schedule.courseId) }}</h3><p>{{ className(schedule.classId) }} · {{ schedule.room }} · 课次 #{{ schedule.id }}</p></div>
-                <span class="status">{{ schedule.teacherId === currentUser.id ? '本人授课' : '班主任可见' }}</span>
+                <span class="status">{{ schedule.status === 'CANCELLED' ? '课次已取消' : schedule.teacherId === currentUser.id ? '本人授课' : '班主任可见' }}</span>
                 <div class="card-actions">
-                  <button class="secondary" type="button" :disabled="!canWriteSchedule(currentUser, schedule)" @click="selectSchedule(schedule.id, 'schedule-change')">申请调课</button>
-                  <button class="primary" type="button" :disabled="!canWriteSchedule(currentUser, schedule)" @click="selectSchedule(schedule.id, 'attendance')">进入签到</button>
+                  <button class="secondary" type="button" :disabled="!canWriteSchedule(currentUser, schedule) || schedule.status === 'CANCELLED'" @click="selectSchedule(schedule.id, 'schedule-change')">申请调课</button>
+                  <button class="primary" type="button" :disabled="!canWriteSchedule(currentUser, schedule) || schedule.status === 'CANCELLED'" @click="selectSchedule(schedule.id, 'attendance')">进入签到</button>
                 </div>
               </article>
             </div>
@@ -500,14 +537,37 @@ onMounted(async () => {
           <p v-if="selectedStudents.length === 0" class="muted empty-state">当前课次没有可签到学生。</p>
           <div v-else class="table-wrap">
             <table><thead><tr><th>学生</th><th>签到状态</th><th>备注</th></tr></thead>
-              <tbody><tr v-for="draft in attendanceDrafts" :key="draft.studentId">
-                <td><strong>{{ studentName(draft.studentId) }}</strong><small>ID {{ draft.studentId }}</small></td>
-                <td><select v-model="draft.status" :disabled="recordedStudentIds.has(draft.studentId)"><option v-for="status in attendanceStatuses" :key="status" :value="status">{{ status }}</option></select></td>
-                <td><input v-model="draft.note" :disabled="recordedStudentIds.has(draft.studentId)" placeholder="可选备注" /></td>
-              </tr></tbody>
+              <tbody>
+                <tr v-for="draft in attendanceDrafts" :key="draft.studentId">
+                  <td>
+                    <strong>{{ studentName(draft.studentId) }}</strong>
+                    <small>ID {{ draft.studentId }}</small>
+                    <span
+                      v-if="getStudentLeave(draft.studentId)"
+                      class="leave-badge"
+                      :class="`leave-${getStudentLeave(draft.studentId)!.status.toLowerCase()}`"
+                    >{{ leaveBadgeText(getStudentLeave(draft.studentId)!) }}</span>
+                  </td>
+                  <td>
+                    <select
+                      v-model="draft.status"
+                      :disabled="recordedStudentIds.has(draft.studentId) || getStudentLeave(draft.studentId)?.status === 'APPROVED' || selectedScheduleCancelled"
+                    >
+                      <option v-for="status in attendanceStatuses" :key="status" :value="status">{{ status }}</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      v-model="draft.note"
+                      :disabled="recordedStudentIds.has(draft.studentId) || getStudentLeave(draft.studentId)?.status === 'APPROVED' || selectedScheduleCancelled"
+                      placeholder="可选备注"
+                    />
+                  </td>
+                </tr>
+              </tbody>
             </table>
           </div>
-          <div class="panel-footer"><p class="muted">已保存学生将被锁定，避免重复签到。</p><button class="primary" type="button" :disabled="pendingAction !== null || unrecordedAttendanceCount === 0" @click="saveAttendance">{{ pendingAction === 'attendance' ? '保存中…' : '保存签到' }}</button></div>
+          <div class="panel-footer"><p class="muted">已批准请假固定为 LEAVE；已保存学生将被锁定。</p><button class="primary" type="button" :disabled="pendingAction !== null || unrecordedAttendanceCount === 0 || selectedScheduleCancelled" @click="saveAttendance">{{ pendingAction === 'attendance' ? '保存中…' : '保存签到' }}</button></div>
         </section>
 
         <section v-else-if="activePage === 'publish'" class="panel">
@@ -518,7 +578,7 @@ onMounted(async () => {
             <label class="full"><span>作业内容</span><textarea v-model="assignmentDraft.description" rows="4" required></textarea></label>
             <label><span>截止时间</span><input v-model="assignmentDraft.dueAt" type="datetime-local" required /></label>
             <label class="check-field"><input v-model="assignmentDraft.allowLate" type="checkbox" /><span>允许截止后提交</span></label>
-            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null">{{ pendingAction === 'assignment' ? '发布中…' : '发布作业' }}</button></div>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedScheduleCancelled">{{ pendingAction === 'assignment' ? '发布中…' : '发布作业' }}</button></div>
           </form>
         </section>
 
@@ -544,7 +604,7 @@ onMounted(async () => {
             <label><span>优点</span><textarea v-model="feedbackDraft.strengths" rows="3" required></textarea></label>
             <label><span>待提升</span><textarea v-model="feedbackDraft.improvements" rows="3" required></textarea></label>
             <label class="full"><span>学习建议</span><textarea v-model="feedbackDraft.suggestion" rows="3" required></textarea></label>
-            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedStudents.length === 0">{{ pendingAction === 'feedback' ? '发送中…' : '发送给家长' }}</button></div>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedStudents.length === 0 || selectedScheduleCancelled">{{ pendingAction === 'feedback' ? '发送中…' : '发送给家长' }}</button></div>
           </form>
         </section>
 
@@ -555,7 +615,7 @@ onMounted(async () => {
             <label><span>申请日期</span><input v-model="scheduleChangeDraft.proposedDate" type="date" required /></label>
             <div class="time-fields"><label><span>开始时间</span><input v-model="scheduleChangeDraft.proposedStartTime" type="time" required /></label><label><span>结束时间</span><input v-model="scheduleChangeDraft.proposedEndTime" type="time" required /></label></div>
             <label class="full"><span>调课原因</span><textarea v-model="scheduleChangeDraft.reason" rows="4" required></textarea></label>
-            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null">{{ pendingAction === 'schedule-change' ? '提交中…' : '提交调课申请' }}</button></div>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedScheduleCancelled">{{ pendingAction === 'schedule-change' ? '提交中…' : '提交调课申请' }}</button></div>
           </form>
           <div v-if="scheduleChanges.length" class="request-list"><article v-for="item in scheduleChanges" :key="item.id"><strong>申请 #{{ item.id }} · {{ item.status }}</strong><span>{{ item.proposedDate }} {{ item.proposedStartTime }}–{{ item.proposedEndTime }}</span><small>{{ item.reason }}</small></article></div>
           <p v-else class="muted empty-state">当前没有调课申请。</p>
