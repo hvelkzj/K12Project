@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type {
   LeaveRequest,
   UserSummary,
@@ -35,6 +35,9 @@ import {
 import {
   canDisableCurrentAdmin,
   canManageUser,
+  canReviewLeaveRequest,
+  isScheduleIdentityLocked,
+  runManagementAction,
   validateRequiredText,
   validateScheduleTime,
 } from './adminManagementRules'
@@ -128,6 +131,7 @@ const substituteNote = ref('已与代课教师确认，无课程冲突')
 const selectedWorkOrderId = ref<number | null>(null)
 const workOrderResult = ref('')
 const leaveStatusFilter = ref<'PENDING' | 'ALL'>('PENDING')
+const managementActionState = reactive({ pendingKey: null as string | null })
 
 const currentPage = computed(
   () => pages.find((page) => page.key === activePage.value) ?? pages[0],
@@ -605,6 +609,11 @@ async function submitLeaveReview(decision: 'APPROVED' | 'REJECTED') {
     return
   }
 
+  if (!canReviewLeaveRequest(selected.status)) {
+    showError(new Error('该请假已完成审批，不能重复处理'))
+    return
+  }
+
   if (decision === 'REJECTED') {
     const error = validateRequiredText(leaveReviewNote.value, '拒绝请假时必须填写原因')
     if (error) {
@@ -614,11 +623,17 @@ async function submitLeaveReview(decision: 'APPROVED' | 'REJECTED') {
   }
 
   try {
-    const reviewed = await adminApiClient.reviewLeaveRequest({
-      leaveRequestId: selected.id,
-      decision,
-      reviewNote: leaveReviewNote.value,
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `leave-${selected.id}`,
+      () => adminApiClient.reviewLeaveRequest({
+        leaveRequestId: selected.id,
+        decision,
+        reviewNote: leaveReviewNote.value,
+      }),
+    )
+    if (!action.started) return
+    const reviewed = action.value
     const index = leaveRequests.value.findIndex((item) => item.id === selected.id)
     leaveRequests.value[index] = reviewed
     leaveReviewNote.value = ''
@@ -931,12 +946,22 @@ async function submitScheduleForm() {
 async function cancelSchedule(scheduleId: number) {
   const current = schedules.value.find((item) => item.id === scheduleId)
   if (!current) return
+  if (current.status === 'CANCELLED') {
+    showError(new Error('该课次已经取消'))
+    return
+  }
 
   try {
-    const updated = await adminApiClient.updateSchedule({
-      scheduleId,
-      changes: { status: 'CANCELLED' },
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `schedule-${scheduleId}`,
+      () => adminApiClient.updateSchedule({
+        scheduleId,
+        changes: { status: 'CANCELLED' },
+      }),
+    )
+    if (!action.started) return
+    const updated = action.value
     const index = schedules.value.findIndex((item) => item.id === scheduleId)
     schedules.value[index] = updated
     showNotice('课次已取消')
@@ -957,10 +982,16 @@ async function toggleUserActive(user: UserAccount) {
   }
 
   try {
-    const updated = await adminApiClient.updateUser({
-      userId: user.id,
-      active: !user.active,
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `user-${user.id}`,
+      () => adminApiClient.updateUser({
+        userId: user.id,
+        active: !user.active,
+      }),
+    )
+    if (!action.started) return
+    const updated = action.value
     const index = users.value.findIndex((item) => item.id === user.id)
     users.value[index] = updated
     showNotice(`${user.displayName}账号已${updated.active ? '启用' : '停用'}`)
@@ -1210,7 +1241,7 @@ async function toggleUserActive(user: UserAccount) {
                 <span>校区</span>
                 <select
                   v-model.number="scheduleForm.campusId"
-                  :disabled="currentRole !== 'SYSTEM_ADMIN'"
+                  :disabled="currentRole !== 'SYSTEM_ADMIN' || isScheduleIdentityLocked(editingScheduleId)"
                 >
                   <option
                     v-for="campus in visibleCampuses"
@@ -1223,7 +1254,10 @@ async function toggleUserActive(user: UserAccount) {
               </label>
               <label class="stack-field">
                 <span>班级</span>
-                <select v-model.number="scheduleForm.classId">
+                <select
+                  v-model.number="scheduleForm.classId"
+                  :disabled="isScheduleIdentityLocked(editingScheduleId)"
+                >
                   <option :value="0" disabled>请选择班级</option>
                   <option
                     v-for="item in scheduleFormOptions(scheduleForm.campusId).classesForCampus"
@@ -1236,7 +1270,10 @@ async function toggleUserActive(user: UserAccount) {
               </label>
               <label class="stack-field">
                 <span>课程</span>
-                <select v-model.number="scheduleForm.courseId">
+                <select
+                  v-model.number="scheduleForm.courseId"
+                  :disabled="isScheduleIdentityLocked(editingScheduleId)"
+                >
                   <option :value="0" disabled>请选择课程</option>
                   <option
                     v-for="item in scheduleFormOptions(scheduleForm.campusId).coursesForCampus"
@@ -1333,9 +1370,10 @@ async function toggleUserActive(user: UserAccount) {
                         v-if="schedule.status !== 'CANCELLED'"
                         class="table-action danger-action"
                         type="button"
+                        :disabled="managementActionState.pendingKey !== null"
                         @click="cancelSchedule(schedule.id)"
                       >
-                        取消
+                        {{ managementActionState.pendingKey === `schedule-${schedule.id}` ? '取消中…' : '取消' }}
                       </button>
                     </div>
                   </td>
@@ -1552,11 +1590,21 @@ async function toggleUserActive(user: UserAccount) {
               ></textarea>
             </label>
             <div class="form-actions">
-              <button class="danger" type="button" @click="submitLeaveReview('REJECTED')">
-                拒绝请假
+              <button
+                class="danger"
+                type="button"
+                :disabled="managementActionState.pendingKey !== null"
+                @click="submitLeaveReview('REJECTED')"
+              >
+                {{ managementActionState.pendingKey === `leave-${selectedLeaveRequest.id}` ? '处理中…' : '拒绝请假' }}
               </button>
-              <button class="primary" type="button" @click="submitLeaveReview('APPROVED')">
-                通过请假
+              <button
+                class="primary"
+                type="button"
+                :disabled="managementActionState.pendingKey !== null"
+                @click="submitLeaveReview('APPROVED')"
+              >
+                {{ managementActionState.pendingKey === `leave-${selectedLeaveRequest.id}` ? '处理中…' : '通过请假' }}
               </button>
             </div>
           </template>
@@ -1762,10 +1810,10 @@ async function toggleUserActive(user: UserAccount) {
                   <button
                     class="table-action"
                     type="button"
-                    :disabled="currentUser?.id === user.id && user.role === 'SYSTEM_ADMIN' && user.active"
+                    :disabled="managementActionState.pendingKey !== null || (currentUser?.id === user.id && user.role === 'SYSTEM_ADMIN' && user.active)"
                     @click="toggleUserActive(user)"
                   >
-                    {{ user.active ? '停用' : '启用' }}
+                    {{ managementActionState.pendingKey === `user-${user.id}` ? '处理中…' : user.active ? '停用' : '启用' }}
                   </button>
                 </td>
               </tr>
