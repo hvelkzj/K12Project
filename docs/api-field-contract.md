@@ -101,17 +101,18 @@ Mock 密码不进入用户响应。当前内存会话用于课程项目运行，
 
 | 接口 | 请求字段 | 成功响应 |
 |---|---|---|
-| `PATCH /parent/notifications/:notificationId/read` | 无请求体 | `200 Notification` |
+| `PATCH /parent/notifications/:notificationId/read` | `read: true` | `200 Notification` |
 | `PATCH /admin/leave-requests/:leaveRequestId/review` | `decision: 'APPROVED' \| 'REJECTED'`、`reviewNote` | `200 LeaveRequest` |
 | `POST /admin/schedules` | `campusId`、`classId`、`courseId`、`teacherId`、`lessonDate`、`startTime`、`endTime`、`room` | `201 ScheduleSummary` |
-| `PATCH /admin/schedules/:scheduleId` | 上述排课字段中至少一个；`campusId` 只能保持原值 | `200 ScheduleSummary` |
-| `PATCH /admin/schedules/:scheduleId/cancel` | 无请求体 | `200 ScheduleSummary`，`status = 'CANCELLED'` |
+| `PATCH /admin/schedules/:scheduleId` | `teacherId?`、`lessonDate?`、`startTime?`、`endTime?`、`room?`、`status?: 'SCHEDULED' \| 'CANCELLED'`；至少一个字段 | `200 ScheduleSummary` |
 | `PATCH /admin/users/:userId` | `active: boolean` | `200 UserAccountSummary` |
 
 - 通知标记已读是幂等操作；已有 `readAt` 时不覆盖原时间。
 - 教务只能审批和维护所属校区；系统管理员可以操作全部校区。
 - 排课新增和修改必须校验班级、课程、教师的校区归属，并阻止教师或班级时间冲突。
-- 修改排课后状态为 `CHANGED`；已取消或已完成课次不能修改，取消操作不能重复执行。
+- `campusId`、`classId`、`courseId` 是已有课次的身份字段，不能通过 PATCH 修改。
+- 普通字段修改且未提供 `status` 时，服务端把状态改为 `CHANGED`。
+- 取消课次通过同一个 PATCH 接口发送 `status: 'CANCELLED'`；已取消或已完成课次不能再次修改。
 - 请假拒绝必须填写 `reviewNote`，已经审批的申请不能重复审批。
 - 账号启停仅系统管理员可用；当前系统管理员不能停用自己。
 - 停用账号后撤销该账号全部会话，后续登录统一返回 `INVALID_CREDENTIALS`；重新启用后可以再次登录。
