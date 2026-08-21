@@ -1,12 +1,15 @@
 import type { AssignmentListRow } from './assignmentPresentation'
+import type { StudentOverview } from './studentBusinessClient'
 import {
   getLatestSubmission,
   listAssignments,
 } from './studentService'
 
-export function listAssignmentRows(studentId: number): AssignmentListRow[] {
-  return listAssignments(studentId).map((assignment) => {
-    const latestSubmission = getLatestSubmission(assignment.id, studentId)
+export function listAssignmentRows(
+  overview: StudentOverview,
+): AssignmentListRow[] {
+  return listAssignments(overview).map((assignment) => {
+    const latestSubmission = getLatestSubmission(overview, assignment.id)
 
     return {
       assignment,

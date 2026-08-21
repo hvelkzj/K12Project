@@ -5,6 +5,8 @@ import type { UserSummary } from '@k12/shared'
 import { listAssignmentRows } from './assignmentListService'
 import { getSubmissionStatusLabel } from './assignmentPresentation'
 import { authService } from './services/authService'
+import { studentBusinessClient, StudentBusinessError } from './studentBusinessClient'
+import type { StudentOverview } from './studentBusinessClient'
 import { listCourseware } from './studentService'
 import Home from './views/Home.vue'
 import Login from './views/Login.vue'
@@ -25,7 +27,9 @@ const authMessage = ref('')
 const notice = ref('')
 const requestedAssignmentId = ref<number | null>(null)
 const assignmentViewKey = ref(0)
-const submissionRevision = ref(0)
+const overview = ref<StudentOverview | null>(null)
+const isOverviewLoading = ref(false)
+const overviewError = ref('')
 
 onMounted(async () => {
   const hadStoredSession = Boolean(authService.getAccessToken())
@@ -34,7 +38,9 @@ onMounted(async () => {
     const user = await authService.restoreCurrentUser()
     currentUser.value = user
 
-    if (!user && hadStoredSession) {
+    if (user) {
+      await loadOverview()
+    } else if (hadStoredSession) {
       authMessage.value = '登录已失效，请重新登录'
     }
   } catch (error) {
@@ -47,12 +53,11 @@ onMounted(async () => {
   }
 })
 
-const assignmentRows = computed(() => {
-  void submissionRevision.value
-  return currentUser.value ? listAssignmentRows(currentUser.value.id) : []
-})
+const assignmentRows = computed(() =>
+  overview.value ? listAssignmentRows(overview.value) : [],
+)
 const materials = computed(() =>
-  currentUser.value ? listCourseware(currentUser.value.id) : [],
+  overview.value ? listCourseware(overview.value) : [],
 )
 const pendingCount = computed(
   () =>
@@ -66,11 +71,39 @@ const gradedCount = computed(
     assignmentRows.value.filter(({ status }) => status === 'GRADED').length,
 )
 
+async function loadOverview(): Promise<void> {
+  isOverviewLoading.value = true
+  overviewError.value = ''
+  try {
+    overview.value = await studentBusinessClient.getOverview()
+  } catch (error) {
+    if (error instanceof StudentBusinessError && error.status === 401) {
+      handleSessionExpired('登录已失效，请重新登录')
+      return
+    }
+    overviewError.value =
+      error instanceof Error ? error.message : '学生数据加载失败'
+  } finally {
+    isOverviewLoading.value = false
+  }
+}
+
+function handleSessionExpired(message: string): void {
+  authService.clearAccessToken()
+  currentUser.value = null
+  currentPage.value = 'home'
+  overview.value = null
+  overviewError.value = ''
+  authMessage.value = message
+  notice.value = ''
+}
+
 function handleLoginSuccess(user: UserSummary): void {
   currentUser.value = user
   currentPage.value = 'home'
   authMessage.value = ''
   notice.value = ''
+  void loadOverview()
 }
 
 async function handleLogout(): Promise<void> {
@@ -84,6 +117,8 @@ async function handleLogout(): Promise<void> {
   } finally {
     currentUser.value = null
     currentPage.value = 'home'
+    overview.value = null
+    overviewError.value = ''
     authMessage.value = logoutFailure
       ? `退出请求失败：${logoutFailure}。本机登录信息已清除。`
       : ''
@@ -103,8 +138,8 @@ function openAssignment(assignmentId: number): void {
   notice.value = ''
 }
 
-function handleAssignmentsChanged(): void {
-  submissionRevision.value += 1
+function handleOverviewChanged(): void {
+  void loadOverview()
 }
 
 function showDownload(fileName: string): void {
@@ -194,105 +229,131 @@ function formatBytes(byteSize: number): string {
 
       <div class="page-content">
         <p v-if="notice" class="success-message" role="status">{{ notice }}</p>
+        <div v-if="overviewError && overview" class="state-banner" role="alert">
+          <span>{{ overviewError }}</span>
+          <button type="button" @click="loadOverview">重试</button>
+        </div>
 
-        <section v-if="currentPage === 'home'" class="page-section">
-          <div class="welcome-banner">
-            <div>
-              <p class="eyebrow">你好，{{ currentUser.displayName }}</p>
-              <h2>先完成今天最重要的一份作业吧</h2>
-              <p>你有 {{ pendingCount }} 份待完成或待订正作业。</p>
-              <button
-                class="primary-button"
-                type="button"
-                @click="navigate('assignments')"
-              >
-                查看作业
+        <div v-if="isOverviewLoading && !overview" class="state-panel" role="status">
+          <h3>学生数据加载中…</h3>
+        </div>
+
+        <div v-else-if="overviewError && !overview" class="state-panel" role="alert">
+          <h3>学生数据加载失败</h3>
+          <p>{{ overviewError }}</p>
+          <button class="primary-button" type="button" @click="loadOverview">
+            重试
+          </button>
+        </div>
+
+        <template v-else-if="overview">
+          <section v-if="currentPage === 'home'" class="page-section">
+            <div class="welcome-banner">
+              <div>
+                <p class="eyebrow">你好，{{ currentUser.displayName }}</p>
+                <h2>先完成今天最重要的一份作业吧</h2>
+                <p>你有 {{ pendingCount }} 份待完成或待订正作业。</p>
+                <button
+                  class="primary-button"
+                  type="button"
+                  @click="navigate('assignments')"
+                >
+                  查看作业
+                </button>
+              </div>
+              <div class="banner-symbol" aria-hidden="true">A+</div>
+            </div>
+
+            <div class="summary-grid">
+              <article class="summary-card coral">
+                <span>待处理</span><strong>{{ pendingCount }}</strong><small>份作业</small>
+              </article>
+              <article class="summary-card blue">
+                <span>已批改</span><strong>{{ gradedCount }}</strong><small>份作业</small>
+              </article>
+              <article class="summary-card green">
+                <span>新课件</span><strong>{{ materials.length }}</strong><small>份资料</small>
+              </article>
+            </div>
+
+            <div class="section-heading">
+              <div><p class="eyebrow">下一步</p><h3>待完成作业</h3></div>
+              <button class="text-button" type="button" @click="navigate('assignments')">
+                查看全部
               </button>
             </div>
-            <div class="banner-symbol" aria-hidden="true">A+</div>
-          </div>
-
-          <div class="summary-grid">
-            <article class="summary-card coral">
-              <span>待处理</span><strong>{{ pendingCount }}</strong><small>份作业</small>
-            </article>
-            <article class="summary-card blue">
-              <span>已批改</span><strong>{{ gradedCount }}</strong><small>份作业</small>
-            </article>
-            <article class="summary-card green">
-              <span>新课件</span><strong>{{ materials.length }}</strong><small>份资料</small>
-            </article>
-          </div>
-
-          <div class="section-heading">
-            <div><p class="eyebrow">下一步</p><h3>待完成作业</h3></div>
-            <button class="text-button" type="button" @click="navigate('assignments')">
-              查看全部
-            </button>
-          </div>
-          <div class="compact-list">
-            <button
-              v-for="row in assignmentRows.filter(({ status }) => status === 'NOT_SUBMITTED' || status === 'REVISION_REQUIRED').slice(0, 3)"
-              :key="row.assignment.id"
-              class="compact-item"
-              type="button"
-              @click="openAssignment(row.assignment.id)"
-            >
-              <span class="course-icon">{{ courseName(row.assignment.courseId).slice(0, 1) }}</span>
-              <span>
-                <strong>{{ row.assignment.title }}</strong>
-                <small>{{ courseName(row.assignment.courseId) }} · 截止 {{ formatDateTime(row.assignment.dueAt) }}</small>
-              </span>
-              <em :class="['status', row.status.toLowerCase()]">
-                {{ getSubmissionStatusLabel(row.status) }}
-              </em>
-            </button>
-          </div>
-        </section>
-
-        <section v-else-if="currentPage === 'courseware'" class="page-section">
-          <div class="page-heading">
-            <div>
-              <p class="eyebrow">学习资料</p>
-              <h2>课件中心</h2>
-              <p>按课程查看老师最新发布的课件与附件。</p>
+            <p v-if="assignmentRows.length === 0" class="state-message">
+              暂无作业，老师发布后会自动显示。
+            </p>
+            <div v-else class="compact-list">
+              <button
+                v-for="row in assignmentRows.filter(({ status }) => status === 'NOT_SUBMITTED' || status === 'REVISION_REQUIRED').slice(0, 3)"
+                :key="row.assignment.id"
+                class="compact-item"
+                type="button"
+                @click="openAssignment(row.assignment.id)"
+              >
+                <span class="course-icon">{{ courseName(row.assignment.courseId).slice(0, 1) }}</span>
+                <span>
+                  <strong>{{ row.assignment.title }}</strong>
+                  <small>{{ courseName(row.assignment.courseId) }} · 截止 {{ formatDateTime(row.assignment.dueAt) }}</small>
+                </span>
+                <em :class="['status', row.status.toLowerCase()]">
+                  {{ getSubmissionStatusLabel(row.status) }}
+                </em>
+              </button>
             </div>
-          </div>
-          <div class="card-grid">
-            <article
-              v-for="material in materials"
-              :key="material.id"
-              class="material-card"
-            >
-              <div class="file-cover">{{ courseName(material.courseId).slice(0, 1) }}</div>
-              <div class="material-content">
-                <span class="course-tag">{{ courseName(material.courseId) }}</span>
-                <h3>{{ material.title }}</h3>
-                <p>{{ material.description }}</p>
-                <div class="material-files">
-                  <button
-                    v-for="file in material.attachments"
-                    :key="file.id"
-                    class="material-file"
-                    type="button"
-                    @click="showDownload(file.originalName)"
-                  >
-                    <span>{{ file.originalName }}</span>
-                    <small>{{ formatBytes(file.byteSize) }}</small>
-                  </button>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
+          </section>
 
-        <Home
-          v-else
-          :key="assignmentViewKey"
-          :current-user="currentUser"
-          :initial-assignment-id="requestedAssignmentId"
-          @assignments-changed="handleAssignmentsChanged"
-        />
+          <section v-else-if="currentPage === 'courseware'" class="page-section">
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow">学习资料</p>
+                <h2>课件中心</h2>
+                <p>按课程查看老师最新发布的课件与附件。</p>
+              </div>
+            </div>
+            <p v-if="materials.length === 0" class="state-message">
+              暂无课件，老师发布后会自动显示。
+            </p>
+            <div v-else class="card-grid">
+              <article
+                v-for="material in materials"
+                :key="material.id"
+                class="material-card"
+              >
+                <div class="file-cover">{{ courseName(material.courseId).slice(0, 1) }}</div>
+                <div class="material-content">
+                  <span class="course-tag">{{ courseName(material.courseId) }}</span>
+                  <h3>{{ material.title }}</h3>
+                  <p>{{ material.description }}</p>
+                  <div class="material-files">
+                    <button
+                      v-for="file in material.attachments"
+                      :key="file.id"
+                      class="material-file"
+                      type="button"
+                      @click="showDownload(file.originalName)"
+                    >
+                      <span>{{ file.originalName }}</span>
+                      <small>{{ formatBytes(file.byteSize) }}</small>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <Home
+            v-else
+            :key="assignmentViewKey"
+            :current-user="currentUser"
+            :overview="overview"
+            :initial-assignment-id="requestedAssignmentId"
+            @submitted="handleOverviewChanged"
+            @session-expired="handleSessionExpired"
+          />
+        </template>
       </div>
     </section>
   </div>
@@ -335,5 +396,51 @@ function formatBytes(byteSize: number): string {
 
 .material-file small {
   min-height: auto;
+}
+
+.state-panel {
+  padding: 32px;
+  border: 1px solid #e4e7ef;
+  border-radius: 18px;
+  background: #fff;
+  text-align: center;
+  color: #536079;
+}
+
+.state-panel h3 {
+  margin: 0 0 8px;
+  color: #263247;
+}
+
+.state-panel p {
+  margin: 0 0 18px;
+}
+
+.state-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid #ffd9d9;
+  border-radius: 10px;
+  color: #b54d4f;
+  background: #fff5f5;
+}
+
+.state-banner button {
+  border: 1px solid #e5a5a5;
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: #b54d4f;
+  background: #fff;
+  cursor: pointer;
+}
+
+.state-message {
+  padding: 18px 0;
+  color: #8991a0;
+  text-align: center;
 }
 </style>

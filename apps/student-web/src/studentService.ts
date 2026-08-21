@@ -1,16 +1,17 @@
-import {
-  assignments,
-  coursewareMaterials,
-  initialSubmissions,
-  studentClassId,
-} from './mockData'
 import type {
   Assignment,
   Courseware,
   FileSummary,
   Submission,
-  SubmissionViewStatus,
-} from './types'
+} from '@k12/shared'
+
+import { studentBusinessClient } from './studentBusinessClient'
+import type {
+  StudentBusinessClient,
+  StudentOverview,
+  SubmitWorkInput,
+} from './studentBusinessClient'
+import type { SubmissionViewStatus } from './types'
 
 export const maximumAttachmentBytes = 10 * 1024 * 1024
 
@@ -20,86 +21,6 @@ const allowedAttachmentTypes = new Set([
   'image/jpeg',
   'image/png',
 ])
-
-let submissions = cloneSubmissions(initialSubmissions)
-
-function cloneSubmissions(items: Submission[]): Submission[] {
-  return items.map((item) => ({
-    ...item,
-    attachments: item.attachments.map((attachment) => ({ ...attachment })),
-  }))
-}
-
-function ensureCurrentStudent(studentId: number): void {
-  if (studentId !== 101) {
-    throw new Error('学生只能查看和提交自己的作业')
-  }
-}
-
-export function listCourseware(studentId: number): Courseware[] {
-  ensureCurrentStudent(studentId)
-  return coursewareMaterials.map((material) => ({
-    ...material,
-    attachments: material.attachments.map((attachment) => ({ ...attachment })),
-  }))
-}
-
-export function listAssignments(studentId: number): Assignment[] {
-  ensureCurrentStudent(studentId)
-  return assignments
-    .filter((assignment) => assignment.classId === studentClassId)
-    .map((assignment) => ({
-      ...assignment,
-      attachments: assignment.attachments.map((attachment) => ({
-        ...attachment,
-      })),
-    }))
-}
-
-export function getAssignment(
-  assignmentId: number,
-  studentId: number,
-): Assignment {
-  const assignment = listAssignments(studentId).find(
-    (item) => item.id === assignmentId,
-  )
-
-  if (!assignment) {
-    throw new Error('作业不存在或不属于当前班级')
-  }
-
-  return assignment
-}
-
-export function getSubmissionHistory(
-  assignmentId: number,
-  studentId: number,
-): Submission[] {
-  ensureCurrentStudent(studentId)
-  return cloneSubmissions(
-    submissions
-      .filter(
-        (submission) =>
-          submission.assignmentId === assignmentId &&
-          submission.studentId === studentId,
-      )
-      .sort((left, right) => left.attempt - right.attempt),
-  )
-}
-
-export function getLatestSubmission(
-  assignmentId: number,
-  studentId: number,
-): Submission | undefined {
-  return getSubmissionHistory(assignmentId, studentId).at(-1)
-}
-
-export function getSubmissionViewStatus(
-  assignmentId: number,
-  studentId: number,
-): SubmissionViewStatus {
-  return getLatestSubmission(assignmentId, studentId)?.status ?? 'NOT_SUBMITTED'
-}
 
 export function validateAttachments(attachments: FileSummary[]): void {
   for (const attachment of attachments) {
@@ -113,56 +34,81 @@ export function validateAttachments(attachments: FileSummary[]): void {
   }
 }
 
-export function submitAssignment(input: {
-  assignmentId: number
-  studentId: number
+export function validateSubmissionInput(input: {
   content: string
   attachments: FileSummary[]
-  submittedAt?: string
-}): Submission {
-  const assignment = getAssignment(input.assignmentId, input.studentId)
-  const latestSubmission = getLatestSubmission(input.assignmentId, input.studentId)
-  const submittedAt = input.submittedAt ?? new Date().toISOString()
-
+}): void {
   if (!input.content.trim() && input.attachments.length === 0) {
     throw new Error('作业正文和附件不能同时为空')
   }
 
-  if (
-    !assignment.allowLate &&
-    new Date(submittedAt).getTime() > new Date(assignment.dueAt).getTime()
-  ) {
-    throw new Error('作业已截止，不能继续提交')
-  }
-
-  if (
-    latestSubmission &&
-    latestSubmission.status !== 'REVISION_REQUIRED'
-  ) {
-    throw new Error('当前作业已提交，不能重复提交')
-  }
-
   validateAttachments(input.attachments)
+}
 
-  const nextId = Math.max(0, ...submissions.map((submission) => submission.id)) + 1
-  const nextAttempt = (latestSubmission?.attempt ?? 0) + 1
-  const submission: Submission = {
-    id: nextId,
-    assignmentId: assignment.id,
-    studentId: input.studentId,
-    attempt: nextAttempt,
-    content: input.content.trim(),
-    attachments: input.attachments.map((attachment) => ({ ...attachment })),
-    status: 'SUBMITTED',
-    submittedAt,
-    teacherComment: '',
-    updatedAt: submittedAt,
+export function listCourseware(overview: StudentOverview): Courseware[] {
+  return overview.courseware
+}
+
+export function listAssignments(overview: StudentOverview): Assignment[] {
+  return overview.assignments
+}
+
+export function getAssignment(
+  overview: StudentOverview,
+  assignmentId: number,
+): Assignment {
+  const assignment = listAssignments(overview).find(
+    (item) => item.id === assignmentId,
+  )
+
+  if (!assignment) {
+    throw new Error('作业不存在或不属于当前班级')
   }
 
-  submissions.push(submission)
-  return cloneSubmissions([submission])[0] as Submission
+  return assignment
 }
 
-export function resetMockSubmissions(): void {
-  submissions = cloneSubmissions(initialSubmissions)
+export function getSubmissionHistory(
+  overview: StudentOverview,
+  assignmentId: number,
+): Submission[] {
+  return overview.submissions
+    .filter((submission) => submission.assignmentId === assignmentId)
+    .sort((left, right) => left.attempt - right.attempt)
 }
+
+export function getLatestSubmission(
+  overview: StudentOverview,
+  assignmentId: number,
+): Submission | undefined {
+  return getSubmissionHistory(overview, assignmentId).at(-1)
+}
+
+export function getSubmissionViewStatus(
+  overview: StudentOverview,
+  assignmentId: number,
+): SubmissionViewStatus {
+  return getLatestSubmission(overview, assignmentId)?.status ?? 'NOT_SUBMITTED'
+}
+
+export interface StudentDataService {
+  loadOverview(): Promise<StudentOverview>
+  submitWork(input: SubmitWorkInput): Promise<Submission>
+}
+
+export function createStudentDataService(
+  client: StudentBusinessClient = studentBusinessClient,
+): StudentDataService {
+  return {
+    loadOverview() {
+      return client.getOverview()
+    },
+
+    async submitWork(input) {
+      validateSubmissionInput(input)
+      return client.submitWork(input)
+    },
+  }
+}
+
+export const studentDataService = createStudentDataService()

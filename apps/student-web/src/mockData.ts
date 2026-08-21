@@ -1,126 +1,117 @@
-import type { Assignment, Courseware, Submission } from '@k12/shared'
+import type {
+  Assignment,
+  CourseSummary,
+  Courseware,
+  StudentSummary,
+  Submission,
+  UserSummary,
+} from '@k12/shared'
 
+import type { StudentOverview } from './studentBusinessClient'
+
+// 运行时页面不再读取业务 Mock；本文件只作为测试夹具使用，
+// 内容对齐 apps/api/src/businessSeed.ts 中林晓雨（student_101）的数据。
 export const mockNow = '2026-08-07T10:00:00+08:00'
 
 export const studentId = 101
 export const studentClassId = 101
 
-export const coursewareMaterials: Courseware[] = [
+const student: StudentSummary = {
+  id: 101,
+  displayName: '林晓雨',
+  classId: 101,
+  className: '六年级 1 班',
+  campusId: 1,
+  campusName: '滨江校区',
+}
+
+const courses: CourseSummary[] = [
+  { id: 11, campusId: 1, name: '数学提高班', subject: '数学' },
+  { id: 12, campusId: 1, name: '英语阅读班', subject: '英语' },
+]
+
+const teachers: UserSummary[] = [
+  { id: 301, displayName: '李老师', role: 'TEACHER', campusId: 1, campusName: '滨江校区' },
+  { id: 302, displayName: '周老师', role: 'HOMEROOM_TEACHER', campusId: 1, campusName: '滨江校区' },
+]
+
+const courseware: Courseware[] = [
   {
-    id: 201,
-    classId: studentClassId,
+    id: 2001,
+    classId: 101,
     courseId: 11,
-    teacherId: 2001,
-    title: '分数混合运算课堂讲义',
-    description: '复习运算顺序，并完成讲义中的三个例题。',
-    attachments: [{
-      id: 2001,
-      originalName: '分数混合运算讲义.pdf',
-      mimeType: 'application/pdf',
-      byteSize: 1_248_900,
-      createdAt: '2026-08-05T16:20:00+08:00',
-    }],
-    publishedAt: '2026-08-05T16:20:00+08:00',
-  },
-  {
-    id: 202,
-    classId: studentClassId,
-    courseId: 12,
-    teacherId: 2002,
-    title: '《草原》阅读提示',
-    description: '结合问题清单预习课文，标记不理解的句子。',
-    attachments: [{
-      id: 2002,
-      originalName: '草原阅读提示.docx',
-      mimeType:
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      byteSize: 486_200,
-      createdAt: '2026-08-06T18:00:00+08:00',
-    }],
-    publishedAt: '2026-08-06T18:00:00+08:00',
-  },
-  {
-    id: 203,
-    classId: studentClassId,
-    courseId: 13,
-    teacherId: 2003,
-    title: 'Unit 2 单词表',
-    description: '跟读单词，并在下次课前完成自测。',
-    attachments: [{
-      id: 2003,
-      originalName: 'unit-2-words.pdf',
-      mimeType: 'application/pdf',
-      byteSize: 820_400,
-      createdAt: '2026-08-07T08:30:00+08:00',
-    }],
-    publishedAt: '2026-08-07T08:30:00+08:00',
+    teacherId: 301,
+    title: '分数混合运算讲义',
+    description: '复习运算顺序并完成课堂例题。',
+    attachments: [
+      {
+        id: 9001,
+        originalName: '分数练习.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 640_000,
+        createdAt: '2026-08-06T09:00:00+08:00',
+      },
+    ],
+    publishedAt: '2026-08-06T09:00:00+08:00',
   },
 ]
 
-export const assignments: Assignment[] = [
+const assignments: Assignment[] = [
   {
-    id: 301,
+    id: 3001,
     campusId: 1,
     classId: 101,
     courseId: 11,
-    scheduleId: 701,
-    teacherId: 2001,
+    scheduleId: 1001,
+    teacherId: 301,
     title: '分数单元练习',
-    description:
-      '完成练习册第 18—20 页，并写出第 6 题和第 9 题的计算过程。可以填写文字说明，也可以上传 PDF 或图片。',
-    attachments: [
-      {
-        id: 3001,
-        originalName: '分数单元练习.pdf',
-        mimeType: 'application/pdf',
-        byteSize: 932_100,
-        createdAt: '2026-08-06T17:00:00+08:00',
-      },
-    ],
+    description: '完成练习册第 18—20 页。',
+    attachments: [],
     dueAt: '2026-08-20T20:00:00+08:00',
     allowLate: false,
-    publishedAt: '2026-08-06T17:00:00+08:00',
-    createdAt: '2026-08-06T16:55:00+08:00',
-    updatedAt: '2026-08-06T17:00:00+08:00',
+    publishedAt: '2026-08-06T09:00:00+08:00',
+    createdAt: '2026-08-06T09:00:00+08:00',
+    updatedAt: '2026-08-06T09:00:00+08:00',
   },
   {
-    id: 302,
+    id: 3002,
     campusId: 1,
     classId: 101,
-    courseId: 12,
-    scheduleId: 702,
-    teacherId: 2002,
-    title: '《草原》段落仿写',
-    description: '仿照课文第一自然段，写一段 150 字左右的景物描写。',
+    courseId: 11,
+    scheduleId: 1001,
+    teacherId: 301,
+    title: '分数计算订正',
+    description: '订正课堂练习中的错题。',
     attachments: [],
     dueAt: '2026-08-12T20:00:00+08:00',
     allowLate: false,
-    publishedAt: '2026-08-04T16:30:00+08:00',
-    createdAt: '2026-08-04T16:20:00+08:00',
-    updatedAt: '2026-08-04T16:30:00+08:00',
+    publishedAt: '2026-08-06T09:00:00+08:00',
+    createdAt: '2026-08-06T09:00:00+08:00',
+    updatedAt: '2026-08-06T09:00:00+08:00',
   },
   {
-    id: 303,
+    id: 3003,
     campusId: 1,
     classId: 101,
-    courseId: 13,
-    scheduleId: 703,
-    teacherId: 2003,
-    title: 'Unit 2 口语练习',
-    description: '录制一段 1 分钟的自我介绍，并根据老师评语完成订正。',
+    courseId: 12,
+    scheduleId: 1003,
+    teacherId: 302,
+    title: '英语朗读订正',
+    description: '根据评语重新整理朗读内容。',
     attachments: [],
     dueAt: '2026-08-22T20:00:00+08:00',
     allowLate: true,
-    publishedAt: '2026-08-05T18:00:00+08:00',
-    createdAt: '2026-08-05T17:50:00+08:00',
-    updatedAt: '2026-08-05T18:00:00+08:00',
+    publishedAt: '2026-08-06T09:00:00+08:00',
+    createdAt: '2026-08-06T09:00:00+08:00',
+    updatedAt: '2026-08-06T09:00:00+08:00',
   },
   {
-    id: 304,
+    id: 3004,
     campusId: 1,
     classId: 101,
-    courseId: 14,
-    teacherId: 2004,
+    courseId: 12,
+    scheduleId: 1003,
+    teacherId: 302,
     title: '科学观察日记',
     description: '记录一周内植物叶片的变化。',
     attachments: [],
@@ -132,43 +123,46 @@ export const assignments: Assignment[] = [
   },
 ]
 
-export const initialSubmissions: Submission[] = [
+const submissions: Submission[] = [
   {
-    id: 501,
-    assignmentId: 302,
-    studentId: studentId,
+    id: 4001,
+    assignmentId: 3002,
+    studentId: 101,
     attempt: 1,
-    content: '清晨的湖面像一面银色的镜子，远处的小船慢慢划开水纹。',
+    content: '第一次计算过程。',
     attachments: [],
-    status: 'GRADED',
-    submittedAt: '2026-08-06T19:10:00+08:00',
-    score: 92,
-    teacherComment: '景物顺序清楚，可以再加入声音描写。',
-    gradedBy: 2002,
-    gradedAt: '2026-08-07T09:00:00+08:00',
-    updatedAt: '2026-08-07T09:00:00+08:00',
+    status: 'SUBMITTED',
+    submittedAt: '2026-08-06T19:00:00+08:00',
+    score: null,
+    teacherComment: '',
+    gradedBy: null,
+    gradedAt: null,
+    updatedAt: '2026-08-06T19:00:00+08:00',
   },
   {
-    id: 502,
-    assignmentId: 303,
-    studentId: studentId,
+    id: 4002,
+    assignmentId: 3003,
+    studentId: 101,
     attempt: 1,
-    content: '第一次口语录音。',
-    attachments: [
-      {
-        id: 5001,
-        originalName: 'unit-2-speaking.pdf',
-        mimeType: 'application/pdf',
-        byteSize: 302_100,
-        createdAt: '2026-08-06T20:00:00+08:00',
-      },
-    ],
+    content: '第一次朗读文字稿。',
+    attachments: [],
     status: 'REVISION_REQUIRED',
-    submittedAt: '2026-08-06T20:00:00+08:00',
+    submittedAt: '2026-08-06T19:30:00+08:00',
     score: 70,
-    teacherComment: '请补充完整句子，并重新提交第二次记录。',
-    gradedBy: 2003,
-    gradedAt: '2026-08-07T08:20:00+08:00',
-    updatedAt: '2026-08-07T08:20:00+08:00',
+    teacherComment: '请补充完整句子后订正。',
+    gradedBy: 302,
+    gradedAt: '2026-08-07T08:00:00+08:00',
+    updatedAt: '2026-08-07T08:00:00+08:00',
   },
 ]
+
+export function createStudentOverviewFixture(): StudentOverview {
+  return structuredClone({
+    student,
+    courses,
+    teachers,
+    courseware,
+    assignments,
+    submissions,
+  })
+}

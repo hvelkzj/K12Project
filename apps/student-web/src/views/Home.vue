@@ -2,20 +2,24 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Assignment, FileSummary, Submission, UserSummary } from '@k12/shared'
 import { listAssignmentRows } from '../assignmentListService'
-import { getSubmissionHistory, submitAssignment } from '../studentService'
+import { getSubmissionHistory, studentDataService } from '../studentService'
 import { isAssignmentSubmissionClosed } from '../assignmentPresentation'
 import type { AssignmentListRow } from '../assignmentPresentation'
+import { StudentBusinessError } from '../studentBusinessClient'
+import type { StudentOverview } from '../studentBusinessClient'
 import AssignmentList from './AssignmentList.vue'
 
 const props = withDefaults(
   defineProps<{
     currentUser: UserSummary
+    overview: StudentOverview | null
     initialAssignmentId?: number | null
   }>(),
   { initialAssignmentId: null },
 )
 const emit = defineEmits<{
-  (event: 'assignmentsChanged'): void
+  (event: 'submitted'): void
+  (event: 'sessionExpired', message: string): void
 }>()
 type Page = 'list' | 'detail' | 'submit' | 'result'
 type SidePanel = 'statistics' | 'profile' | null
@@ -26,7 +30,7 @@ const currentNow = ref(new Date().toISOString())
 const content = ref('')
 const attachments = ref<FileSummary[]>([])
 const errorMessage = ref('')
-const revision = ref(0)
+const isSubmitting = ref(false)
 let timer: ReturnType<typeof setInterval> | undefined
 
 onMounted(() => {
@@ -37,11 +41,13 @@ onMounted(() => {
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
 
-const rows = computed<AssignmentListRow[]>(() => { void revision.value; return listAssignmentRows(props.currentUser.id) })
+const rows = computed<AssignmentListRow[]>(() =>
+  props.overview ? listAssignmentRows(props.overview) : [],
+)
 const selectedRow = computed(() => rows.value.find((row) => row.assignment.id === selectedId.value))
 const assignment = computed<Assignment | undefined>(() => selectedRow.value?.assignment)
 const latestSubmission = computed<Submission | undefined>(() => selectedRow.value?.latestSubmission)
-const submissionHistory = computed<Submission[]>(() => { void revision.value; return selectedId.value === null ? [] : getSubmissionHistory(selectedId.value, props.currentUser.id) })
+const submissionHistory = computed<Submission[]>(() => props.overview && selectedId.value !== null ? getSubmissionHistory(props.overview, selectedId.value) : [])
 const isClosed = computed(() => assignment.value ? isAssignmentSubmissionClosed(assignment.value, currentNow.value) : false)
 const canSubmit = computed(() => !isClosed.value && (selectedRow.value?.status === 'NOT_SUBMITTED' || selectedRow.value?.status === 'REVISION_REQUIRED'))
 const nextAttempt = computed(() => (latestSubmission.value?.attempt ?? 0) + 1)
@@ -63,14 +69,28 @@ function handleFileChange(event: Event): void {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
   attachments.value = files.map((file, index) => ({ id: Date.now() + index, originalName: file.name, mimeType: file.type || 'application/octet-stream', byteSize: file.size, createdAt: new Date().toISOString() }))
 }
-function submit(): void {
+async function submit(): Promise<void> {
   if (!assignment.value || !canSubmit.value) { errorMessage.value = '该作业已截止，不能继续提交。'; return }
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  errorMessage.value = ''
   try {
-    submitAssignment({ assignmentId: assignment.value.id, studentId: props.currentUser.id, content: content.value, attachments: attachments.value, submittedAt: new Date().toISOString() })
-    revision.value += 1
-    emit('assignmentsChanged')
+    await studentDataService.submitWork({
+      assignmentId: assignment.value.id,
+      content: content.value,
+      attachments: attachments.value,
+    })
+    emit('submitted')
     page.value = 'result'
-  } catch (error) { errorMessage.value = error instanceof Error ? error.message : '提交失败，请稍后重试。' }
+  } catch (error) {
+    if (error instanceof StudentBusinessError && error.status === 401) {
+      emit('sessionExpired', '登录已失效，请重新登录')
+      return
+    }
+    errorMessage.value = error instanceof Error ? error.message : '提交失败，请稍后重试。'
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -91,7 +111,7 @@ function submit(): void {
       <label class="field"><span>作业正文 <i>可选，至少提交正文或附件之一</i></span><textarea v-model="content" rows="8" placeholder="请填写解题过程、作文内容或订正说明……"></textarea></label>
       <label class="upload-zone"><input type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png" @change="handleFileChange" /><span class="upload-icon">↑</span><strong>选择作业附件</strong><small>支持 PDF、DOCX、JPG、PNG，单个文件不超过 10 MB</small></label>
       <p v-for="file in attachments" :key="file.id" class="file-name">{{ file.originalName }}</p><p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
-      <div class="actions"><button class="secondary-button" type="button" @click="page = 'detail'">取消</button><button class="primary-button" type="submit">确认提交</button></div>
+      <div class="actions"><button class="secondary-button" type="button" :disabled="isSubmitting" @click="page = 'detail'">取消</button><button class="primary-button" type="submit" :disabled="isSubmitting">{{ isSubmitting ? '提交中…' : '确认提交' }}</button></div>
     </form>
     <article v-else class="panel result">
       <div class="result-check">✓</div><p class="eyebrow">提交结果</p><h1>{{ latestSubmission ? '作业已成功提交' : '暂无提交记录' }}</h1><p v-if="latestSubmission">第 {{ latestSubmission.attempt }} 次提交 · {{ formatDateTime(latestSubmission.submittedAt) }}</p>
@@ -120,6 +140,6 @@ function submit(): void {
 </template>
 
 <style scoped>
-.assignment-workspace { max-width: 960px; margin: 0 auto; }.back-button, .secondary-button, .primary-button { border: 0; border-radius: 10px; padding: 11px 17px; font-weight: 800; cursor: pointer; transition: transform .2s, box-shadow .2s; }.back-button, .secondary-button { color: #536079; background: #eef0f7; }.primary-button { color: #fff; background: linear-gradient(135deg, #746de2, #564cc4); box-shadow: 0 8px 18px rgb(98 91 207 / 25%); }.primary-button:hover { transform: translateY(-1px); box-shadow: 0 12px 22px rgb(98 91 207 / 30%); }.panel { margin-top: 16px; padding: 32px; border: 1px solid #e4e7ef; border-radius: 22px; background: #fff; box-shadow: 0 14px 38px rgb(38 51 75 / 10%); }.detail-hero, .submit-heading { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }.eyebrow { margin: 0; color: #6c64d7; font-size: 12px; font-weight: 850; letter-spacing: .08em; }h1 { margin: 9px 0 12px; color: #263247; font-size: clamp(27px, 4vw, 36px); }.description, .deadline { color: #68748a; line-height: 1.75; }.status-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 800; }.status-pill.open { color: #23845f; background: #e8f7f0; }.status-pill.closed { color: #b64f55; background: #ffeded; }.meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; }.meta div { padding: 15px; border-radius: 13px; background: #f7f8fc; }.meta dt { color: #7a8496; font-size: 12px; }.meta dd { margin: 7px 0 0; color: #34425a; font-weight: 800; }.attachments { margin: 20px 0; padding: 17px; border: 1px solid #e9ebf2; border-radius: 14px; }.section-title { display: flex; justify-content: space-between; margin-bottom: 12px; font-weight: 800; }.section-title small { color: #8991a0; font-weight: 600; }.attachment-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; background: #f8f9fd; }.attachment-row small { color: #8490a3; }.file-icon { border-radius: 6px; padding: 4px 5px; color: #ce555b; background: #ffe8e8; font-size: 10px; font-weight: 900; }.closed-message, .error-message { margin: 18px 0; color: #b54d4f; font-weight: 700; }.field { display: grid; gap: 9px; margin-top: 22px; font-weight: 800; color: #3e4960; }.field i { color: #9299a7; font-size: 12px; font-style: normal; font-weight: 500; }.field textarea { border: 1px solid #d7dce8; border-radius: 12px; padding: 14px; font: inherit; line-height: 1.6; resize: vertical; }.field textarea:focus { outline: 3px solid rgb(98 91 207 / 15%); border-color: #746de2; }.upload-zone { display: grid; place-items: center; gap: 7px; margin-top: 18px; padding: 24px; border: 2px dashed #d9d6fa; border-radius: 14px; color: #57627a; background: #fafaff; cursor: pointer; }.upload-zone input { display: none; }.upload-zone small { color: #8b94a6; }.upload-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; color: #625bcf; background: #eeecff; font-size: 21px; }.file-name { margin: 9px 0; color: #50607c; }.actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }.result { text-align: center; }.result-check { display: grid; width: 56px; height: 56px; place-items: center; margin: 0 auto 16px; border-radius: 50%; color: #fff; background: #42aa80; font-size: 28px; font-weight: 900; }.result details { margin: 18px 0; color: #536079; text-align: left; }@media (max-width: 650px) { .detail-hero, .submit-heading { flex-direction: column; }.meta { grid-template-columns: 1fr; }.panel { padding: 22px; } }
+.assignment-workspace { max-width: 960px; margin: 0 auto; }.back-button, .secondary-button, .primary-button { border: 0; border-radius: 10px; padding: 11px 17px; font-weight: 800; cursor: pointer; transition: transform .2s, box-shadow .2s; }.back-button, .secondary-button { color: #536079; background: #eef0f7; }.primary-button { color: #fff; background: linear-gradient(135deg, #746de2, #564cc4); box-shadow: 0 8px 18px rgb(98 91 207 / 25%); }.primary-button:hover { transform: translateY(-1px); box-shadow: 0 12px 22px rgb(98 91 207 / 30%); }.primary-button:disabled, .secondary-button:disabled { opacity: .6; cursor: not-allowed; transform: none; }.panel { margin-top: 16px; padding: 32px; border: 1px solid #e4e7ef; border-radius: 22px; background: #fff; box-shadow: 0 14px 38px rgb(38 51 75 / 10%); }.detail-hero, .submit-heading { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }.eyebrow { margin: 0; color: #6c64d7; font-size: 12px; font-weight: 850; letter-spacing: .08em; }h1 { margin: 9px 0 12px; color: #263247; font-size: clamp(27px, 4vw, 36px); }.description, .deadline { color: #68748a; line-height: 1.75; }.status-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 800; }.status-pill.open { color: #23845f; background: #e8f7f0; }.status-pill.closed { color: #b64f55; background: #ffeded; }.meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; }.meta div { padding: 15px; border-radius: 13px; background: #f7f8fc; }.meta dt { color: #7a8496; font-size: 12px; }.meta dd { margin: 7px 0 0; color: #34425a; font-weight: 800; }.attachments { margin: 20px 0; padding: 17px; border: 1px solid #e9ebf2; border-radius: 14px; }.section-title { display: flex; justify-content: space-between; margin-bottom: 12px; font-weight: 800; }.section-title small { color: #8991a0; font-weight: 600; }.attachment-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; background: #f8f9fd; }.attachment-row small { color: #8490a3; }.file-icon { border-radius: 6px; padding: 4px 5px; color: #ce555b; background: #ffe8e8; font-size: 10px; font-weight: 900; }.closed-message, .error-message { margin: 18px 0; color: #b54d4f; font-weight: 700; }.field { display: grid; gap: 9px; margin-top: 22px; font-weight: 800; color: #3e4960; }.field i { color: #9299a7; font-size: 12px; font-style: normal; font-weight: 500; }.field textarea { border: 1px solid #d7dce8; border-radius: 12px; padding: 14px; font: inherit; line-height: 1.6; resize: vertical; }.field textarea:focus { outline: 3px solid rgb(98 91 207 / 15%); border-color: #746de2; }.upload-zone { display: grid; place-items: center; gap: 7px; margin-top: 18px; padding: 24px; border: 2px dashed #d9d6fa; border-radius: 14px; color: #57627a; background: #fafaff; cursor: pointer; }.upload-zone input { display: none; }.upload-zone small { color: #8b94a6; }.upload-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; color: #625bcf; background: #eeecff; font-size: 21px; }.file-name { margin: 9px 0; color: #50607c; }.actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }.result { text-align: center; }.result-check { display: grid; width: 56px; height: 56px; place-items: center; margin: 0 auto 16px; border-radius: 50%; color: #fff; background: #42aa80; font-size: 28px; font-weight: 900; }.result details { margin: 18px 0; color: #536079; text-align: left; }@media (max-width: 650px) { .detail-hero, .submit-heading { flex-direction: column; }.meta { grid-template-columns: 1fr; }.panel { padding: 22px; } }
 .panel-overlay { position: fixed; z-index: 20; inset: 0; display: flex; justify-content: flex-end; background: rgb(31 40 60 / 35%); backdrop-filter: blur(2px); }.side-panel { width: min(400px, 92vw); min-height: 100%; padding: 32px; color: #2e3850; background: #fff; box-shadow: -18px 0 42px rgb(25 34 55 / 18%); }.side-panel h2 { margin: 8px 0; font-size: 28px; }.close-button { float: right; border: 0; border-radius: 50%; width: 32px; height: 32px; color: #68748a; background: #f1f2f7; font-size: 23px; cursor: pointer; }.panel-subtitle { margin: 0; color: #8790a0; }.ring { display: grid; width: 142px; height: 142px; place-content: center; margin: 28px auto; border-radius: 50%; background: radial-gradient(closest-side, white 77%, transparent 78% 100%), conic-gradient(#625bcf var(--progress), #ececf5 0); text-align: center; }.ring strong { font-size: 27px; }.ring span { color: #8991a0; font-size: 12px; }.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }.stats-grid div { display: grid; gap: 4px; padding: 15px; border-radius: 13px; background: #f7f8fc; }.stats-grid strong { color: #625bcf; font-size: 25px; }.stats-grid span, .profile-card small { color: #8490a3; font-size: 12px; }.tip-card, .privacy-note { margin-top: 18px; padding: 16px; border-radius: 13px; color: #536079; background: #f2f1ff; line-height: 1.6; }.tip-card p { margin: 6px 0 0; }.profile-card { display: flex; align-items: center; gap: 13px; margin: 24px 0; padding: 18px; border-radius: 15px; background: linear-gradient(135deg, #f0efff, #fff4ef); }.profile-card > span { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: #fff; background: #ed956c; font-size: 20px; font-weight: 900; }.profile-card div { display: grid; gap: 4px; }.profile-list { margin: 0; }.profile-list div { display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #edf0f5; }.profile-list dt { color: #8991a0; }.profile-list dd { margin: 0; font-weight: 750; }.online { color: #23845f; }
 </style>
