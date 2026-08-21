@@ -15,11 +15,17 @@ import {
 
 const parentOverviewPattern = /^\/parent\/students\/(\d+)\/overview$/
 const parentFeedbackPattern = /^\/parent\/feedback\/(\d+)$/
+const parentNotificationReadPattern =
+  /^\/parent\/notifications\/(\d+)\/read$/
 const teacherSubmissionPattern = /^\/teacher\/submissions\/(\d+)$/
 const adminReviewPattern = /^\/admin\/schedule-changes\/(\d+)\/review$/
 const adminSubstitutePattern =
   /^\/admin\/schedule-changes\/(\d+)\/substitute$/
 const adminWorkOrderPattern = /^\/admin\/work-orders\/(\d+)$/
+const adminLeaveReviewPattern =
+  /^\/admin\/leave-requests\/(\d+)\/review$/
+const adminSchedulePattern = /^\/admin\/schedules\/(\d+)$/
+const adminUserPattern = /^\/admin\/users\/(\d+)$/
 
 const exactBusinessPaths = new Set([
   '/parent/students',
@@ -32,16 +38,21 @@ const exactBusinessPaths = new Set([
   '/teacher/feedback',
   '/teacher/schedule-changes',
   '/admin/overview',
+  '/admin/schedules',
 ])
 
 function dynamicPathMatches(path: string): boolean {
   return [
     parentOverviewPattern,
     parentFeedbackPattern,
+    parentNotificationReadPattern,
     teacherSubmissionPattern,
     adminReviewPattern,
     adminSubstitutePattern,
     adminWorkOrderPattern,
+    adminLeaveReviewPattern,
+    adminSchedulePattern,
+    adminUserPattern,
   ].some((pattern) => pattern.test(path))
 }
 
@@ -168,6 +179,26 @@ export async function handleBusinessRequest(
     return true
   }
 
+  const parentNotificationReadMatch = path.match(parentNotificationReadPattern)
+  if (parentNotificationReadMatch) {
+    if (method !== 'PATCH') methodNotAllowed(response, ['PATCH'])
+    else {
+      const input = await readBusinessInput(request, response)
+      if (input) {
+        sendJson(
+          response,
+          200,
+          store.markNotificationRead(
+            user,
+            pathId(parentNotificationReadMatch),
+            input,
+          ),
+        )
+      }
+    }
+    return true
+  }
+
   if (path === '/student/overview') {
     if (method !== 'GET') methodNotAllowed(response, ['GET'])
     else sendJson(response, 200, store.getStudentOverview(user))
@@ -244,6 +275,69 @@ export async function handleBusinessRequest(
   if (path === '/admin/overview') {
     if (method !== 'GET') methodNotAllowed(response, ['GET'])
     else sendJson(response, 200, store.getAdminOverview(user))
+    return true
+  }
+
+  if (path === '/admin/schedules') {
+    if (method !== 'POST') methodNotAllowed(response, ['POST'])
+    else {
+      const input = await readBusinessInput(request, response)
+      if (input) sendJson(response, 201, store.createSchedule(user, input))
+    }
+    return true
+  }
+
+  const adminScheduleMatch = path.match(adminSchedulePattern)
+  if (adminScheduleMatch) {
+    if (method !== 'PATCH') methodNotAllowed(response, ['PATCH'])
+    else {
+      const input = await readBusinessInput(request, response)
+      if (input) {
+        sendJson(
+          response,
+          200,
+          store.updateSchedule(user, pathId(adminScheduleMatch), input),
+        )
+      }
+    }
+    return true
+  }
+
+  const adminLeaveReviewMatch = path.match(adminLeaveReviewPattern)
+  if (adminLeaveReviewMatch) {
+    if (method !== 'PATCH') methodNotAllowed(response, ['PATCH'])
+    else {
+      const input = await readBusinessInput(request, response)
+      if (input) {
+        sendJson(
+          response,
+          200,
+          store.reviewLeaveRequest(
+            user,
+            pathId(adminLeaveReviewMatch),
+            input,
+          ),
+        )
+      }
+    }
+    return true
+  }
+
+  const adminUserMatch = path.match(adminUserPattern)
+  if (adminUserMatch) {
+    if (method !== 'PATCH') methodNotAllowed(response, ['PATCH'])
+    else {
+      const input = await readBusinessInput(request, response)
+      if (input) {
+        const updated = store.updateUserAccount(
+          user,
+          pathId(adminUserMatch),
+          input,
+        )
+        authService.setAccountActive(updated.id, updated.active)
+        sendJson(response, 200, updated)
+      }
+    }
     return true
   }
 

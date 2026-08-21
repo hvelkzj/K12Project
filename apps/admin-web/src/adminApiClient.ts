@@ -1,6 +1,15 @@
 import type {
   AdminOverview,
+  CreateScheduleInput,
+  UpdateScheduleInput,
 } from './adminTypes'
+import type {
+  LeaveRequest,
+  ScheduleChange,
+  ScheduleSummary,
+  FeedbackWorkOrder,
+  UserAccountSummary,
+} from '@k12/shared'
 import { ACCESS_TOKEN_KEY } from './authService'
 
 export class AdminApiError extends Error {
@@ -20,17 +29,31 @@ export interface AdminApiClient {
     changeId: number
     decision: 'APPROVED' | 'REJECTED'
     decisionNote: string
-  }): Promise<import('./types').ScheduleChange>
+  }): Promise<ScheduleChange>
   assignSubstitute(input: {
     changeId: number
     substituteTeacherId: number
     substituteNote: string
-  }): Promise<import('./types').ScheduleChange>
+  }): Promise<ScheduleChange>
   updateWorkOrder(input: {
     workOrderId: number
     action: 'START' | 'CLOSE'
     result?: string
-  }): Promise<import('./types').FeedbackWorkOrder>
+  }): Promise<FeedbackWorkOrder>
+  reviewLeaveRequest(input: {
+    leaveRequestId: number
+    decision: 'APPROVED' | 'REJECTED'
+    reviewNote: string
+  }): Promise<LeaveRequest>
+  createSchedule(input: CreateScheduleInput): Promise<ScheduleSummary>
+  updateSchedule(input: {
+    scheduleId: number
+    changes: UpdateScheduleInput
+  }): Promise<ScheduleSummary>
+  updateUser(input: {
+    userId: number
+    active: boolean
+  }): Promise<UserAccountSummary>
 }
 
 export interface AdminApiClientOptions {
@@ -138,6 +161,37 @@ export function createAdminApiClient(
       return request(`/admin/work-orders/${input.workOrderId}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
+      })
+    },
+
+    reviewLeaveRequest(input) {
+      return request(`/admin/leave-requests/${input.leaveRequestId}/review`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          decision: input.decision,
+          reviewNote: input.reviewNote,
+        }),
+      })
+    },
+
+    createSchedule(input) {
+      return request('/admin/schedules', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+    },
+
+    updateSchedule(input) {
+      return request(`/admin/schedules/${input.scheduleId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input.changes),
+      })
+    },
+
+    updateUser(input) {
+      return request(`/admin/users/${input.userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ active: input.active }),
       })
     },
   }

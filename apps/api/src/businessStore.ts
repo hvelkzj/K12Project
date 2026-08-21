@@ -156,6 +156,46 @@ function requireIsoTimestamp(input: BusinessInput, field: string): string {
   return value
 }
 
+function scheduleInteger(
+  input: BusinessInput,
+  field: string,
+  existing?: number,
+): number {
+  if (Object.hasOwn(input, field)) return requirePositiveInteger(input, field)
+  if (existing !== undefined) return existing
+  invalid(`${field} 不能为空`)
+}
+
+function scheduleText(
+  input: BusinessInput,
+  field: string,
+  existing?: string,
+): string {
+  if (Object.hasOwn(input, field)) return requireText(input, field)
+  if (existing !== undefined) return existing
+  invalid(`${field} 不能为空`)
+}
+
+function scheduleDate(
+  input: BusinessInput,
+  field: string,
+  existing?: string,
+): string {
+  if (Object.hasOwn(input, field)) return requireDate(input, field)
+  if (existing !== undefined) return existing
+  invalid(`${field} 不能为空`)
+}
+
+function scheduleTime(
+  input: BusinessInput,
+  field: string,
+  existing?: string,
+): string {
+  if (Object.hasOwn(input, field)) return requireTime(input, field)
+  if (existing !== undefined) return existing
+  invalid(`${field} 不能为空`)
+}
+
 function requireFiles(input: BusinessInput, field: string): FileSummary[] {
   const value = input[field]
   if (!Array.isArray(value)) invalid(`${field} 必须是数组`)
@@ -255,6 +295,12 @@ export function createBusinessStore(
     return classRecord
   }
 
+  function findUser(userId: number): UserAccountSummary {
+    const account = data.users.find((item) => item.id === userId)
+    if (!account) notFound('账号不存在')
+    return account
+  }
+
   function ensureParentBinding(parentId: number, studentId: number) {
     const binding = data.parentBindings.find(
       (item) => item.parentId === parentId && item.student.id === studentId,
@@ -276,6 +322,10 @@ export function createBusinessStore(
     requireRole(user, ['ACADEMIC_ADMIN', 'SYSTEM_ADMIN'])
   }
 
+  function ensureSystemAdmin(user: UserSummary): void {
+    requireRole(user, ['SYSTEM_ADMIN'])
+  }
+
   function ensureAdminCampus(user: UserSummary, campusId: number): void {
     ensureAdmin(user)
     if (user.role === 'ACADEMIC_ADMIN' && user.campusId !== campusId) {
@@ -295,6 +345,71 @@ export function createBusinessStore(
             .map((item) => item.id)
         : []
     return uniqueNumbers([...ownClassIds, ...homeroomClassIds])
+  }
+
+  function normalizedSchedule(
+    input: BusinessInput,
+    existing?: ScheduleSummary,
+  ): Omit<ScheduleSummary, 'id' | 'status'> {
+    const campusId = scheduleInteger(input, 'campusId', existing?.campusId)
+    if (existing && campusId !== existing.campusId) {
+      invalid('课次不能变更所属校区')
+    }
+    const candidate = {
+      campusId,
+      classId: scheduleInteger(input, 'classId', existing?.classId),
+      courseId: scheduleInteger(input, 'courseId', existing?.courseId),
+      teacherId: scheduleInteger(input, 'teacherId', existing?.teacherId),
+      lessonDate: scheduleDate(input, 'lessonDate', existing?.lessonDate),
+      startTime: scheduleTime(input, 'startTime', existing?.startTime),
+      endTime: scheduleTime(input, 'endTime', existing?.endTime),
+      room: scheduleText(input, 'room', existing?.room),
+    }
+
+    if (!data.campuses.some((item) => item.id === candidate.campusId)) {
+      notFound('校区不存在')
+    }
+    const classRecord = findClass(candidate.classId)
+    const course = data.courses.find((item) => item.id === candidate.courseId)
+    if (!course) notFound('课程不存在')
+    const teacher = findUser(candidate.teacherId)
+
+    if (classRecord.campusId !== candidate.campusId) {
+      invalid('班级必须属于课次校区')
+    }
+    if (course.campusId !== candidate.campusId) {
+      invalid('课程必须属于课次校区')
+    }
+    if (
+      teacher.campusId !== candidate.campusId ||
+      (teacher.role !== 'TEACHER' && teacher.role !== 'HOMEROOM_TEACHER') ||
+      !teacher.active
+    ) {
+      invalid('任课教师必须是同校区的启用教师账号')
+    }
+    if (timeInSeconds(candidate.endTime) <= timeInSeconds(candidate.startTime)) {
+      invalid('课次结束时间必须晚于开始时间')
+    }
+
+    const activeSameDay = data.schedules.filter(
+      (item) =>
+        item.id !== existing?.id &&
+        item.status !== 'CANCELLED' &&
+        item.lessonDate === candidate.lessonDate &&
+        overlaps(
+          item.startTime,
+          item.endTime,
+          candidate.startTime,
+          candidate.endTime,
+        ),
+    )
+    if (activeSameDay.some((item) => item.teacherId === candidate.teacherId)) {
+      conflict('任课教师在该时间已有课程')
+    }
+    if (activeSameDay.some((item) => item.classId === candidate.classId)) {
+      conflict('班级在该时间已有课程')
+    }
+    return candidate
   }
 
   function parentOverview(user: UserSummary, studentId: number): ParentOverview {
@@ -400,6 +515,9 @@ export function createBusinessStore(
         (item) =>
           item.requestedBy === user.id || scheduleIds.includes(item.scheduleId),
       ),
+      leaveRequests: data.leaveRequests.filter((item) =>
+        scheduleIds.includes(item.scheduleId),
+      ),
     })
   }
 
@@ -428,6 +546,9 @@ export function createBusinessStore(
       ),
       feedbackWorkOrders: data.workOrders.filter((item) =>
         campusAllowed(item.campusId),
+      ),
+      leaveRequests: data.leaveRequests.filter((item) =>
+        campusAllowed(findSchedule(item.scheduleId).campusId),
       ),
     })
   }
@@ -535,6 +656,22 @@ export function createBusinessStore(
         })
       }
       return clone(feedback)
+    },
+
+    markNotificationRead(user, notificationId, input) {
+      requireRole(user, ['PARENT'])
+      if (!requireBoolean(input, 'read')) {
+        invalid('read 只能是 true')
+      }
+      const notification = data.notifications.find(
+        (item) => item.id === notificationId,
+      )
+      if (!notification) notFound('通知不存在')
+      if (notification.userId !== user.id) {
+        forbidden('家长只能标记自己的通知')
+      }
+      notification.readAt ??= currentIso()
+      return clone(notification)
     },
 
     getStudentOverview(user) {
@@ -983,6 +1120,113 @@ export function createBusinessStore(
         return clone(workOrder)
       }
       invalid('action 只能是 START 或 CLOSE')
+    },
+
+    reviewLeaveRequest(user, leaveRequestId, input) {
+      ensureAdmin(user)
+      const leaveRequest = data.leaveRequests.find(
+        (item) => item.id === leaveRequestId,
+      )
+      if (!leaveRequest) notFound('请假申请不存在')
+      const schedule = findSchedule(leaveRequest.scheduleId)
+      ensureAdminCampus(user, schedule.campusId)
+      if (leaveRequest.status !== 'PENDING') {
+        conflict('该请假申请已经审批')
+      }
+
+      const decision = requireText(input, 'decision')
+      if (decision !== 'APPROVED' && decision !== 'REJECTED') {
+        invalid('decision 只能是 APPROVED 或 REJECTED')
+      }
+      const reviewNote = requireString(input, 'reviewNote').trim()
+      if (decision === 'REJECTED' && !reviewNote) {
+        invalid('拒绝请假时必须填写原因')
+      }
+
+      const timestamp = currentIso()
+      leaveRequest.status = decision
+      leaveRequest.reviewNote = reviewNote
+      leaveRequest.reviewedBy = user.id
+      leaveRequest.reviewedAt = timestamp
+      leaveRequest.updatedAt = timestamp
+      return clone(leaveRequest)
+    },
+
+    createSchedule(user, input) {
+      ensureAdmin(user)
+      ensureAdminCampus(user, requirePositiveInteger(input, 'campusId'))
+      const candidate = normalizedSchedule(input)
+      const schedule: ScheduleSummary = {
+        id: nextId(data.schedules, 1001),
+        ...candidate,
+        status: 'SCHEDULED',
+      }
+      data.schedules.push(schedule)
+      return clone(schedule)
+    },
+
+    updateSchedule(user, scheduleId, input) {
+      ensureAdmin(user)
+      const schedule = findSchedule(scheduleId)
+      ensureAdminCampus(user, schedule.campusId)
+      if (schedule.status === 'CANCELLED') {
+        conflict('已取消课次不能修改')
+      }
+      if (schedule.status === 'COMPLETED') {
+        conflict('已完成课次不能修改')
+      }
+
+      const editableFields = [
+        'teacherId',
+        'lessonDate',
+        'startTime',
+        'endTime',
+        'room',
+        'status',
+      ] as const
+      const unsupportedFields = Object.keys(input).filter(
+        (field) =>
+          !editableFields.includes(
+            field as (typeof editableFields)[number],
+          ),
+      )
+      if (unsupportedFields.length > 0) {
+        invalid(`课次字段不可修改：${unsupportedFields.join('、')}`)
+      }
+      if (!editableFields.some((field) => Object.hasOwn(input, field))) {
+        invalid('至少提供一个可修改的课次字段')
+      }
+
+      let requestedStatus: 'SCHEDULED' | 'CANCELLED' | undefined
+      if (Object.hasOwn(input, 'status')) {
+        const status = requireText(input, 'status')
+        if (status !== 'SCHEDULED' && status !== 'CANCELLED') {
+          invalid('status 只能是 SCHEDULED 或 CANCELLED')
+        }
+        requestedStatus = status
+      }
+
+      const hasScheduleChanges = editableFields
+        .filter((field) => field !== 'status')
+        .some((field) => Object.hasOwn(input, field))
+      if (hasScheduleChanges) {
+        const candidate = normalizedSchedule(input, schedule)
+        Object.assign(schedule, candidate)
+      }
+
+      schedule.status = requestedStatus ?? 'CHANGED'
+      return clone(schedule)
+    },
+
+    updateUserAccount(user, userId, input) {
+      ensureSystemAdmin(user)
+      const account = findUser(userId)
+      const active = requireBoolean(input, 'active')
+      if (account.id === user.id && !active) {
+        invalid('当前系统管理员不能停用自己')
+      }
+      account.active = active
+      return clone(account)
     },
 
     reset() {

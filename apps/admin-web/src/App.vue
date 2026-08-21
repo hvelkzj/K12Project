@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import type { UserSummary } from '@k12/shared'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import type {
+  LeaveRequest,
+  UserSummary,
+} from '@k12/shared'
 
 import {
   createAdminApiClient,
@@ -21,11 +24,23 @@ import type {
   UserRole,
   WorkOrderStatus,
 } from './types'
-import type { AdminOverview } from './adminTypes'
+import type {
+  AdminOverview,
+  CreateScheduleInput,
+} from './adminTypes'
 import {
   chooseSubstituteTeacherId,
   countSchedulesForBusinessDate,
 } from './adminViewHelpers'
+import {
+  canDisableCurrentAdmin,
+  canManageUser,
+  canReviewLeaveRequest,
+  isScheduleIdentityLocked,
+  runManagementAction,
+  validateRequiredText,
+  validateScheduleTime,
+} from './adminManagementRules'
 
 type PageKey =
   | 'login'
@@ -104,14 +119,19 @@ const schedules = ref<Schedule[]>([])
 const scheduleChanges = ref<ScheduleChange[]>([])
 const workOrders = ref<FeedbackWorkOrder[]>([])
 const users = ref<UserAccount[]>([])
+const leaveRequests = ref<LeaveRequest[]>([])
 
 const selectedApprovalId = ref<number | null>(null)
 const decisionNote = ref('')
+const selectedLeaveRequestId = ref<number | null>(null)
+const leaveReviewNote = ref('')
 const selectedSubstituteChangeId = ref<number | null>(null)
 const selectedSubstituteTeacherId = ref<number | null>(null)
 const substituteNote = ref('已与代课教师确认，无课程冲突')
 const selectedWorkOrderId = ref<number | null>(null)
 const workOrderResult = ref('')
+const leaveStatusFilter = ref<'PENDING' | 'ALL'>('PENDING')
+const managementActionState = reactive({ pendingKey: null as string | null })
 
 const currentPage = computed(
   () => pages.find((page) => page.key === activePage.value) ?? pages[0],
@@ -237,6 +257,26 @@ const selectedWorkOrder = computed(() =>
   ),
 )
 
+const visibleLeaveRequests = computed(() => {
+  const scoped = currentRole.value === 'SYSTEM_ADMIN'
+    ? leaveRequests.value
+    : leaveRequests.value.filter(
+        (leave) => scheduleCampusForLeave(leave) === homeCampusId.value,
+      )
+
+  if (leaveStatusFilter.value === 'PENDING') {
+    return scoped.filter((leave) => leave.status === 'PENDING')
+  }
+
+  return scoped
+})
+
+const selectedLeaveRequest = computed(() =>
+  visibleLeaveRequests.value.find(
+    (leave) => leave.id === selectedLeaveRequestId.value,
+  ),
+)
+
 const dashboardStats = computed(() => [
   {
     label: '今日排课',
@@ -291,8 +331,10 @@ function resetScopedSelections() {
   selectedApprovalId.value = visibleScheduleChanges.value[0]?.id ?? null
   selectedSubstituteChangeId.value = substituteCandidates.value[0]?.id ?? null
   selectedWorkOrderId.value = visibleWorkOrders.value[0]?.id ?? null
+  selectedLeaveRequestId.value = visibleLeaveRequests.value[0]?.id ?? null
   workOrderResult.value = ''
   decisionNote.value = ''
+  leaveReviewNote.value = ''
 }
 
 function clearMessages() {
@@ -332,6 +374,7 @@ function applyOverview(overview: AdminOverview) {
   scheduleChanges.value = overview.scheduleChanges.map((item) => ({ ...item }))
   workOrders.value = overview.feedbackWorkOrders.map((item) => ({ ...item }))
   users.value = overview.users.map((item) => ({ ...item }))
+  leaveRequests.value = (overview.leaveRequests ?? []).map((item) => ({ ...item }))
 }
 
 async function loadOverview(): Promise<boolean> {
@@ -374,6 +417,7 @@ async function clearSessionAndGoLogin(message: string) {
     scheduleChanges.value = []
     workOrders.value = []
     users.value = []
+    leaveRequests.value = []
     resetScopedSelections()
     clearMessages()
     goTo('login')
@@ -471,6 +515,18 @@ function scheduleFor(change: ScheduleChange) {
   return schedules.value.find((schedule) => schedule.id === change.scheduleId)
 }
 
+function scheduleForLeave(leave: LeaveRequest) {
+  return schedules.value.find((schedule) => schedule.id === leave.scheduleId)
+}
+
+function scheduleCampusForLeave(leave: LeaveRequest) {
+  return scheduleForLeave(leave)?.campusId ?? 0
+}
+
+function studentNameForLeave(leave: LeaveRequest) {
+  return `学生 #${leave.studentId}`
+}
+
 function formatTime(time: string) {
   return time.slice(0, 5)
 }
@@ -506,9 +562,12 @@ async function submitReview(decision: 'APPROVED' | 'REJECTED') {
     return
   }
 
-  if (decision === 'REJECTED' && !decisionNote.value.trim()) {
-    showError(new Error('拒绝调课时必须填写拒绝原因'))
-    return
+  if (decision === 'REJECTED') {
+    const error = validateRequiredText(decisionNote.value, '拒绝调课时必须填写拒绝原因')
+    if (error) {
+      showError(new Error(error))
+      return
+    }
   }
 
   try {
@@ -535,6 +594,55 @@ async function submitReview(decision: 'APPROVED' | 'REJECTED') {
 function openSubstitute(changeId: number) {
   selectedSubstituteChangeId.value = changeId
   goTo('substitute')
+}
+
+function viewLeaveRequest(leaveRequestId: number) {
+  selectedLeaveRequestId.value = leaveRequestId
+  leaveReviewNote.value = ''
+  clearMessages()
+}
+
+async function submitLeaveReview(decision: 'APPROVED' | 'REJECTED') {
+  const selected = selectedLeaveRequest.value
+  if (!selected) {
+    showError(new Error('请先查看一条请假申请'))
+    return
+  }
+
+  if (!canReviewLeaveRequest(selected.status)) {
+    showError(new Error('该请假已完成审批，不能重复处理'))
+    return
+  }
+
+  if (decision === 'REJECTED') {
+    const error = validateRequiredText(leaveReviewNote.value, '拒绝请假时必须填写原因')
+    if (error) {
+      showError(new Error(error))
+      return
+    }
+  }
+
+  try {
+    const action = await runManagementAction(
+      managementActionState,
+      `leave-${selected.id}`,
+      () => adminApiClient.reviewLeaveRequest({
+        leaveRequestId: selected.id,
+        decision,
+        reviewNote: leaveReviewNote.value,
+      }),
+    )
+    if (!action.started) return
+    const reviewed = action.value
+    const index = leaveRequests.value.findIndex((item) => item.id === selected.id)
+    leaveRequests.value[index] = reviewed
+    leaveReviewNote.value = ''
+    showNotice(
+      decision === 'APPROVED' ? '请假申请已通过' : '请假申请已拒绝，原因已记录',
+    )
+  } catch (error) {
+    showError(error)
+  }
 }
 
 async function submitSubstitute() {
@@ -646,6 +754,250 @@ async function closeSelectedWorkOrder() {
 
 function retryLoadOverview() {
   void loadOverview()
+}
+
+const scheduleFormOpen = ref(false)
+const scheduleFormBusy = ref(false)
+const editingScheduleId = ref<number | null>(null)
+const scheduleForm = ref({
+  campusId: 0,
+  classId: 0,
+  courseId: 0,
+  teacherId: 0,
+  lessonDate: '',
+  startTime: '09:00',
+  endTime: '10:30',
+  room: '',
+})
+
+function resetScheduleForm() {
+  scheduleForm.value = {
+    campusId: homeCampusId.value,
+    classId: 0,
+    courseId: 0,
+    teacherId: 0,
+    lessonDate: '',
+    startTime: '09:00',
+    endTime: '10:30',
+    room: '',
+  }
+}
+
+function openCreateSchedule() {
+  resetScheduleForm()
+  editingScheduleId.value = null
+  scheduleFormOpen.value = true
+  clearMessages()
+}
+
+function openEditSchedule(schedule: Schedule) {
+  editingScheduleId.value = schedule.id
+  scheduleForm.value = {
+    campusId: schedule.campusId,
+    classId: schedule.classId,
+    courseId: schedule.courseId,
+    teacherId: schedule.teacherId,
+    lessonDate: schedule.lessonDate,
+    startTime: schedule.startTime.slice(0, 5),
+    endTime: schedule.endTime.slice(0, 5),
+    room: schedule.room,
+  }
+  scheduleFormOpen.value = true
+  clearMessages()
+}
+
+function cancelScheduleForm() {
+  scheduleFormOpen.value = false
+  editingScheduleId.value = null
+  resetScheduleForm()
+}
+
+function scheduleFormOptions(campusId: number) {
+  const classesForCampus = classGroups.value.filter(
+    (item) => item.campusId === campusId,
+  )
+  const coursesForCampus = courses.value.filter(
+    (item) => item.campusId === campusId,
+  )
+  const teachersForCampus = teachers.value.filter(
+    (item) => item.campusId === campusId,
+  )
+
+  return { classesForCampus, coursesForCampus, teachersForCampus }
+}
+
+function buildScheduleInput(): CreateScheduleInput | null {
+  const form = scheduleForm.value
+  const { classesForCampus, coursesForCampus, teachersForCampus } =
+    scheduleFormOptions(form.campusId)
+
+  if (!form.lessonDate) {
+    showError(new Error('请选择上课日期'))
+    return null
+  }
+  if (!form.room.trim()) {
+    showError(new Error('请填写教室'))
+    return null
+  }
+  if (!classesForCampus.some((item) => item.id === form.classId)) {
+    showError(new Error('请选择该校区下的班级'))
+    return null
+  }
+  if (!coursesForCampus.some((item) => item.id === form.courseId)) {
+    showError(new Error('请选择该校区下的课程'))
+    return null
+  }
+  if (!teachersForCampus.some((item) => item.id === form.teacherId)) {
+    showError(new Error('请选择该校区下的教师'))
+    return null
+  }
+  const timeError = validateScheduleTime(form.startTime, form.endTime)
+  if (timeError) {
+    showError(new Error(timeError))
+    return null
+  }
+
+  return {
+    campusId: form.campusId,
+    classId: form.classId,
+    courseId: form.courseId,
+    teacherId: form.teacherId,
+    lessonDate: form.lessonDate,
+    startTime: `${form.startTime}:00`,
+    endTime: `${form.endTime}:00`,
+    room: form.room.trim(),
+  }
+}
+
+async function submitScheduleForm() {
+  if (scheduleFormBusy.value) return
+
+  clearMessages()
+
+  if (editingScheduleId.value === null) {
+    const input = buildScheduleInput()
+    if (!input) return
+
+    scheduleFormBusy.value = true
+    try {
+      const created = await adminApiClient.createSchedule(input)
+      schedules.value.push(created)
+      scheduleFormOpen.value = false
+      resetScheduleForm()
+      showNotice('课次已新增')
+    } catch (error) {
+      showError(error)
+    } finally {
+      scheduleFormBusy.value = false
+    }
+    return
+  }
+
+  const scheduleId = editingScheduleId.value
+  const current = schedules.value.find((item) => item.id === scheduleId)
+  if (!current) return
+
+  const form = scheduleForm.value
+  const { classesForCampus, coursesForCampus, teachersForCampus } =
+    scheduleFormOptions(form.campusId)
+  if (!classesForCampus.some((item) => item.id === form.classId)) {
+    showError(new Error('请选择该校区下的班级'))
+    return
+  }
+  if (!coursesForCampus.some((item) => item.id === form.courseId)) {
+    showError(new Error('请选择该校区下的课程'))
+    return
+  }
+  if (!teachersForCampus.some((item) => item.id === form.teacherId)) {
+    showError(new Error('请选择该校区下的教师'))
+    return
+  }
+  const timeError = validateScheduleTime(form.startTime, form.endTime)
+  if (timeError) {
+    showError(new Error(timeError))
+    return
+  }
+
+  scheduleFormBusy.value = true
+  try {
+    const updated = await adminApiClient.updateSchedule({
+      scheduleId,
+      changes: {
+        teacherId: form.teacherId,
+        lessonDate: form.lessonDate,
+        startTime: `${form.startTime}:00`,
+        endTime: `${form.endTime}:00`,
+        room: form.room.trim(),
+      },
+    })
+    const index = schedules.value.findIndex((item) => item.id === scheduleId)
+    schedules.value[index] = updated
+    scheduleFormOpen.value = false
+    editingScheduleId.value = null
+    resetScheduleForm()
+    showNotice('课次已更新')
+  } catch (error) {
+    showError(error)
+  } finally {
+    scheduleFormBusy.value = false
+  }
+}
+
+async function cancelSchedule(scheduleId: number) {
+  const current = schedules.value.find((item) => item.id === scheduleId)
+  if (!current) return
+  if (current.status === 'CANCELLED') {
+    showError(new Error('该课次已经取消'))
+    return
+  }
+
+  try {
+    const action = await runManagementAction(
+      managementActionState,
+      `schedule-${scheduleId}`,
+      () => adminApiClient.updateSchedule({
+        scheduleId,
+        changes: { status: 'CANCELLED' },
+      }),
+    )
+    if (!action.started) return
+    const updated = action.value
+    const index = schedules.value.findIndex((item) => item.id === scheduleId)
+    schedules.value[index] = updated
+    showNotice('课次已取消')
+  } catch (error) {
+    showError(error)
+  }
+}
+
+async function toggleUserActive(user: UserAccount) {
+  if (!canManageUser(currentRole.value)) {
+    showError(new Error('只有系统管理员可以启停账号'))
+    return
+  }
+
+  if (!canDisableCurrentAdmin(user, currentUser.value)) {
+    showError(new Error('不能停用当前登录的系统管理员'))
+    return
+  }
+
+  try {
+    const action = await runManagementAction(
+      managementActionState,
+      `user-${user.id}`,
+      () => adminApiClient.updateUser({
+        userId: user.id,
+        active: !user.active,
+      }),
+    )
+    if (!action.started) return
+    const updated = action.value
+    const index = users.value.findIndex((item) => item.id === user.id)
+    users.value[index] = updated
+    showNotice(`${user.displayName}账号已${updated.active ? '启用' : '停用'}`)
+  } catch (error) {
+    showError(error)
+  }
 }
 </script>
 
@@ -842,66 +1194,198 @@ function retryLoadOverview() {
         </section>
       </template>
 
-      <section v-else-if="activePage === 'schedule'" class="panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">课程与教室</p>
-            <h2>排课清单</h2>
+      <section v-else-if="activePage === 'schedule'" class="content-stack">
+        <article class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">课程与教室</p>
+              <h2>排课清单</h2>
+            </div>
+            <div class="heading-actions">
+              <label class="inline-filter">
+                <span>校区</span>
+                <select v-model.number="scheduleCampusFilter">
+                  <option :value="0">当前范围内全部</option>
+                  <option
+                    v-for="campus in visibleCampuses"
+                    :key="campus.id"
+                    :value="campus.id"
+                  >
+                    {{ campus.name }}
+                  </option>
+                </select>
+              </label>
+              <button class="primary" type="button" @click="openCreateSchedule">
+                新增课次
+              </button>
+            </div>
           </div>
-          <div class="heading-actions">
-            <label class="inline-filter">
-              <span>校区</span>
-              <select v-model.number="scheduleCampusFilter">
-                <option :value="0">当前范围内全部</option>
-                <option
-                  v-for="campus in visibleCampuses"
-                  :key="campus.id"
-                  :value="campus.id"
+
+          <form
+            v-if="scheduleFormOpen"
+            class="schedule-form"
+            @submit.prevent="submitScheduleForm"
+          >
+            <div class="schedule-form-heading">
+              <strong>{{ editingScheduleId === null ? '新增课次' : `编辑课次 #${editingScheduleId}` }}</strong>
+              <button
+                class="secondary"
+                type="button"
+                @click="cancelScheduleForm"
+              >
+                取消
+              </button>
+            </div>
+            <div class="schedule-form-grid">
+              <label class="stack-field">
+                <span>校区</span>
+                <select
+                  v-model.number="scheduleForm.campusId"
+                  :disabled="currentRole !== 'SYSTEM_ADMIN' || isScheduleIdentityLocked(editingScheduleId)"
                 >
-                  {{ campus.name }}
-                </option>
-              </select>
-            </label>
+                  <option
+                    v-for="campus in visibleCampuses"
+                    :key="campus.id"
+                    :value="campus.id"
+                  >
+                    {{ campus.name }}
+                  </option>
+                </select>
+              </label>
+              <label class="stack-field">
+                <span>班级</span>
+                <select
+                  v-model.number="scheduleForm.classId"
+                  :disabled="isScheduleIdentityLocked(editingScheduleId)"
+                >
+                  <option :value="0" disabled>请选择班级</option>
+                  <option
+                    v-for="item in scheduleFormOptions(scheduleForm.campusId).classesForCampus"
+                    :key="item.id"
+                    :value="item.id"
+                  >
+                    {{ item.name }}
+                  </option>
+                </select>
+              </label>
+              <label class="stack-field">
+                <span>课程</span>
+                <select
+                  v-model.number="scheduleForm.courseId"
+                  :disabled="isScheduleIdentityLocked(editingScheduleId)"
+                >
+                  <option :value="0" disabled>请选择课程</option>
+                  <option
+                    v-for="item in scheduleFormOptions(scheduleForm.campusId).coursesForCampus"
+                    :key="item.id"
+                    :value="item.id"
+                  >
+                    {{ item.name }}
+                  </option>
+                </select>
+              </label>
+              <label class="stack-field">
+                <span>教师</span>
+                <select v-model.number="scheduleForm.teacherId">
+                  <option :value="0" disabled>请选择教师</option>
+                  <option
+                    v-for="item in scheduleFormOptions(scheduleForm.campusId).teachersForCampus"
+                    :key="item.id"
+                    :value="item.id"
+                  >
+                    {{ item.displayName }}
+                  </option>
+                </select>
+              </label>
+              <label class="stack-field">
+                <span>日期</span>
+                <input v-model="scheduleForm.lessonDate" type="date" required />
+              </label>
+              <label class="stack-field">
+                <span>开始时间</span>
+                <input v-model="scheduleForm.startTime" type="time" required />
+              </label>
+              <label class="stack-field">
+                <span>结束时间</span>
+                <input v-model="scheduleForm.endTime" type="time" required />
+              </label>
+              <label class="stack-field">
+                <span>教室</span>
+                <input v-model="scheduleForm.room" placeholder="如 A-302" required />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button
+                class="primary"
+                type="submit"
+                :disabled="scheduleFormBusy"
+              >
+                {{ scheduleFormBusy ? '提交中…' : editingScheduleId === null ? '保存课次' : '保存修改' }}
+              </button>
+            </div>
+          </form>
+
+          <p class="scope-inline">{{ scopeDescription }}</p>
+          <div v-if="displayedSchedules.length === 0" class="empty-state">
+            <strong>当前范围内没有排课</strong>
           </div>
-        </div>
-        <p class="scope-inline">{{ scopeDescription }}</p>
-        <div v-if="displayedSchedules.length === 0" class="empty-state">
-          <strong>当前范围内没有排课</strong>
-        </div>
-        <div v-else class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>校区 / 班级</th>
-                <th>日期与时间</th>
-                <th>课程</th>
-                <th>教师</th>
-                <th>教室</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="schedule in displayedSchedules" :key="schedule.id">
-                <td>
-                  <strong>{{ campusName(schedule.campusId) }}</strong>
-                  <small>{{ className(schedule.classId) }} · ID {{ schedule.id }}</small>
-                </td>
-                <td>
-                  <strong>{{ schedule.lessonDate }}</strong>
-                  <small>{{ formatTime(schedule.startTime) }}–{{ formatTime(schedule.endTime) }}</small>
-                </td>
-                <td>{{ courseName(schedule.courseId) }}</td>
-                <td>{{ teacherName(schedule.teacherId) }}</td>
-                <td>{{ schedule.room }}</td>
-                <td><span class="status-pill tone-info">{{ schedule.status }}</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div v-else class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>校区 / 班级</th>
+                  <th>日期与时间</th>
+                  <th>课程</th>
+                  <th>教师</th>
+                  <th>教室</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="schedule in displayedSchedules" :key="schedule.id">
+                  <td>
+                    <strong>{{ campusName(schedule.campusId) }}</strong>
+                    <small>{{ className(schedule.classId) }} · ID {{ schedule.id }}</small>
+                  </td>
+                  <td>
+                    <strong>{{ schedule.lessonDate }}</strong>
+                    <small>{{ formatTime(schedule.startTime) }}–{{ formatTime(schedule.endTime) }}</small>
+                  </td>
+                  <td>{{ courseName(schedule.courseId) }}</td>
+                  <td>{{ teacherName(schedule.teacherId) }}</td>
+                  <td>{{ schedule.room }}</td>
+                  <td><span class="status-pill tone-info">{{ schedule.status }}</span></td>
+                  <td>
+                    <div class="row-actions">
+                      <button
+                        v-if="schedule.status !== 'CANCELLED'"
+                        class="table-action"
+                        type="button"
+                        @click="openEditSchedule(schedule)"
+                      >
+                        修改
+                      </button>
+                      <button
+                        v-if="schedule.status !== 'CANCELLED'"
+                        class="table-action danger-action"
+                        type="button"
+                        :disabled="managementActionState.pendingKey !== null"
+                        @click="cancelSchedule(schedule.id)"
+                      >
+                        {{ managementActionState.pendingKey === `schedule-${schedule.id}` ? '取消中…' : '取消' }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
       </section>
 
-      <section v-else-if="activePage === 'approval'" class="split-layout">
-        <article class="panel list-panel">
+      <section v-else-if="activePage === 'approval'" class="content-stack">
+        <article class="panel">
           <div class="section-heading">
             <div>
               <p class="eyebrow">查看申请 → 作出决策</p>
@@ -1008,6 +1492,123 @@ function retryLoadOverview() {
             前往安排代课
           </button>
           <p v-else class="finished-note">该申请已完成审批，不能重复处理。</p>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">家长请假申请</p>
+              <h2>请假审批</h2>
+            </div>
+            <div class="heading-actions">
+              <label class="inline-filter">
+                <span>状态</span>
+                <select v-model="leaveStatusFilter">
+                  <option value="PENDING">待审批</option>
+                  <option value="ALL">全部</option>
+                </select>
+              </label>
+              <span class="count-tag">{{ visibleLeaveRequests.length }} 条</span>
+            </div>
+          </div>
+          <div v-if="visibleLeaveRequests.length === 0" class="empty-state">
+            <strong>当前范围内没有请假申请</strong>
+          </div>
+          <div v-else class="request-list">
+            <button
+              v-for="leave in visibleLeaveRequests"
+              :key="leave.id"
+              class="request-item"
+              :class="{ selected: selectedLeaveRequestId === leave.id }"
+              type="button"
+              @click="viewLeaveRequest(leave.id)"
+            >
+              <span>
+                <strong>#{{ leave.id }} · {{ className(scheduleForLeave(leave)?.classId ?? 0) }}</strong>
+                <small>{{ campusName(scheduleCampusForLeave(leave)) }} · {{ scheduleForLeave(leave)?.lessonDate }}</small>
+              </span>
+              <span class="status-pill" :class="statusTone(leave.status)">
+                {{ leave.status === 'PENDING' ? '待审批' : leave.status === 'APPROVED' ? '已通过' : '已拒绝' }}
+              </span>
+            </button>
+          </div>
+        </article>
+
+        <article v-if="selectedLeaveRequest" class="panel detail-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">请假 #{{ selectedLeaveRequest.id }}</p>
+              <h2>请假详情</h2>
+            </div>
+            <span class="status-pill" :class="statusTone(selectedLeaveRequest.status)">
+              {{ selectedLeaveRequest.status === 'PENDING' ? '待审批' : selectedLeaveRequest.status === 'APPROVED' ? '已通过' : '已拒绝' }}
+            </span>
+          </div>
+          <dl class="detail-list two-column">
+            <div>
+              <dt>学生</dt>
+              <dd>{{ studentNameForLeave(selectedLeaveRequest) }}</dd>
+            </div>
+            <div>
+              <dt>课程</dt>
+              <dd>
+                {{ className(scheduleForLeave(selectedLeaveRequest)?.classId ?? 0) }} ·
+                {{ courseName(scheduleForLeave(selectedLeaveRequest)?.courseId ?? 0) }}
+              </dd>
+            </div>
+            <div>
+              <dt>课次时间</dt>
+              <dd>
+                {{ scheduleForLeave(selectedLeaveRequest)?.lessonDate }}
+                {{ formatTime(scheduleForLeave(selectedLeaveRequest)?.startTime ?? '') }}–{{ formatTime(scheduleForLeave(selectedLeaveRequest)?.endTime ?? '') }}
+              </dd>
+            </div>
+            <div class="full-row">
+              <dt>请假原因</dt>
+              <dd>{{ selectedLeaveRequest.reason }}</dd>
+            </div>
+            <div class="full-row">
+              <dt>联系电话</dt>
+              <dd>{{ selectedLeaveRequest.contactPhone || '未填写' }}</dd>
+            </div>
+            <div v-if="selectedLeaveRequest.reviewedAt" class="full-row">
+              <dt>审批记录</dt>
+              <dd>
+                {{ selectedLeaveRequest.reviewNote || (selectedLeaveRequest.status === 'APPROVED' ? '通过' : '') }} ·
+                {{ formatDateTime(selectedLeaveRequest.reviewedAt) }}
+              </dd>
+            </div>
+          </dl>
+
+          <template v-if="selectedLeaveRequest.status === 'PENDING'">
+            <label class="stack-field">
+              <span>拒绝原因</span>
+              <textarea
+                v-model="leaveReviewNote"
+                rows="3"
+                placeholder="选择拒绝时必填；通过时可留空"
+              ></textarea>
+            </label>
+            <div class="form-actions">
+              <button
+                class="danger"
+                type="button"
+                :disabled="managementActionState.pendingKey !== null"
+                @click="submitLeaveReview('REJECTED')"
+              >
+                {{ managementActionState.pendingKey === `leave-${selectedLeaveRequest.id}` ? '处理中…' : '拒绝请假' }}
+              </button>
+              <button
+                class="primary"
+                type="button"
+                :disabled="managementActionState.pendingKey !== null"
+                @click="submitLeaveReview('APPROVED')"
+              >
+                {{ managementActionState.pendingKey === `leave-${selectedLeaveRequest.id}` ? '处理中…' : '通过请假' }}
+              </button>
+            </div>
+          </template>
+          <p v-else class="finished-note">该请假已完成审批，不能重复处理。</p>
         </article>
       </section>
 
@@ -1185,12 +1786,15 @@ function retryLoadOverview() {
           </div>
           <span class="count-tag">{{ scopeDescription }}</span>
         </div>
+        <p v-if="currentRole === 'SYSTEM_ADMIN'" class="scope-inline">
+          系统管理员可以启停账号；不能停用当前登录的系统管理员。
+        </p>
         <div v-if="visibleUsers.length === 0" class="empty-state">
           <strong>当前范围内没有用户</strong>
         </div>
         <div v-else class="table-wrap">
           <table>
-            <thead><tr><th>用户</th><th>账号</th><th>校区</th><th>角色</th><th>账号状态</th></tr></thead>
+            <thead><tr><th>用户</th><th>账号</th><th>校区</th><th>角色</th><th>账号状态</th><th v-if="currentRole === 'SYSTEM_ADMIN'">操作</th></tr></thead>
             <tbody>
               <tr v-for="user in visibleUsers" :key="user.id">
                 <td><strong>{{ user.displayName }}</strong><small>ID {{ user.id }}</small></td>
@@ -1201,6 +1805,16 @@ function retryLoadOverview() {
                   <span class="status-pill" :class="user.active ? 'tone-success' : 'tone-danger'">
                     {{ user.active ? '已启用' : '已停用' }}
                   </span>
+                </td>
+                <td v-if="currentRole === 'SYSTEM_ADMIN'">
+                  <button
+                    class="table-action"
+                    type="button"
+                    :disabled="managementActionState.pendingKey !== null || (currentUser?.id === user.id && user.role === 'SYSTEM_ADMIN' && user.active)"
+                    @click="toggleUserActive(user)"
+                  >
+                    {{ managementActionState.pendingKey === `user-${user.id}` ? '处理中…' : user.active ? '停用' : '启用' }}
+                  </button>
                 </td>
               </tr>
             </tbody>

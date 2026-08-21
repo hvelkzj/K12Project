@@ -1,8 +1,8 @@
 # 公共字段契约
 
-版本：7/28 字段基线，7/29 公共 TypeScript 包已通过 PR #4 合并。
+版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口。
 
-本文件只确定跨端字段，不提前实现 B、C、D、E 的业务接口。接口 JSON 使用 camelCase，数据库列使用 snake_case。
+本文件记录跨端字段和已确认接口。接口 JSON 使用 camelCase，数据库列使用 snake_case。
 
 实现位置：业务类型和状态由 `@k12/shared` 导出；六角色测试账号由 `@k12/shared/mock-accounts` 导出。
 
@@ -78,8 +78,8 @@ Mock 密码不进入用户响应。当前内存会话用于课程项目运行，
 | `GET /parent/students` | `ParentStudentBinding[]` |
 | `GET /parent/students/:studentId/overview` | `student: StudentSummary`、`schedules: ScheduleSummary[]`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`leaveRequests: LeaveRequest[]`、`notifications: Notification[]`、`scheduleChangeNotices: ScheduleChangeNotice[]`、`feedback: StudentFeedback[]` |
 | `GET /student/overview` | `student: StudentSummary`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`courseware: Courseware[]`、`assignments: Assignment[]`、`submissions: Submission[]` |
-| `GET /teacher/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`students: StudentSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`attendance: AttendanceRecord[]`、`assignments: Assignment[]`、`submissions: Submission[]`、`feedback: StudentFeedback[]`、`scheduleChanges: ScheduleChange[]` |
-| `GET /admin/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`users: UserAccountSummary[]`、`teachers: UserSummary[]`、`scheduleChanges: ScheduleChange[]`、`feedbackWorkOrders: FeedbackWorkOrder[]` |
+| `GET /teacher/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`students: StudentSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`attendance: AttendanceRecord[]`、`assignments: Assignment[]`、`submissions: Submission[]`、`feedback: StudentFeedback[]`、`scheduleChanges: ScheduleChange[]`、`leaveRequests: LeaveRequest[]` |
+| `GET /admin/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`users: UserAccountSummary[]`、`teachers: UserSummary[]`、`scheduleChanges: ScheduleChange[]`、`feedbackWorkOrders: FeedbackWorkOrder[]`、`leaveRequests: LeaveRequest[]` |
 
 ### 写接口
 
@@ -96,6 +96,26 @@ Mock 密码不进入用户响应。当前内存会话用于课程项目运行，
 | `PATCH /admin/schedule-changes/:changeId/review` | `decision: 'APPROVED' \| 'REJECTED'`、`decisionNote` | `200 ScheduleChange` |
 | `PATCH /admin/schedule-changes/:changeId/substitute` | `substituteTeacherId`、`substituteNote` | `200 ScheduleChange` |
 | `PATCH /admin/work-orders/:workOrderId` | `action: 'START' \| 'CLOSE'`、`result?` | `200 FeedbackWorkOrder` |
+
+### 2026-08-20 第二轮管理接口
+
+| 接口 | 请求字段 | 成功响应 |
+|---|---|---|
+| `PATCH /parent/notifications/:notificationId/read` | `read: true` | `200 Notification` |
+| `PATCH /admin/leave-requests/:leaveRequestId/review` | `decision: 'APPROVED' \| 'REJECTED'`、`reviewNote` | `200 LeaveRequest` |
+| `POST /admin/schedules` | `campusId`、`classId`、`courseId`、`teacherId`、`lessonDate`、`startTime`、`endTime`、`room` | `201 ScheduleSummary` |
+| `PATCH /admin/schedules/:scheduleId` | `teacherId?`、`lessonDate?`、`startTime?`、`endTime?`、`room?`、`status?: 'SCHEDULED' \| 'CANCELLED'`；至少一个字段 | `200 ScheduleSummary` |
+| `PATCH /admin/users/:userId` | `active: boolean` | `200 UserAccountSummary` |
+
+- 通知标记已读是幂等操作；已有 `readAt` 时不覆盖原时间。
+- 教务只能审批和维护所属校区；系统管理员可以操作全部校区。
+- 排课新增和修改必须校验班级、课程、教师的校区归属，并阻止教师或班级时间冲突。
+- `campusId`、`classId`、`courseId` 是已有课次的身份字段，不能通过 PATCH 修改。
+- 普通字段修改且未提供 `status` 时，服务端把状态改为 `CHANGED`。
+- 取消课次通过同一个 PATCH 接口发送 `status: 'CANCELLED'`；已取消或已完成课次不能再次修改。
+- 请假拒绝必须填写 `reviewNote`，已经审批的申请不能重复审批。
+- 账号启停仅系统管理员可用；当前系统管理员不能停用自己。
+- 停用账号后撤销该账号全部会话，后续登录统一返回 `INVALID_CREDENTIALS`；重新启用后可以再次登录。
 
 ### 错误和联动
 
