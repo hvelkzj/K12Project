@@ -7,6 +7,7 @@ import type {
   ClassSummary,
   CourseSummary,
   FileSummary,
+  LeaveRequest,
   ScheduleChange,
   ScheduleSummary,
   StudentFeedback,
@@ -31,6 +32,7 @@ export interface TeacherOverview {
   submissions: Submission[]
   feedback: StudentFeedback[]
   scheduleChanges: ScheduleChange[]
+  leaveRequests: LeaveRequest[]
 }
 
 export interface AttendanceInput {

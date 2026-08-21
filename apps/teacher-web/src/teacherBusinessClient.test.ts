@@ -70,6 +70,7 @@ function overview(): TeacherOverview {
     submissions: [],
     feedback: [],
     scheduleChanges: [],
+    leaveRequests: [],
   }
 }
 
