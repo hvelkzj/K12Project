@@ -117,6 +117,7 @@ function baseOverview(): AdminOverview {
       },
     ],
     feedbackWorkOrders: [],
+    leaveRequests: [],
   }
 }
 
@@ -366,5 +367,167 @@ test('工单 CLOSE 发送处理结果', async () => {
     result: '已处理完成',
   })
   assert.equal(workOrder.status, 'CLOSED')
+  assert.equal(calls.length, 1)
+})
+
+test('请假审批发送决策和原因', async () => {
+  const { client, calls } = setup((url, init) => {
+    assert.equal(url, 'http://api.test/admin/leave-requests/8001/review')
+    assert.equal(init?.method, 'PATCH')
+    assert.deepEqual(JSON.parse(String(init?.body)), {
+      decision: 'APPROVED',
+      reviewNote: '已核实',
+    })
+    return jsonResponse(200, {
+      id: 8001,
+      parentId: 201,
+      studentId: 101,
+      scheduleId: 1001,
+      reason: '身体不适',
+      contactPhone: '13800000000',
+      status: 'APPROVED',
+      reviewNote: '已核实',
+      reviewedBy: 901,
+      reviewedAt: '2026-08-20T12:00:00+08:00',
+      createdAt: '2026-08-20T09:00:00+08:00',
+      updatedAt: '2026-08-20T12:00:00+08:00',
+    })
+  })
+
+  const leave = await client.reviewLeaveRequest({
+    leaveRequestId: 8001,
+    decision: 'APPROVED',
+    reviewNote: '已核实',
+  })
+  assert.equal(leave.status, 'APPROVED')
+  assert.equal(leave.reviewNote, '已核实')
+  assert.equal(calls.length, 1)
+})
+
+test('新增课次发送完整排课数据', async () => {
+  const { client, calls } = setup((url, init) => {
+    assert.equal(url, 'http://api.test/admin/schedules')
+    assert.equal(init?.method, 'POST')
+    assert.deepEqual(JSON.parse(String(init?.body)), {
+      campusId: 1,
+      classId: 101,
+      courseId: 11,
+      teacherId: 302,
+      lessonDate: '2026-08-21',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+    })
+    return jsonResponse(201, {
+      id: 1009,
+      campusId: 1,
+      classId: 101,
+      courseId: 11,
+      teacherId: 302,
+      lessonDate: '2026-08-21',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+      status: 'SCHEDULED',
+    })
+  })
+
+  const schedule = await client.createSchedule({
+    campusId: 1,
+    classId: 101,
+    courseId: 11,
+    teacherId: 302,
+    lessonDate: '2026-08-21',
+    startTime: '09:00:00',
+    endTime: '10:30:00',
+    room: 'A-302',
+  })
+  assert.equal(schedule.id, 1009)
+  assert.equal(schedule.status, 'SCHEDULED')
+  assert.equal(calls.length, 1)
+})
+
+test('修改课次发送变更字段', async () => {
+  const { client, calls } = setup((url, init) => {
+    assert.equal(url, 'http://api.test/admin/schedules/1001')
+    assert.equal(init?.method, 'PATCH')
+    assert.deepEqual(JSON.parse(String(init?.body)), {
+      teacherId: 302,
+      lessonDate: '2026-08-22',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+    })
+    return jsonResponse(200, {
+      id: 1001,
+      campusId: 1,
+      classId: 101,
+      courseId: 11,
+      teacherId: 302,
+      lessonDate: '2026-08-22',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+      status: 'SCHEDULED',
+    })
+  })
+
+  const schedule = await client.updateSchedule({
+    scheduleId: 1001,
+    changes: {
+      teacherId: 302,
+      lessonDate: '2026-08-22',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+    },
+  })
+  assert.equal(schedule.teacherId, 302)
+  assert.equal(calls.length, 1)
+})
+
+test('取消课次发送 CANCELLED 状态', async () => {
+  const { client, calls } = setup((url, init) => {
+    assert.equal(url, 'http://api.test/admin/schedules/1001')
+    assert.deepEqual(JSON.parse(String(init?.body)), { status: 'CANCELLED' })
+    return jsonResponse(200, {
+      id: 1001,
+      campusId: 1,
+      classId: 101,
+      courseId: 11,
+      teacherId: 301,
+      lessonDate: '2026-08-21',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+      status: 'CANCELLED',
+    })
+  })
+
+  const schedule = await client.updateSchedule({
+    scheduleId: 1001,
+    changes: { status: 'CANCELLED' },
+  })
+  assert.equal(schedule.status, 'CANCELLED')
+  assert.equal(calls.length, 1)
+})
+
+test('账号启停发送 active 状态', async () => {
+  const { client, calls } = setup((url, init) => {
+    assert.equal(url, 'http://api.test/admin/users/301')
+    assert.equal(init?.method, 'PATCH')
+    assert.deepEqual(JSON.parse(String(init?.body)), { active: false })
+    return jsonResponse(200, {
+      id: 301,
+      campusId: 1,
+      displayName: '李老师',
+      username: 'teacher_301',
+      role: 'TEACHER',
+      active: false,
+    })
+  })
+
+  const user = await client.updateUser({ userId: 301, active: false })
+  assert.equal(user.active, false)
   assert.equal(calls.length, 1)
 })

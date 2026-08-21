@@ -1206,3 +1206,47 @@ td small {
   margin-top: 8px;
 }
 
+.schedule-form {
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid #d9e1ec;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.schedule-form-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.schedule-form-heading strong {
+  font-size: 15px;
+}
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.schedule-form .form-actions {
+  margin-top: 16px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.danger-action {
+  color: #b42318;
+}
+
+.table-action:disabled {
+  color: #98a2b3;
+  cursor: not-allowed;
+}
+
