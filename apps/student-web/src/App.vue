@@ -1,25 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { UserSummary } from '@k12/shared'
+import type { Submission, UserSummary } from '@k12/shared'
 
 import { listAssignmentRows } from './assignmentListService'
 import { getSubmissionStatusLabel } from './assignmentPresentation'
 import { filterCoursewareByTitle } from './coursewareSearch'
+import { getCourseDisplayName } from './coursePresentation'
 import { authService } from './services/authService'
 import { studentBusinessClient, StudentBusinessError } from './studentBusinessClient'
 import type { StudentOverview } from './studentBusinessClient'
-import { listCourseware } from './studentService'
+import { applySubmissionToOverview, listCourseware } from './studentService'
 import Home from './views/Home.vue'
 import Login from './views/Login.vue'
 
 type MainPage = 'home' | 'courseware' | 'assignments'
-
-const courseNames: Record<number, string> = {
-  11: '数学',
-  12: '语文',
-  13: '英语',
-  14: '科学',
-}
 
 const currentUser = ref<UserSummary | null>(null)
 const currentPage = ref<MainPage>('home')
@@ -142,12 +136,15 @@ function openAssignment(assignmentId: number): void {
   notice.value = ''
 }
 
-function handleOverviewChanged(): void {
+function handleOverviewChanged(submission: Submission): void {
+  if (overview.value) {
+    overview.value = applySubmissionToOverview(overview.value, submission)
+  }
   void loadOverview()
 }
 
 function courseName(courseId: number): string {
-  return courseNames[courseId] ?? '课程'
+  return getCourseDisplayName(overview.value?.courses ?? [], courseId)
 }
 
 function formatDateTime(value: string): string {

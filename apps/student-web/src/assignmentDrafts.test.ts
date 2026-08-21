@@ -176,6 +176,25 @@ test('存储数据损坏时按无草稿处理', () => {
   assert.equal(store.load(3001)?.content, '可重新写入')
 })
 
+test('合法 JSON 中的无效草稿结构不会导致提交页崩溃', () => {
+  const store = createAssignmentDraftStore(
+    createStorage({
+      [assignmentDraftsStorageKey]: JSON.stringify({
+        3001: { content: '缺少附件数组' },
+        3002: { content: '附件类型错误', attachments: [{}] },
+        3003: { content: '仍然有效', attachments: [] },
+      }),
+    }),
+  )
+
+  assert.equal(store.load(3001), null)
+  assert.equal(store.load(3002), null)
+  assert.deepEqual(store.load(3003), {
+    content: '仍然有效',
+    attachments: [],
+  })
+})
+
 test('刷新页面后草稿仍然存在', () => {
   const storage = createStorage()
   const first = createAssignmentDraftStore(storage)

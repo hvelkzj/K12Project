@@ -84,6 +84,20 @@ export function getLatestSubmission(
   return getSubmissionHistory(overview, assignmentId).at(-1)
 }
 
+export function applySubmissionToOverview(
+  overview: StudentOverview,
+  submission: Submission,
+): StudentOverview {
+  const submissions = overview.submissions.filter(
+    (item) => item.id !== submission.id,
+  )
+
+  return {
+    ...overview,
+    submissions: [...submissions, submission],
+  }
+}
+
 export function getSubmissionViewStatus(
   overview: StudentOverview,
   assignmentId: number,

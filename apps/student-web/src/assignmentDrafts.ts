@@ -44,6 +44,37 @@ function cloneDraft(draft: AssignmentDraft): AssignmentDraft {
   }
 }
 
+function isFileSummary(value: unknown): value is FileSummary {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.id === 'number' &&
+    Number.isFinite(candidate.id) &&
+    typeof candidate.originalName === 'string' &&
+    typeof candidate.mimeType === 'string' &&
+    typeof candidate.byteSize === 'number' &&
+    Number.isFinite(candidate.byteSize) &&
+    typeof candidate.createdAt === 'string'
+  )
+}
+
+function normalizeDraft(value: unknown): AssignmentDraft | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const candidate = value as Record<string, unknown>
+  if (
+    typeof candidate.content !== 'string' ||
+    !Array.isArray(candidate.attachments) ||
+    !candidate.attachments.every(isFileSummary)
+  ) {
+    return null
+  }
+
+  return cloneDraft({
+    content: candidate.content,
+    attachments: candidate.attachments,
+  })
+}
+
 export function createAssignmentDraftStore(
   storage: DraftStorage = getDefaultStorage(),
 ): AssignmentDraftStore {
@@ -56,7 +87,13 @@ export function createAssignmentDraftStore(
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         return {}
       }
-      return parsed as Record<string, AssignmentDraft>
+      return Object.fromEntries(
+        Object.entries(parsed)
+          .map(([key, value]) => [key, normalizeDraft(value)] as const)
+          .filter((entry): entry is readonly [string, AssignmentDraft] =>
+            entry[1] !== null,
+          ),
+      )
     } catch {
       return {}
     }

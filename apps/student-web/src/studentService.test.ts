@@ -7,7 +7,9 @@ import { calculateGlobalProgress } from './assignmentPresentation'
 import { listAssignmentRows } from './assignmentListService'
 import { createStudentOverviewFixture, mockNow, studentId } from './mockData'
 import {
+  applySubmissionToOverview,
   createStudentDataService,
+  getLatestSubmission,
   getSubmissionHistory,
   getSubmissionViewStatus,
   validateSubmissionInput,
@@ -177,6 +179,24 @@ test('提交成功后重新加载概览，列表状态和完成率更新', () =>
     calculateGlobalProgress(afterRows.map(({ status }) => status)),
     50,
   )
+})
+
+test('提交接口返回后可立即回写概览且重复回写不会产生重复记录', () => {
+  const before = createStudentOverviewFixture()
+  const created = submission(3001, { id: 4999 })
+
+  const once = applySubmissionToOverview(before, created)
+  const twice = applySubmissionToOverview(once, {
+    ...created,
+    content: '服务端返回的最新正文',
+  })
+
+  assert.equal(getSubmissionViewStatus(once, 3001), 'SUBMITTED')
+  assert.equal(
+    twice.submissions.filter((item) => item.id === created.id).length,
+    1,
+  )
+  assert.equal(getLatestSubmission(twice, 3001)?.content, '服务端返回的最新正文')
 })
 
 test('数据服务提交复用客户端且只发送契约字段', async () => {

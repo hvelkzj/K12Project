@@ -21,7 +21,7 @@ const props = withDefaults(
   { initialAssignmentId: null },
 )
 const emit = defineEmits<{
-  (event: 'submitted'): void
+  (event: 'submitted', submission: Submission): void
   (event: 'sessionExpired', message: string): void
 }>()
 type Page = 'list' | 'detail' | 'submit' | 'result'
@@ -96,12 +96,12 @@ async function submit(): Promise<void> {
   isSubmitting.value = true
   errorMessage.value = ''
   try {
-    await draftSubmissionFlow.submitWork({
+    const submission = await draftSubmissionFlow.submitWork({
       assignmentId: assignment.value.id,
       content: content.value,
       attachments: attachments.value,
     })
-    emit('submitted')
+    emit('submitted', submission)
     page.value = 'result'
   } catch (error) {
     if (error instanceof StudentBusinessError && error.status === 401) {

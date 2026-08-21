@@ -18,6 +18,11 @@ import {
   listCourseFilterOptions,
 } from '../assignmentFilters'
 import type { AssignmentStatusFilter } from '../assignmentFilters'
+import {
+  getCourseDisplayCode,
+  getCourseDisplayIcon,
+  getCourseDisplayName,
+} from '../coursePresentation'
 import type { SubmissionViewStatus } from '../types'
 
 const props = defineProps<{
@@ -45,27 +50,6 @@ const filteredRows = computed(() =>
   }),
 )
 
-const courseCodes: Record<number, string> = {
-  11: 'MATH',
-  12: 'CHN',
-  13: 'ENG',
-  14: 'SCI',
-}
-
-const courseNames: Record<number, string> = {
-  11: '数学',
-  12: '语文',
-  13: '英语',
-  14: '科学',
-}
-
-const courseIcons: Record<number, string> = {
-  11: '∫',
-  12: '文',
-  13: 'A',
-  14: '⚗',
-}
-
 const statusIcons: Record<SubmissionViewStatus, string> = {
   NOT_SUBMITTED: '◷',
   SUBMITTED: '✓',
@@ -78,15 +62,15 @@ const globalProgressPercent = computed(() =>
 )
 
 function courseCode(courseId: number): string {
-  return courseCodes[courseId] ?? `COURSE-${courseId}`
+  return getCourseDisplayCode(props.courses, courseId)
 }
 
 function courseName(courseId: number): string {
-  return courseNames[courseId] ?? '课程'
+  return getCourseDisplayName(props.courses, courseId)
 }
 
 function courseIcon(courseId: number): string {
-  return courseIcons[courseId] ?? '书'
+  return getCourseDisplayIcon(props.courses, courseId)
 }
 
 function statusClass(status: SubmissionViewStatus): string {
