@@ -50,6 +50,7 @@ export interface ParentBusinessClient {
   listStudents(): Promise<ParentStudentBinding[]>
   getOverview(studentId: number): Promise<ParentOverview>
   submitLeaveRequest(input: LeaveRequestInput): Promise<LeaveRequest>
+  markNotificationRead(notificationId: number): Promise<Notification>
   respondToFeedback(
     feedbackId: number,
     input: FeedbackResponseInput,
@@ -171,6 +172,16 @@ export function createParentBusinessClient(
         method: 'POST',
         body: JSON.stringify(input),
       })
+    },
+
+    markNotificationRead(notificationId) {
+      return requestJson<Notification>(
+        `/parent/notifications/${notificationId}/read`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ read: true }),
+        },
+      )
     },
 
     respondToFeedback(feedbackId, input) {

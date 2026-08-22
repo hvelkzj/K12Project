@@ -18,6 +18,8 @@ import type { ParentOverview } from './parentBusinessClient'
 import {
   countPendingParentFeedback,
   overviewRetryStudentId,
+  replaceReadNotification,
+  replaceReadScheduleChangeNotice,
 } from './parentViewHelpers'
 
 const tabs = ['首页', '学生切换', '课表', '请假', '通知', '反馈'] as const
@@ -27,6 +29,12 @@ const mockParentCredentials = {
   username: 'parent_201',
   password: MOCK_ACCOUNT_PASSWORD,
 } as const
+
+interface LoadOverviewOptions {
+  clearBeforeLoad?: boolean
+  resetSchedule?: boolean
+  successMessage?: string | null
+}
 
 function formatLessonTime(time: string): string {
   return time.slice(0, 5)
@@ -47,6 +55,7 @@ export default defineComponent({
     const isLoadingOverview = ref(false)
     const isSubmittingLeave = ref(false)
     const isSavingFeedback = ref(false)
+    const savingNotificationId = ref<number | null>(null)
     const currentUser = ref<UserSummary | null>(null)
     const username = ref<string>(mockParentCredentials.username)
     const password = ref<string>(mockParentCredentials.password)
@@ -61,6 +70,7 @@ export default defineComponent({
     const disputeReason = ref('希望核对本周课堂记录')
     const message = ref('')
     const loadError = ref('')
+    let overviewRequestSeq = 0
 
     const boundStudents = computed(() =>
       bindings.value.map((binding) => binding.student),
@@ -104,6 +114,7 @@ export default defineComponent({
     )
 
     function resetBusinessState(): void {
+      overviewRequestSeq += 1
       bindings.value = []
       overview.value = null
       selectedStudentId.value = null
@@ -132,21 +143,50 @@ export default defineComponent({
       return error instanceof Error ? error.message : fallback
     }
 
-    async function loadOverview(studentId: number): Promise<void> {
+    async function loadOverview(
+      studentId: number,
+      options: LoadOverviewOptions = {},
+    ): Promise<void> {
+      const requestSeq = (overviewRequestSeq += 1)
+      const clearBeforeLoad = options.clearBeforeLoad ?? true
+      const resetSchedule = options.resetSchedule ?? clearBeforeLoad
       selectedStudentId.value = studentId
-      selectedScheduleId.value = null
-      overview.value = null
+      if (resetSchedule) selectedScheduleId.value = null
+      if (clearBeforeLoad) overview.value = null
       loadError.value = ''
       isLoadingOverview.value = true
 
       try {
-        overview.value = await parentBusinessClient.getOverview(studentId)
-        message.value = '学生概览已更新'
+        const nextOverview = await parentBusinessClient.getOverview(studentId)
+        if (requestSeq !== overviewRequestSeq) return
+
+        overview.value = nextOverview
+        if (options.successMessage !== null) {
+          message.value = options.successMessage ?? '学生概览已更新'
+        }
       } catch (error) {
+        if (requestSeq !== overviewRequestSeq) return
         loadError.value = businessErrorMessage(error, '学生概览加载失败')
       } finally {
-        isLoadingOverview.value = false
+        if (requestSeq === overviewRequestSeq) {
+          isLoadingOverview.value = false
+        }
       }
+    }
+
+    async function refreshCurrentOverview(
+      successMessage = '学生概览已刷新',
+    ): Promise<void> {
+      if (selectedStudentId.value === null) {
+        await loadStudentsAndDefaultOverview()
+        return
+      }
+
+      await loadOverview(selectedStudentId.value, {
+        clearBeforeLoad: false,
+        resetSchedule: false,
+        successMessage,
+      })
     }
 
     async function loadStudentsAndDefaultOverview(): Promise<void> {
@@ -342,10 +382,43 @@ export default defineComponent({
           }
         }
         message.value = `请假已提交，状态：${request.status}`
+        await refreshCurrentOverview('请假已提交，审批状态已刷新')
       } catch (error) {
         message.value = businessErrorMessage(error, '请假提交失败，请稍后重试')
       } finally {
         isSubmittingLeave.value = false
+      }
+    }
+
+    async function markNoticeRead(notification: Notification) {
+      if (notification.readAt) return
+
+      savingNotificationId.value = notification.id
+      try {
+        const updated = await parentBusinessClient.markNotificationRead(
+          notification.id,
+        )
+
+        if (overview.value) {
+          overview.value = {
+            ...overview.value,
+            notifications: replaceReadNotification(
+              overview.value.notifications,
+              updated,
+            ),
+            scheduleChangeNotices: replaceReadScheduleChangeNotice(
+              overview.value.scheduleChangeNotices,
+              updated,
+            ),
+          }
+        }
+        message.value = '通知已标记为已读'
+      } catch (error) {
+        message.value = businessErrorMessage(error, '通知标记已读失败，请稍后重试')
+      } finally {
+        if (savingNotificationId.value === notification.id) {
+          savingNotificationId.value = null
+        }
       }
     }
 
@@ -544,7 +617,20 @@ export default defineComponent({
             : null,
           !panelState && activeTab.value === '请假'
             ? h('section', { class: 'panel' }, [
-                h('h3', '提交请假'),
+                h('div', { class: 'panel-heading' }, [
+                  h('h3', '提交请假'),
+                  h(
+                    'button',
+                    {
+                      class: 'secondary',
+                      disabled: isLoadingOverview.value,
+                      type: 'button',
+                      onClick: () =>
+                        void refreshCurrentOverview('请假审批状态已刷新'),
+                    },
+                    isLoadingOverview.value ? '刷新中...' : '刷新审批状态',
+                  ),
+                ]),
                 h('label', [
                   '选择课程',
                   h(
@@ -635,7 +721,24 @@ export default defineComponent({
                                 )
                               : null,
                           ]),
-                          h('span', notification.readAt ? '已读' : '未读'),
+                          h('div', { class: 'notice-actions' }, [
+                            h('span', notification.readAt ? '已读' : '未读'),
+                            notification.readAt
+                              ? null
+                              : h(
+                                  'button',
+                                  {
+                                    class: 'secondary',
+                                    disabled:
+                                      savingNotificationId.value === notification.id,
+                                    type: 'button',
+                                    onClick: () => void markNoticeRead(notification),
+                                  },
+                                  savingNotificationId.value === notification.id
+                                    ? '标记中...'
+                                    : '标记已读',
+                                ),
+                          ]),
                         ])
                       }),
                     ),

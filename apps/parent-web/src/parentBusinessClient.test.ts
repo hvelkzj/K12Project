@@ -5,6 +5,7 @@ import {
   confirmedFeedback,
   disputedFeedback,
   emptyOverview,
+  generalNotice,
   leaveRequest,
   overviewOne,
   overviewTwo,
@@ -220,6 +221,76 @@ test('反馈异议成功后返回 DISPUTED', async () => {
 
   assert.equal(disputed.status, 'DISPUTED')
   assert.equal(disputed.parentResponse, '课堂记录与实际情况不一致。')
+})
+
+test('调课通知和普通通知可以标记已读', async () => {
+  const readAt = '2026-08-18T18:00:00+08:00'
+  const client = createParentBusinessClient({
+    apiBaseUrl: 'http://api.test',
+    authClient: createAuth(),
+    fetchImpl: async (url, init) => {
+      assert.equal(url, 'http://api.test/parent/notifications/8002/read')
+      assert.equal(init?.method, 'PATCH')
+      assert.deepEqual(JSON.parse(String(init?.body)), { read: true })
+      return jsonResponse({
+        ...scheduleChangeNotice.notification,
+        readAt,
+      })
+    },
+  })
+
+  const updated = await client.markNotificationRead(
+    scheduleChangeNotice.notification.id,
+  )
+
+  assert.equal(updated.readAt, readAt)
+
+  const generalClient = createParentBusinessClient({
+    apiBaseUrl: 'http://api.test',
+    authClient: createAuth(),
+    fetchImpl: async () => jsonResponse({ ...generalNotice, readAt }),
+  })
+
+  assert.equal(
+    (await generalClient.markNotificationRead(generalNotice.id)).readAt,
+    readAt,
+  )
+})
+
+test('通知已读 409 和网络错误不会返回假成功', async (context) => {
+  for (const scenario of [
+    {
+      name: '业务冲突',
+      fetchImpl: async () =>
+        jsonResponse({ code: 'CONFLICT', message: '通知状态已变化，请刷新' }, 409),
+      expected: /通知状态已变化，请刷新/,
+      status: 409,
+    },
+    {
+      name: '网络错误',
+      fetchImpl: async () => {
+        throw new TypeError('network unavailable')
+      },
+      expected: /network unavailable/,
+      status: 0,
+    },
+  ]) {
+    await context.test(scenario.name, async () => {
+      const client = createParentBusinessClient({
+        apiBaseUrl: 'http://api.test',
+        authClient: createAuth(),
+        fetchImpl: scenario.fetchImpl,
+      })
+
+      await assert.rejects(
+        () => client.markNotificationRead(8002),
+        (error) =>
+          error instanceof ParentBusinessError &&
+          error.status === scenario.status &&
+          scenario.expected.test(error.message),
+      )
+    })
+  }
 })
 
 test('调课通知字段完整', () => {
