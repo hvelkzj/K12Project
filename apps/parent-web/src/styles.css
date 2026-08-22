@@ -306,6 +306,7 @@ textarea:focus {
 
 .logout-button,
 .primary,
+.secondary,
 .actions button {
   min-height: 40px;
   padding: 9px 15px;
@@ -375,6 +376,13 @@ textarea:focus {
   border-radius: 15px;
   background: #fff;
   box-shadow: 0 9px 32px rgb(35 53 83 / 5%);
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .panel h3 {
@@ -483,11 +491,29 @@ textarea:focus {
   background: #1958a4;
 }
 
+.secondary {
+  width: fit-content;
+  border: 1px solid #d3dce8;
+  color: #3f536e;
+  background: #fff;
+}
+
+.secondary:hover {
+  border-color: #aebdd0;
+  background: #f7f9fc;
+}
+
 .notice {
   align-items: flex-start;
 }
 
-.notice > span,
+.notice-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.notice-actions > span,
 .list.compact .row > span {
   display: inline-flex;
   min-height: 27px;
@@ -623,10 +649,15 @@ button:disabled {
   }
 
   .topbar,
+  .panel-heading,
   .row,
   .row-button {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .notice-actions {
+    justify-items: start;
   }
 
   .summary-grid {
