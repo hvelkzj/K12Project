@@ -554,6 +554,39 @@ export function createBusinessStore(
   }
 
   return {
+    isUsernameAvailable(username) {
+      return !data.users.some((item) => item.username === username)
+    },
+
+    registerPublicAccount(account) {
+      if (account.role !== 'PARENT' && account.role !== 'STUDENT') {
+        invalid('公开注册只支持家长或学生账号')
+      }
+      if (
+        data.users.some(
+          (item) => item.id === account.id || item.username === account.username,
+        )
+      ) {
+        conflict('账号已经存在')
+      }
+      if (account.campusId !== 1) {
+        invalid('公开注册账号必须属于默认校区')
+      }
+
+      data.users.push(clone(account))
+      if (account.role === 'STUDENT') {
+        const defaultClass = findClass(101)
+        data.students.push({
+          id: account.id,
+          displayName: account.displayName,
+          classId: defaultClass.id,
+          className: defaultClass.name,
+          campusId: defaultClass.campusId,
+          campusName: account.campusName ?? '滨江校区',
+        })
+      }
+    },
+
     listParentStudents(user) {
       requireRole(user, ['PARENT'])
       return clone(

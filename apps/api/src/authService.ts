@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto'
 
-import type { LoginResponse, UserSummary } from '@k12/shared'
+import type {
+  LoginResponse,
+  RegisterRequest,
+  UserAccountSummary,
+  UserSummary,
+} from '@k12/shared'
 import { MOCK_ACCOUNTS } from '@k12/shared/mock-accounts'
 
 const defaultSessionDurationMs = 8 * 60 * 60 * 1000
@@ -12,11 +17,19 @@ interface SessionRecord {
 }
 
 export interface AuthService {
+  register(input: RegisterRequest): UserAccountSummary | null
   login(username: string, password: string): LoginResponse | null
   getCurrentUser(accessToken: string): UserSummary | null
   logout(accessToken: string): boolean
   setAccountActive(userId: number, active: boolean): void
   reset(): void
+}
+
+interface AuthAccount {
+  username: string
+  password: string
+  active: boolean
+  user: UserSummary
 }
 
 export interface AuthServiceOptions {
@@ -33,6 +46,20 @@ function cloneUser(user: UserSummary): UserSummary {
   return { ...user }
 }
 
+function initialAccounts(): Map<string, AuthAccount> {
+  return new Map(
+    MOCK_ACCOUNTS.map((account) => [
+      account.username,
+      {
+        username: account.username,
+        password: account.password,
+        active: account.active,
+        user: cloneUser(account.user),
+      },
+    ]),
+  )
+}
+
 export function createAuthService(
   options: AuthServiceOptions = {},
 ): AuthService {
@@ -43,6 +70,7 @@ export function createAuthService(
     options.sessionDurationMs ?? defaultSessionDurationMs
   const sessions = new Map<string, SessionRecord>()
   const accountActiveOverrides = new Map<number, boolean>()
+  let accounts = initialAccounts()
 
   if (!Number.isFinite(sessionDurationMs) || sessionDurationMs <= 0) {
     throw new TypeError('sessionDurationMs must be a positive number')
@@ -82,13 +110,37 @@ export function createAuthService(
   }
 
   return {
+    register(input) {
+      if (accounts.has(input.username)) return null
+
+      const userId =
+        Math.max(1000, ...[...accounts.values()].map(({ user }) => user.id)) + 1
+      const user: UserSummary = {
+        id: userId,
+        displayName: input.displayName,
+        role: input.role,
+        campusId: 1,
+        campusName: '滨江校区',
+      }
+      accounts.set(input.username, {
+        username: input.username,
+        password: input.password,
+        active: true,
+        user,
+      })
+
+      return {
+        ...cloneUser(user),
+        username: input.username,
+        active: true,
+      }
+    },
+
     login(username, password) {
       const currentTime = now()
       removeExpiredSessions(currentTime)
 
-      const account = MOCK_ACCOUNTS.find(
-        (candidate) => candidate.username === username,
-      )
+      const account = accounts.get(username)
 
       if (
         !account ||
@@ -129,7 +181,7 @@ export function createAuthService(
         return null
       }
 
-      const account = MOCK_ACCOUNTS.find(
+      const account = [...accounts.values()].find(
         (candidate) => candidate.user.id === session.userId,
       )
       if (!account || !isAccountActive(account.user.id, account.active)) {
@@ -157,6 +209,7 @@ export function createAuthService(
     reset() {
       sessions.clear()
       accountActiveOverrides.clear()
+      accounts = initialAccounts()
     },
   }
 }
