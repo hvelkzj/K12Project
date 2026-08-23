@@ -9,7 +9,12 @@ const workspaces = [
 ]
 
 const children = workspaces.map((workspace) => {
-  const child = spawn('npm', ['run', 'dev', '--workspace', workspace], {
+  const args = ['run', 'dev', '--workspace', workspace]
+  if (workspace !== '@k12/api') {
+    args.push('--', '--host', '127.0.0.1')
+  }
+
+  const child = spawn('npm', args, {
     stdio: 'inherit',
     shell: process.platform === 'win32',
   })

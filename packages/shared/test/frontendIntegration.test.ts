@@ -4,6 +4,7 @@ import test from 'node:test'
 
 interface PackageManifest {
   dependencies?: Record<string, string>
+  scripts?: Record<string, string>
 }
 
 const repositoryRoot = new URL('../../../', import.meta.url)
@@ -70,4 +71,45 @@ test('所有工作区只使用根目录锁文件', () => {
     existsSync(new URL('package-lock.json', repositoryRoot)),
     true,
   )
+})
+
+test('根目录四个前端启动命令统一监听回环地址', () => {
+  const rootManifest = readPackageManifest('.')
+  for (const scriptName of [
+    'dev:parent',
+    'dev:student',
+    'dev:teacher',
+    'dev:admin',
+  ]) {
+    assert.match(
+      rootManifest.scripts?.[scriptName] ?? '',
+      /--host 127\.0\.0\.1$/,
+      `${scriptName} 必须与文档地址一致`,
+    )
+  }
+
+  const unifiedDevScript = readFileSync(
+    new URL('scripts/dev.mjs', repositoryRoot),
+    'utf8',
+  )
+  assert.match(
+    unifiedDevScript,
+    /args\.push\('--', '--host', '127\.0\.0\.1'\)/,
+  )
+})
+
+test('公共 npm 脚本不使用单系统命令或本机绝对路径', () => {
+  const manifests = [
+    readPackageManifest('.'),
+    readPackageManifest('packages/shared'),
+    readPackageManifest('apps/api'),
+    ...frontendWorkspaces.map(readPackageManifest),
+  ]
+  const forbidden = /(?:^|\s)(?:cp|rm|export|set)(?:\s|$)|\/Users\/|[A-Za-z]:\\/
+
+  for (const manifest of manifests) {
+    for (const command of Object.values(manifest.scripts ?? {})) {
+      assert.doesNotMatch(command, forbidden)
+    }
+  }
 })
