@@ -98,7 +98,7 @@ test('对应家长可以标记通知已读，越权和其他角色被拒绝', as
   let currentTime = fixedNow
   const seed = createBusinessSeed(fixedNow)
   seed.notifications.push({
-    id: 8002,
+    id: 8999,
     userId: 202,
     studentId: 101,
     type: 'GENERAL',
@@ -133,7 +133,7 @@ test('对应家长可以标记通知已读，越权和其他角色被拒绝', as
 
   const otherParentNotification = await authorizedCall(handler, parent, {
     method: 'PATCH',
-    url: '/parent/notifications/8002/read',
+    url: '/parent/notifications/8999/read',
     jsonBody: { read: true },
   })
   assert.equal(otherParentNotification.status, 403)
