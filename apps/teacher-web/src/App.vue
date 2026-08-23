@@ -284,8 +284,12 @@ async function loadOverview(): Promise<void> {
   try {
     applyOverview(await teacherBusinessClient.loadOverview())
   } catch (error) {
-    if (error instanceof TeacherBusinessError && error.status === 401) {
+    if (error instanceof TeacherBusinessError) {
       handleBusinessError(error, '教师数据加载失败')
+      // 401会在handleBusinessError内部清空状态；其余业务错误把消息同时给到页面加载失败面板
+      if(error.status !== 401){
+        overviewLoadError.value = error instanceof Error ? error.message : '教师数据加载失败'
+      }
       return
     }
     overviewLoadError.value = error instanceof Error ? error.message : '教师数据加载失败'
