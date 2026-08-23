@@ -142,7 +142,7 @@ async function submitRegistration(): Promise<void> {
             <span>都从一个入口开始</span>
           </h1>
           <p class="hero-lead">
-            面向家长、学生、教师与教务的统一 K12 管理平台。课程、作业、反馈、调课和运营数据在真实业务 API 中顺畅流转。
+            面向家长、学生、教师与学校管理人员的统一 K12 教育平台。课程安排、作业进展、家校反馈和校园事务都能在这里顺畅协作。
           </p>
           <div class="hero-actions">
             <a class="primary-button" href="#portals">
@@ -153,7 +153,7 @@ async function submitRegistration(): Promise<void> {
               创建学习账号
             </button>
           </div>
-          <dl class="hero-metrics" aria-label="项目完成数据">
+          <dl class="hero-metrics" aria-label="平台服务概览">
             <div>
               <dt>6</dt>
               <dd>用户角色</dd>
@@ -183,11 +183,11 @@ async function submitRegistration(): Promise<void> {
           </div>
           <div class="floating-note note-top">
             <span class="note-icon">✓</span>
-            <span><strong>真实业务 API</strong><small>跨端状态即时同步</small></span>
+            <span><strong>学习进展同步</strong><small>重要变化及时可见</small></span>
           </div>
           <div class="floating-note note-bottom">
             <span class="note-icon violet">6</span>
-            <span><strong>角色权限隔离</strong><small>只访问自己的数据</small></span>
+            <span><strong>专属使用空间</strong><small>只查看与自己相关的信息</small></span>
           </div>
         </div>
       </section>
@@ -206,8 +206,8 @@ async function submitRegistration(): Promise<void> {
           </article>
           <article>
             <span class="value-number">02</span>
-            <h3>真实联动</h3>
-            <p>写操作等待服务端确认，失败不显示假成功，跨端结果立即可见。</p>
+            <h3>进度同步</h3>
+            <p>作业、反馈和校园事务有进展时，相关人员可以及时查看最新结果。</p>
           </article>
           <article>
             <span class="value-number">03</span>
@@ -221,7 +221,7 @@ async function submitRegistration(): Promise<void> {
         <div class="section-heading light-heading">
           <p class="eyebrow">CONNECTED WORKFLOWS</p>
           <h2 id="workflow-title">业务不止呈现，更能完整流转</h2>
-          <p>每条流程都穿过真实页面和接口，不依赖运行时业务 Mock。</p>
+          <p>每项事务从发起到完成都有清晰进度，家校与学校可以共同跟进。</p>
         </div>
         <div class="workflow-grid">
           <article v-for="workflow in workflows" :key="workflow.step">
@@ -274,9 +274,9 @@ async function submitRegistration(): Promise<void> {
             学生注册后默认加入滨江校区六年级 1 班，可立即进入学生端；家长账号创建后由学校完成学生绑定。
           </p>
           <ul>
-            <li><span>✓</span> 注册信息由真实 API 校验并保存到运行时账号仓库</li>
-            <li><span>✓</span> 教师和管理角色不开放自注册，避免权限越界</li>
-            <li><span>✓</span> 项目重启后恢复初始数据，不保存真实个人信息</li>
+            <li><span>✓</span> 填写信息并通过校验后即可创建账号</li>
+            <li><span>✓</span> 学生账号创建后可以直接进入学习空间</li>
+            <li><span>✓</span> 教师和管理人员账号由学校统一开通</li>
           </ul>
         </div>
 
@@ -377,7 +377,7 @@ async function submitRegistration(): Promise<void> {
         <span class="brand-mark" aria-hidden="true">K</span>
         <span><strong>K12 Link</strong><small>教育协作平台</small></span>
       </div>
-      <p>课程项目 · 统一身份 · 真实业务 API · macOS / Windows</p>
+      <p>家校协同 · 教学管理 · 校园运营</p>
       <a href="#top">返回顶部 ↑</a>
     </footer>
   </div>
