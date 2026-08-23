@@ -18,6 +18,7 @@ import {
   assignmentInput,
   feedbackInput,
   gradeInput,
+  resetScheduleScopedDrafts,
   scheduleChangeInput,
 } from './teacherFormRules'
 import {
@@ -168,19 +169,11 @@ const selectedScheduleCancelled = computed(() =>
   isScheduleCancelled(selectedSchedule.value),
 )
 watch(selectedScheduleId, () => {
-  // 切换课次，清空发布作业草稿
-  assignmentDraft.title = ''
-  assignmentDraft.description = ''
-  assignmentDraft.dueAt = ''
-  assignmentDraft.allowLate = false
-
-  // 清空调课申请草稿
-  scheduleChangeDraft.proposedDate = ''
-  scheduleChangeDraft.proposedStartTime = ''
-  scheduleChangeDraft.proposedEndTime = ''
-  scheduleChangeDraft.reason = ''
-
-  // feedbackDraft不需要全清，resetAttendanceDrafts内部会重置studentId
+  resetScheduleScopedDrafts({
+    assignment: assignmentDraft,
+    feedback: feedbackDraft,
+    scheduleChange: scheduleChangeDraft,
+  })
 })
 const unrecordedAttendanceCount = computed(
   () =>
@@ -282,7 +275,6 @@ function handleBusinessError(error: unknown, fallback: string): void {
     authMessage.value = '登录已失效，请重新登录'
     return
   }
-  // 403权限不足 /409冲突，统一展示业务提示
   notice.value = error instanceof Error ? error.message : fallback
 }
 

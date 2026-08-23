@@ -7,6 +7,40 @@ import type {
   ScheduleChangeInput,
 } from './teacherBusinessClient'
 
+export function resetScheduleScopedDrafts(drafts: {
+  assignment: {
+    title: string
+    description: string
+    dueAt: string
+    allowLate: boolean
+  }
+  feedback: {
+    performance: string
+    strengths: string
+    improvements: string
+    suggestion: string
+  }
+  scheduleChange: {
+    proposedDate: string
+    proposedStartTime: string
+    proposedEndTime: string
+    reason: string
+  }
+}): void {
+  drafts.assignment.title = ''
+  drafts.assignment.description = ''
+  drafts.assignment.dueAt = ''
+  drafts.assignment.allowLate = false
+  drafts.feedback.performance = ''
+  drafts.feedback.strengths = ''
+  drafts.feedback.improvements = ''
+  drafts.feedback.suggestion = ''
+  drafts.scheduleChange.proposedDate = ''
+  drafts.scheduleChange.proposedStartTime = ''
+  drafts.scheduleChange.proposedEndTime = ''
+  drafts.scheduleChange.reason = ''
+}
+
 export function assignmentInput(
   schedule: ScheduleSummary,
   draft: {

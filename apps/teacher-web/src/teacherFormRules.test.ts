@@ -6,6 +6,7 @@ import {
   assignmentInput,
   feedbackInput,
   gradeInput,
+  resetScheduleScopedDrafts,
   scheduleChangeInput,
 } from './teacherFormRules'
 
@@ -110,4 +111,40 @@ test('调课请求校验日期、原因和开始结束时间', () => {
     () => scheduleChangeInput(1001, { proposedDate: '2026-08-21', proposedStartTime: '10:00', proposedEndTime: '11:30', reason: '' }),
     /调课原因不能为空/,
   )
+})
+
+test('切换课次清空作业、反馈和调课正文', () => {
+  const drafts = {
+    assignment: {
+      title: '上一课次作业',
+      description: '上一课次内容',
+      dueAt: '2026-08-24T20:00',
+      allowLate: true,
+    },
+    feedback: {
+      performance: '上一课次表现',
+      strengths: '上一课次优点',
+      improvements: '上一课次待提升',
+      suggestion: '上一课次建议',
+    },
+    scheduleChange: {
+      proposedDate: '2026-08-24',
+      proposedStartTime: '10:00',
+      proposedEndTime: '11:00',
+      reason: '上一课次调课原因',
+    },
+  }
+
+  resetScheduleScopedDrafts(drafts)
+
+  assert.deepEqual(drafts, {
+    assignment: { title: '', description: '', dueAt: '', allowLate: false },
+    feedback: { performance: '', strengths: '', improvements: '', suggestion: '' },
+    scheduleChange: {
+      proposedDate: '',
+      proposedStartTime: '',
+      proposedEndTime: '',
+      reason: '',
+    },
+  })
 })
