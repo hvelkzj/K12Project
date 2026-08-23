@@ -8,6 +8,7 @@ import {
   ensureCampusAccess,
   filterByScope,
   reviewScheduleChange,
+  startWorkOrder,
 } from './adminService'
 import { isAdminRole } from './authService'
 import type {
@@ -294,4 +295,38 @@ test('关闭反馈工单前必须填写处理结果', () => {
   )
   assert.equal(closed.status, 'CLOSED')
   assert.equal(closed.closedAt, '2026-08-17T12:20:00+08:00')
+})
+
+test('已关闭工单不能再次关闭', () => {
+  const closed = closeWorkOrder(
+    workOrders[0] as FeedbackWorkOrder,
+    '已核对签到，教师已更正反馈。',
+    901,
+    '2026-08-17T12:20:00+08:00',
+  )
+
+  assert.throws(
+    () =>
+      closeWorkOrder(
+        closed,
+        '再次关闭',
+        901,
+        '2026-08-17T12:30:00+08:00',
+      ),
+    /该工单已经关闭/,
+  )
+})
+
+test('已关闭工单不能重新开始处理', () => {
+  const closed = closeWorkOrder(
+    workOrders[0] as FeedbackWorkOrder,
+    '已核对签到，教师已更正反馈。',
+    901,
+    '2026-08-17T12:20:00+08:00',
+  )
+
+  assert.throws(
+    () => startWorkOrder(closed, 901, '2026-08-17T12:30:00+08:00'),
+    /已关闭工单不能重新处理/,
+  )
 })

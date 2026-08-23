@@ -154,7 +154,7 @@ const apiBaseUrl =
 const authClient = createAuthClient({ apiBaseUrl })
 
 function handleUnauthorized() {
-  void clearSessionAndGoLogin('登录已失效，请重新登录')
+  return clearSessionAndGoLogin('登录已失效，请重新登录')
 }
 
 const adminApiClient = createAdminApiClient({
@@ -579,6 +579,11 @@ async function submitReview(decision: 'APPROVED' | 'REJECTED') {
     return
   }
 
+  if (selected.status !== 'PENDING') {
+    showError(new Error('该申请已审批，不能重复处理'))
+    return
+  }
+
   if (decision === 'REJECTED') {
     const error = validateRequiredText(decisionNote.value, '拒绝调课时必须填写拒绝原因')
     if (error) {
@@ -739,7 +744,15 @@ function viewWorkOrder(workOrderId: number) {
 
 async function beginSelectedWorkOrder() {
   const selected = selectedWorkOrder.value
-  if (!selected) return
+  if (!selected) {
+    showError(new Error('请先查看一条反馈工单'))
+    return
+  }
+
+  if (selected.status !== 'OPEN') {
+    showError(new Error('该工单已经开始处理'))
+    return
+  }
 
   try {
     const action = await runManagementAction(
@@ -810,6 +823,16 @@ const scheduleForm = ref({
   endTime: '10:30',
   room: '',
 })
+
+watch(
+  () => scheduleForm.value.campusId,
+  () => {
+    if (editingScheduleId.value !== null) return
+    scheduleForm.value.classId = 0
+    scheduleForm.value.courseId = 0
+    scheduleForm.value.teacherId = 0
+  },
+)
 
 function resetScheduleForm() {
   scheduleForm.value = {
@@ -915,13 +938,23 @@ async function submitScheduleForm() {
 
   clearMessages()
 
+  const actionKey = editingScheduleId.value === null
+    ? 'schedule-create'
+    : `schedule-edit-${editingScheduleId.value}`
+
   if (editingScheduleId.value === null) {
     const input = buildScheduleInput()
     if (!input) return
 
     scheduleFormBusy.value = true
     try {
-      const created = await adminApiClient.createSchedule(input)
+      const action = await runManagementAction(
+        managementActionState,
+        actionKey,
+        () => adminApiClient.createSchedule(input),
+      )
+      if (!action.started) return
+      const created = action.value
       schedules.value.push(created)
       scheduleFormOpen.value = false
       resetScheduleForm()
@@ -961,16 +994,22 @@ async function submitScheduleForm() {
 
   scheduleFormBusy.value = true
   try {
-    const updated = await adminApiClient.updateSchedule({
-      scheduleId,
-      changes: {
-        teacherId: form.teacherId,
-        lessonDate: form.lessonDate,
-        startTime: `${form.startTime}:00`,
-        endTime: `${form.endTime}:00`,
-        room: form.room.trim(),
-      },
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      actionKey,
+      () => adminApiClient.updateSchedule({
+        scheduleId,
+        changes: {
+          teacherId: form.teacherId,
+          lessonDate: form.lessonDate,
+          startTime: `${form.startTime}:00`,
+          endTime: `${form.endTime}:00`,
+          room: form.room.trim(),
+        },
+      }),
+    )
+    if (!action.started) return
+    const updated = action.value
     const index = schedules.value.findIndex((item) => item.id === scheduleId)
     schedules.value[index] = updated
     scheduleFormOpen.value = false

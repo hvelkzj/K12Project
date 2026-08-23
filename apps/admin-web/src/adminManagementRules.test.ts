@@ -135,3 +135,13 @@ test('状态变更失败后也会释放操作锁', async () => {
   )
   assert.equal(state.pendingKey, null)
 })
+
+test('拒绝请假必须填写原因且已审批请假不能重复处理', () => {
+  const pendingReview = canReviewLeaveRequest('PENDING')
+  assert.equal(pendingReview, true)
+  assert.equal(canReviewLeaveRequest('APPROVED'), false)
+  assert.equal(canReviewLeaveRequest('REJECTED'), false)
+
+  assert.equal(validateRequiredText('   ', '拒绝请假时必须填写原因'), '拒绝请假时必须填写原因')
+  assert.equal(validateRequiredText('孩子确实生病', '拒绝请假时必须填写原因'), null)
+})
