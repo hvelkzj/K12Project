@@ -17,6 +17,7 @@ import {
 import type { ParentOverview } from './parentBusinessClient'
 import {
   canMarkNotificationRead,
+  canSubmitFeedbackResponse,
   countPendingParentFeedback,
   countUnreadNotifications,
   isLatestOverviewRequest,
@@ -449,6 +450,14 @@ export default defineComponent({
       feedbackId: number,
       status: 'CONFIRMED' | 'DISPUTED',
     ) {
+      const targetFeedback = feedback.value.find((item) => item.id === feedbackId)
+      if (
+        !targetFeedback ||
+        !canSubmitFeedbackResponse(targetFeedback, isSavingFeedback.value)
+      ) {
+        return
+      }
+
       if (status === 'DISPUTED' && !disputeReason.value.trim()) {
         message.value = '提出异议时必须填写异议内容'
         return
@@ -812,9 +821,10 @@ export default defineComponent({
                             h(
                               'button',
                               {
-                                disabled:
-                                  isSavingFeedback.value ||
-                                  item.status !== 'PENDING_PARENT',
+                                disabled: !canSubmitFeedbackResponse(
+                                  item,
+                                  isSavingFeedback.value,
+                                ),
                                 type: 'button',
                                 onClick: () => void markFeedback(item.id, 'CONFIRMED'),
                               },
@@ -823,9 +833,10 @@ export default defineComponent({
                             h(
                               'button',
                               {
-                                disabled:
-                                  isSavingFeedback.value ||
-                                  item.status !== 'PENDING_PARENT',
+                                disabled: !canSubmitFeedbackResponse(
+                                  item,
+                                  isSavingFeedback.value,
+                                ),
                                 type: 'button',
                                 onClick: () => void markFeedback(item.id, 'DISPUTED'),
                               },
