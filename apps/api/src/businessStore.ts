@@ -613,6 +613,12 @@ export function createBusinessStore(
       if (schedule.status !== 'SCHEDULED' && schedule.status !== 'CHANGED') {
         conflict('当前课次状态不能提交请假')
       }
+      const scheduleEnd = Date.parse(
+        `${schedule.lessonDate}T${schedule.endTime}+08:00`,
+      )
+      if (!Number.isFinite(scheduleEnd) || scheduleEnd <= now()) {
+        conflict('已结束课次不能提交请假')
+      }
       if (
         data.leaveRequests.some(
           (item) =>

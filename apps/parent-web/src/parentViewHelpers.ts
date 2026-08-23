@@ -3,6 +3,7 @@ import type {
   Notification,
   ParentStudentBinding,
   ScheduleChangeNotice,
+  ScheduleSummary,
   StudentFeedback,
 } from '@k12/shared'
 
@@ -113,6 +114,20 @@ export function leaveStatusLabel(status: LeaveRequest['status']): string {
   }
 
   return labels[status]
+}
+
+export function isLeaveEligibleSchedule(
+  schedule: ScheduleSummary,
+  currentTime = Date.now(),
+): boolean {
+  if (schedule.status !== 'SCHEDULED' && schedule.status !== 'CHANGED') {
+    return false
+  }
+
+  const scheduleEnd = Date.parse(
+    `${schedule.lessonDate}T${schedule.endTime}+08:00`,
+  )
+  return Number.isFinite(scheduleEnd) && scheduleEnd > currentTime
 }
 
 export function replaceReadNotification(

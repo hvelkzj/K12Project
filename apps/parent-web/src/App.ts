@@ -23,6 +23,7 @@ import {
   countUnreadNotifications,
   feedbackResponseDraft,
   isCurrentStudentAction,
+  isLeaveEligibleSchedule,
   isLatestOverviewRequest,
   leaveStatusLabel,
   mergeParentNotices,
@@ -116,6 +117,9 @@ export default defineComponent({
       countUnreadNotifications(notices.value),
     )
     const leaveRequests = computed(() => overview.value?.leaveRequests ?? [])
+    const leaveEligibleSchedules = computed(() =>
+      schedules.value.filter((item) => isLeaveEligibleSchedule(item)),
+    )
     const courseNames = computed(
       () =>
         new Map(
@@ -404,7 +408,8 @@ export default defineComponent({
       if (isSubmittingLeave.value) return
 
       const studentId = selectedStudentId.value
-      const firstScheduleId = selectedScheduleId.value ?? schedules.value[0]?.id
+      const firstScheduleId =
+        selectedScheduleId.value ?? leaveEligibleSchedules.value[0]?.id
 
       if (studentId === null || firstScheduleId === undefined) {
         message.value = '当前学生没有可请假的课程'
@@ -751,8 +756,14 @@ export default defineComponent({
                       },
                     },
                     [
-                      h('option', { value: '' }, '默认第一节可请假课程'),
-                      ...schedules.value.map((item) =>
+                      h(
+                        'option',
+                        { value: '' },
+                        leaveEligibleSchedules.value.length > 0
+                          ? '默认第一节可请假课程'
+                          : '暂无可请假课程',
+                      ),
+                      ...leaveEligibleSchedules.value.map((item) =>
                         h(
                           'option',
                           { key: item.id, value: item.id },
@@ -785,7 +796,9 @@ export default defineComponent({
                   'button',
                   {
                     class: 'primary',
-                    disabled: isSubmittingLeave.value,
+                    disabled:
+                      isSubmittingLeave.value ||
+                      leaveEligibleSchedules.value.length === 0,
                     type: 'button',
                     onClick: () => void createLeaveRequest(),
                   },
