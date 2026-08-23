@@ -247,6 +247,30 @@ test('409 返回服务端业务错误', async () => {
   )
 })
 
+test('422 返回服务端校验错误', async () => {
+  const { client } = setup(() =>
+    jsonResponse(422, {
+      code: 'VALIDATION_ERROR',
+      message: '拒绝调课时必须填写原因',
+    }),
+  )
+
+  await assert.rejects(
+    client.reviewScheduleChange({
+      changeId: 7001,
+      decision: 'REJECTED',
+      decisionNote: '',
+    }),
+    (error) => {
+      assert.ok(error instanceof AdminApiError)
+      assert.equal(error.status, 422)
+      assert.equal(error.code, 'VALIDATION_ERROR')
+      assert.equal(error.message, '拒绝调课时必须填写原因')
+      return true
+    },
+  )
+})
+
 test('网络错误转换为 NETWORK_ERROR', async () => {
   const { client } = setup(() => {
     throw new TypeError('fetch failed')
@@ -530,4 +554,86 @@ test('账号启停发送 active 状态', async () => {
   const user = await client.updateUser({ userId: 301, active: false })
   assert.equal(user.active, false)
   assert.equal(calls.length, 1)
+})
+
+test('请假审批接口网络错误转换为 NETWORK_ERROR', async () => {
+  const { client } = setup(() => {
+    throw new TypeError('fetch failed')
+  })
+
+  await assert.rejects(
+    client.reviewLeaveRequest({
+      leaveRequestId: 8001,
+      decision: 'APPROVED',
+      reviewNote: '已核实',
+    }),
+    (error) => {
+      assert.ok(error instanceof AdminApiError)
+      assert.equal(error.code, 'NETWORK_ERROR')
+      return true
+    },
+  )
+})
+
+test('排课创建接口网络错误转换为 NETWORK_ERROR', async () => {
+  const { client } = setup(() => {
+    throw new TypeError('fetch failed')
+  })
+
+  await assert.rejects(
+    client.createSchedule({
+      campusId: 1,
+      classId: 101,
+      courseId: 11,
+      teacherId: 302,
+      lessonDate: '2026-08-21',
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+    }),
+    (error) => {
+      assert.ok(error instanceof AdminApiError)
+      assert.equal(error.code, 'NETWORK_ERROR')
+      return true
+    },
+  )
+})
+
+test('工单关闭接口网络错误转换为 NETWORK_ERROR', async () => {
+  const { client } = setup(() => {
+    throw new TypeError('fetch failed')
+  })
+
+  await assert.rejects(
+    client.updateWorkOrder({
+      workOrderId: 6001,
+      action: 'CLOSE',
+      result: '已处理',
+    }),
+    (error) => {
+      assert.ok(error instanceof AdminApiError)
+      assert.equal(error.code, 'NETWORK_ERROR')
+      return true
+    },
+  )
+})
+
+test('账号启停接口 403 返回服务端错误', async () => {
+  const { client } = setup(() =>
+    jsonResponse(403, {
+      code: 'FORBIDDEN',
+      message: '只有系统管理员可以启停账号',
+    }),
+  )
+
+  await assert.rejects(
+    client.updateUser({ userId: 301, active: false }),
+    (error) => {
+      assert.ok(error instanceof AdminApiError)
+      assert.equal(error.status, 403)
+      assert.equal(error.code, 'FORBIDDEN')
+      assert.equal(error.message, '只有系统管理员可以启停账号')
+      return true
+    },
+  )
 })
