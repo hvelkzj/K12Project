@@ -9,6 +9,7 @@ interface PackageManifest {
 
 const repositoryRoot = new URL('../../../', import.meta.url)
 const frontendWorkspaces = [
+  'apps/portal-web',
   'apps/parent-web',
   'apps/student-web',
   'apps/teacher-web',
@@ -23,7 +24,7 @@ function readPackageManifest(workspace: string): PackageManifest {
   return JSON.parse(contents) as PackageManifest
 }
 
-test('四个前端声明精确的共享包版本', () => {
+test('五个前端声明精确的共享包版本', () => {
   for (const workspace of frontendWorkspaces) {
     const manifest = readPackageManifest(workspace)
     assert.equal(
@@ -34,7 +35,7 @@ test('四个前端声明精确的共享包版本', () => {
   }
 })
 
-test('四个前端使用统一的 API 地址示例', () => {
+test('五个前端使用统一的 API 地址示例', () => {
   for (const workspace of frontendWorkspaces) {
     const envExample = readFileSync(
       new URL(`${workspace}/.env.example`, repositoryRoot),
@@ -73,9 +74,10 @@ test('所有工作区只使用根目录锁文件', () => {
   )
 })
 
-test('根目录四个前端启动命令统一监听回环地址', () => {
+test('根目录五个前端启动命令统一监听回环地址', () => {
   const rootManifest = readPackageManifest('.')
   for (const scriptName of [
+    'dev:portal',
     'dev:parent',
     'dev:student',
     'dev:teacher',

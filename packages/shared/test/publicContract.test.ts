@@ -6,6 +6,7 @@ import {
   FEEDBACK_STATUSES,
   LEAVE_STATUSES,
   NOTIFICATION_TYPES,
+  PUBLIC_REGISTRATION_ROLES,
   SCHEDULE_CHANGE_STATUSES,
   SCHEDULE_STATUSES,
   SUBMISSION_STATUSES,
@@ -22,6 +23,12 @@ test('公共包发布六种唯一角色', () => {
   assert.equal(USER_ROLES.length, 6)
   assert.equal(new Set(USER_ROLES).size, 6)
   assert.deepEqual(MOCK_ACCOUNT_ROLES, USER_ROLES)
+})
+
+test('公开注册只允许家长和学生角色', () => {
+  assert.deepEqual(PUBLIC_REGISTRATION_ROLES, ['PARENT', 'STUDENT'])
+  assert.equal(PUBLIC_REGISTRATION_ROLES.includes('PARENT'), true)
+  assert.equal(PUBLIC_REGISTRATION_ROLES.includes('STUDENT'), true)
 })
 
 test('六个 Mock 账号使用唯一用户名、数字 ID 和统一测试密码', () => {
