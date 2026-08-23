@@ -31,11 +31,19 @@ test('公开注册只允许家长和学生角色', () => {
   assert.equal(PUBLIC_REGISTRATION_ROLES.includes('STUDENT'), true)
 })
 
-test('六个 Mock 账号使用唯一用户名、数字 ID 和统一测试密码', () => {
-  assert.equal(MOCK_ACCOUNTS.length, 6)
+test('十三个本地账号覆盖六种角色、两个校区和唯一身份', () => {
+  assert.equal(MOCK_ACCOUNTS.length, 13)
   assert.equal(
     new Set(MOCK_ACCOUNTS.map(({ username }) => username)).size,
-    6,
+    MOCK_ACCOUNTS.length,
+  )
+  assert.equal(
+    new Set(MOCK_ACCOUNTS.map(({ user }) => user.id)).size,
+    MOCK_ACCOUNTS.length,
+  )
+  assert.deepEqual(
+    [...new Set(MOCK_ACCOUNTS.map(({ user }) => user.campusId))],
+    [1, 2],
   )
 
   for (const account of MOCK_ACCOUNTS) {
@@ -43,6 +51,14 @@ test('六个 Mock 账号使用唯一用户名、数字 ID 和统一测试密码'
     assert.equal(account.active, true)
     assert.equal(Number.isInteger(account.user.id), true)
     assert.equal(Number.isInteger(account.user.campusId), true)
+  }
+
+  for (const role of USER_ROLES) {
+    assert.equal(
+      MOCK_ACCOUNTS.some(({ user }) => user.role === role),
+      true,
+      `${role} 必须至少有一个可登录账号`,
+    )
   }
 })
 

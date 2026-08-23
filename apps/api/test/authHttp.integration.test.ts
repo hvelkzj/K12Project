@@ -90,7 +90,7 @@ test('真实 HTTP 连接会排空超限请求体并稳定返回 413', async (con
   }
 })
 
-test('真实 HTTP 六角色均可登录、恢复会话并退出', async (context) => {
+test('真实 HTTP 全部本地账号均可登录、恢复会话并退出', async (context) => {
   let tokenNumber = 0
   const handler = createRequestHandler(
     createAuthService({ createToken: () => `http-auth-token-${++tokenNumber}` }),
@@ -119,7 +119,7 @@ test('真实 HTTP 六角色均可登录、恢复会话并退出', async (context
     const apiBaseUrl = `http://127.0.0.1:${address.port}`
 
     for (const account of MOCK_ACCOUNTS) {
-      await context.test(account.user.role, async () => {
+      await context.test(account.username, async () => {
         const loginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
