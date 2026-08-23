@@ -12,6 +12,7 @@ import {
   getLatestSubmission,
   getSubmissionHistory,
   getSubmissionViewStatus,
+  selectDisplayedSubmission,
   validateSubmissionInput,
 } from './studentService'
 import type {
@@ -197,6 +198,34 @@ test('提交接口返回后可立即回写概览且重复回写不会产生重�
     1,
   )
   assert.equal(getLatestSubmission(twice, 3001)?.content, '服务端返回的最新正文')
+})
+
+test('结果页优先展示较新 attempt，并让概览批改覆盖提交快照', () => {
+  const submitted = submission(3001, {
+    id: 4101,
+    attempt: 2,
+    status: 'SUBMITTED',
+  })
+  const previousAttempt = submission(3001, {
+    id: 4100,
+    attempt: 1,
+    status: 'GRADED',
+    score: 80,
+  })
+  const graded = {
+    ...submitted,
+    status: 'GRADED' as const,
+    score: 95,
+    teacherComment: '订正正确。',
+  }
+
+  assert.equal(
+    selectDisplayedSubmission(submitted, previousAttempt)?.id,
+    submitted.id,
+  )
+  assert.equal(selectDisplayedSubmission(submitted, graded)?.status, 'GRADED')
+  assert.equal(selectDisplayedSubmission(submitted, graded)?.score, 95)
+  assert.equal(selectDisplayedSubmission(null, graded)?.id, graded.id)
 })
 
 test('数据服务提交复用客户端且只发送契约字段', async () => {

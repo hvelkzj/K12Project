@@ -84,6 +84,18 @@ export function getLatestSubmission(
   return getSubmissionHistory(overview, assignmentId).at(-1)
 }
 
+export function selectDisplayedSubmission(
+  submitted: Submission | null,
+  overviewLatest: Submission | undefined,
+): Submission | null {
+  if (!submitted) return overviewLatest ?? null
+  if (!overviewLatest) return submitted
+
+  return overviewLatest.attempt >= submitted.attempt
+    ? overviewLatest
+    : submitted
+}
+
 export function applySubmissionToOverview(
   overview: StudentOverview,
   submission: Submission,

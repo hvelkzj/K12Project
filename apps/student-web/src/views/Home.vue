@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Assignment, CourseSummary, FileSummary, Submission, UserSummary } from '@k12/shared'
 import { listAssignmentRows } from '../assignmentListService'
-import { getSubmissionHistory } from '../studentService'
+import { getSubmissionHistory, selectDisplayedSubmission } from '../studentService'
 import { getSubmissionStatusLabel, isAssignmentSubmissionClosed } from '../assignmentPresentation'
 import type { AssignmentListRow } from '../assignmentPresentation'
 import { assignmentDrafts } from '../assignmentDrafts'
@@ -51,7 +51,9 @@ const rows = computed<AssignmentListRow[]>(() =>
 const selectedRow = computed(() => rows.value.find((row) => row.assignment.id === selectedId.value))
 const assignment = computed<Assignment | undefined>(() => selectedRow.value?.assignment)
 const latestSubmission = computed<Submission | undefined>(() => selectedRow.value?.latestSubmission)
-const displayedSubmission = computed<Submission | null>(() => lastSubmitted.value ?? latestSubmission.value ?? null)
+const displayedSubmission = computed<Submission | null>(() =>
+  selectDisplayedSubmission(lastSubmitted.value, latestSubmission.value),
+)
 const submissionHistory = computed<Submission[]>(() => props.overview && selectedId.value !== null ? getSubmissionHistory(props.overview, selectedId.value) : [])
 const isClosed = computed(() => assignment.value ? isAssignmentSubmissionClosed(assignment.value, currentNow.value) : false)
 const canSubmit = computed(() => !isClosed.value && (selectedRow.value?.status === 'NOT_SUBMITTED' || selectedRow.value?.status === 'REVISION_REQUIRED'))
@@ -139,6 +141,7 @@ async function submit(): Promise<void> {
     </form>
     <article v-else class="panel result">
       <div class="result-check">✓</div><p class="eyebrow">提交结果</p><h1>{{ displayedSubmission ? '作业已成功提交' : '暂无提交记录' }}</h1><p v-if="displayedSubmission">第 {{ displayedSubmission.attempt }} 次提交 · {{ formatDateTime(displayedSubmission.submittedAt) }}</p>
+      <p v-if="displayedSubmission?.score != null" class="history-score">得分：{{ displayedSubmission.score }}</p>
       <p v-if="displayedSubmission?.teacherComment" class="comment">老师评语：{{ displayedSubmission.teacherComment }}</p>
       <details v-if="submissionHistory.length > 1">
         <summary>查看 {{ submissionHistory.length }} 次提交历史</summary>
