@@ -1,6 +1,6 @@
 # 公共字段契约
 
-版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口。
+版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口；8/24 公开注册。
 
 本文件记录跨端字段和已确认接口。接口 JSON 使用 camelCase，数据库列使用 snake_case。
 
@@ -52,16 +52,28 @@
 |---|---|
 | `LoginRequest` | `username`、`password` |
 | `LoginResponse` | `accessToken`、`tokenType`、`expiresAt`、`user` |
+| `RegisterRequest` | `username`、`password`、`displayName`、`role: 'PARENT' \| 'STUDENT'` |
+| `RegisterResponse` | `user: UserAccountSummary` |
 | `CurrentUserResponse` | `user` |
 | `ApiError` | `code`、`message` |
 
 | 接口 | 说明 |
 |---|---|
+| `POST /auth/register` | 创建家长或学生账号，成功返回 `201 RegisterResponse` |
 | `POST /auth/login` | 使用六角色 Mock 账号创建八小时会话 |
 | `GET /auth/me` | 使用 Bearer 令牌读取当前用户 |
 | `POST /auth/logout` | 删除当前令牌对应的会话 |
 
-Mock 密码不进入用户响应。当前内存会话用于课程项目运行，服务重启后会话失效。
+注册规则：
+
+- `username` 为 4–24 位，以小写字母开头，只包含小写字母、数字和下划线。
+- `displayName` 为 2–20 个字符。
+- `password` 为 8–64 位，同时包含字母和数字。
+- 公开注册只允许 `PARENT` 和 `STUDENT`；教师和管理角色由后台分配。
+- 重复用户名返回 `409 USERNAME_TAKEN`，字段错误返回 `422 VALIDATION_ERROR`。
+- 学生注册后加入默认校区和班级；家长注册后初始无学生绑定。
+
+Mock 密码和注册密码均不进入用户响应。当前内存账号与会话用于课程项目运行，服务重启后注册账号和会话失效。
 
 ## 2026-08-17 共享业务 API
 

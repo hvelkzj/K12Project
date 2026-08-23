@@ -69,4 +69,4 @@ npm run test --workspace @k12/api
 psql -d k12 -f apps/api/db/migrations/001_initial.sql
 ```
 
-迁移只创建结构，不包含真实账号或个人信息。公共类型、登录接口和六角色本地测试账号见 `docs/a-7-29-public-types-and-auth.md`。当前课程项目运行时使用内存会话和进程内业务仓库，该迁移仅作为数据库结构交付。
+迁移只创建结构，不包含真实账号或个人信息。公共类型、登录接口和六角色本地测试账号见 `docs/a-7-29-public-types-and-auth.md`。公开注册的家长和学生账号使用同一 `users`、`classes` 数据关系，但当前课程项目只写入内存账号与业务仓库；API 重启后清除注册账号并恢复初始数据。该迁移仅作为数据库结构交付。
