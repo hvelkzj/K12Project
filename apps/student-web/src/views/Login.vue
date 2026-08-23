@@ -14,6 +14,8 @@ const password = ref('K12Demo123!')
 const errorMessage = ref('')
 const isLoading = ref(false)
 const visibleMessage = computed(() => errorMessage.value || props.notice || '')
+const portalUrl =
+  import.meta.env.VITE_PORTAL_URL ?? 'http://127.0.0.1:5172'
 const currentDate = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',
   month: 'long',
@@ -62,7 +64,6 @@ const handleLogin = async () => {
         <div class="nav-item active">
           <span class="dot"></span>
           登录
-          <span class="route-path">/login</span>
         </div>
       </div>
 
@@ -77,6 +78,7 @@ const handleLogin = async () => {
     <div class="main-content">
       <div class="top-header">
         <span class="date-text">{{ currentDate }}</span>
+        <a class="portal-return-link" :href="portalUrl">← 返回统一首页</a>
       </div>
 
       <div class="page-title">
@@ -87,10 +89,10 @@ const handleLogin = async () => {
       <div class="login-card-wrapper">
         <div class="login-card">
           <div class="card-left">
-            <span class="tag">真实认证接入</span>
+            <span class="tag">学生专属空间</span>
             <h2>进入<br/>学习空间</h2>
             <p class="desc">
-              使用真实认证接口登录。学生仅能访问本人的课程、提交作业及查看批改反馈。
+              登录后可以查看本人的课程、提交作业，并及时了解老师的批改反馈。
             </p>
             <div class="auth-hint">
               <p>✓ 学生：仅限本人数据<br/>(student_101)</p>
@@ -216,12 +218,6 @@ const handleLogin = async () => {
   margin-right: 12px;
 }
 
-.route-path {
-  margin-left: auto;
-  font-size: 12px;
-  color: rgba(255,255,255,0.5);
-}
-
 .brand-footer {
   padding: 0 24px;
   background: rgba(0,0,0,0.1);
@@ -267,6 +263,25 @@ const handleLogin = async () => {
   font-size: 14px;
   color: #8c8c8c;
   font-weight: 500;
+}
+
+.portal-return-link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  padding: 0 16px;
+  border: 1px solid #d9dfea;
+  border-radius: 8px;
+  color: #2f54eb;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.portal-return-link:hover {
+  border-color: #2f54eb;
+  background: #f0f5ff;
 }
 
 .page-title h1 {

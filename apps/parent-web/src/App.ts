@@ -41,6 +41,9 @@ const mockParentCredentials = {
   password: MOCK_ACCOUNT_PASSWORD,
 } as const
 
+const portalUrl =
+  import.meta.env.VITE_PORTAL_URL ?? 'http://127.0.0.1:5172'
+
 interface LoadOverviewOptions {
   clearBeforeLoad?: boolean
   resetSchedule?: boolean
@@ -364,6 +367,11 @@ export default defineComponent({
                 'button',
                 { class: 'primary login-submit', type: 'submit' },
                 '登录并进入首页',
+              ),
+              h(
+                'a',
+                { class: 'portal-return-link', href: portalUrl },
+                '← 返回统一首页',
               ),
             ],
           ),
