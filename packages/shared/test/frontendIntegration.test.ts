@@ -15,6 +15,9 @@ const frontendWorkspaces = [
   'apps/teacher-web',
   'apps/admin-web',
 ] as const
+const businessFrontendWorkspaces = frontendWorkspaces.filter(
+  (workspace) => workspace !== 'apps/portal-web',
+)
 
 function readPackageManifest(workspace: string): PackageManifest {
   const contents = readFileSync(
@@ -51,6 +54,50 @@ test('五个前端使用统一的 API 地址示例', () => {
       `${workspace} 必须提供统一的 VITE_API_BASE_URL`,
     )
   }
+})
+
+test('四个业务端登录页使用统一入口地址示例', () => {
+  for (const workspace of businessFrontendWorkspaces) {
+    const envExample = readFileSync(
+      new URL(`${workspace}/.env.example`, repositoryRoot),
+      'utf8',
+    )
+
+    assert.match(
+      envExample,
+      /^VITE_PORTAL_URL=http:\/\/127\.0\.0\.1:5172$/m,
+      `${workspace} 必须提供统一的 VITE_PORTAL_URL`,
+    )
+  }
+})
+
+test('四个业务端登录页提供返回统一首页入口', () => {
+  const loginSources = [
+    'apps/parent-web/src/App.ts',
+    'apps/student-web/src/views/Login.vue',
+    'apps/teacher-web/src/App.vue',
+    'apps/admin-web/src/App.vue',
+  ]
+
+  for (const sourcePath of loginSources) {
+    const source = readFileSync(new URL(sourcePath, repositoryRoot), 'utf8')
+    assert.match(source, /VITE_PORTAL_URL/)
+    assert.match(source, /返回统一首页/)
+  }
+})
+
+test('统一首页面向家校用户介绍平台', () => {
+  const portalSource = readFileSync(
+    new URL('apps/portal-web/src/App.vue', repositoryRoot),
+    'utf8',
+  )
+  const template = portalSource.split('<template>')[1] ?? ''
+
+  assert.doesNotMatch(
+    template,
+    /\bAPI\b|\bMock\b|访问令牌|状态码|运行时账号仓库/,
+  )
+  assert.match(template, /家长、学生、教师与学校管理人员/)
 })
 
 test('所有工作区只使用根目录锁文件', () => {
