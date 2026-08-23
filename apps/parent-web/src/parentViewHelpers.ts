@@ -59,6 +59,13 @@ export function canMarkNotificationRead(
   return !notification.readAt && savingNotificationId !== notification.id
 }
 
+export function canSubmitFeedbackResponse(
+  feedback: StudentFeedback,
+  isSavingFeedback: boolean,
+): boolean {
+  return !isSavingFeedback && feedback.status === 'PENDING_PARENT'
+}
+
 export function isLatestOverviewRequest(
   requestSequence: number,
   latestRequestSequence: number,

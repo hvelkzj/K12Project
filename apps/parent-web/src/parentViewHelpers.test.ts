@@ -11,6 +11,7 @@ import {
 } from './parentBusinessFixtures.test'
 import {
   canMarkNotificationRead,
+  canSubmitFeedbackResponse,
   countPendingParentFeedback,
   countUnreadNotifications,
   isLatestOverviewRequest,
@@ -70,6 +71,12 @@ test('通知读取和概览请求防止重复操作与旧响应回写', () => {
   )
   assert.equal(isLatestOverviewRequest(3, 3), true)
   assert.equal(isLatestOverviewRequest(2, 3), false)
+})
+
+test('反馈响应防止已处理或保存中的重复提交', () => {
+  assert.equal(canSubmitFeedbackResponse(pendingFeedback, false), true)
+  assert.equal(canSubmitFeedbackResponse(pendingFeedback, true), false)
+  assert.equal(canSubmitFeedbackResponse(confirmedFeedback, false), false)
 })
 
 test('请假三种状态显示为家长可读文案', () => {
