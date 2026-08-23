@@ -207,3 +207,18 @@ test('刷新页面后草稿仍然存在', () => {
     attachments: [attachment],
   })
 })
+
+test('载入的草稿是副本，修改副本不影响存储', () => {
+  const store = createAssignmentDraftStore(createStorage())
+  store.save(3001, { content: '原始正文', attachments: [attachment] })
+
+  const loaded = store.load(3001)
+  assert.ok(loaded)
+  loaded.content = '被修改的正文'
+  loaded.attachments[0]!.originalName = '被修改的名字'
+
+  assert.deepEqual(store.load(3001), {
+    content: '原始正文',
+    attachments: [attachment],
+  })
+})
