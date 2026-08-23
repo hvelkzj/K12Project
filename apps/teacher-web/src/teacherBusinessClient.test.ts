@@ -342,7 +342,7 @@ test('401 清除 token，403 与 409 保留服务端错误', async (context) => 
   }
 })
 
-test('网络错误转换为 NETWORK_ERROR', async () => {
+test('网络错误转换为稳定的 NETWORK_ERROR', async () => {
   const client = createTeacherBusinessClient({
     apiBaseUrl: 'http://api.test',
     authClient: authClient(),
@@ -357,6 +357,6 @@ test('网络错误转换为 NETWORK_ERROR', async () => {
       error instanceof TeacherBusinessError &&
       error.status === 0 &&
       error.code === 'NETWORK_ERROR' &&
-      error.message === '连接失败',
+      error.message === '网络请求失败，请稍后重试',
   )
 })
