@@ -257,8 +257,22 @@ test('调课通知和普通通知可以标记已读', async () => {
   )
 })
 
-test('通知已读 409 和网络错误不会返回假成功', async (context) => {
+test('通知已读权限、缺失、冲突和网络错误不会返回假成功', async (context) => {
   for (const scenario of [
+    {
+      name: '无权读取',
+      fetchImpl: async () =>
+        jsonResponse({ code: 'FORBIDDEN', message: '家长只能标记自己的通知' }, 403),
+      expected: /只能标记自己的通知/,
+      status: 403,
+    },
+    {
+      name: '通知不存在',
+      fetchImpl: async () =>
+        jsonResponse({ code: 'NOT_FOUND', message: '通知不存在' }, 404),
+      expected: /通知不存在/,
+      status: 404,
+    },
     {
       name: '业务冲突',
       fetchImpl: async () =>

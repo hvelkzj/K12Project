@@ -10,9 +10,12 @@ import {
   scheduleChangeNotice,
 } from './parentBusinessFixtures.test'
 import {
+  canMarkNotificationRead,
   countPendingParentFeedback,
   countUnreadNotifications,
+  isLatestOverviewRequest,
   leaveStatusLabel,
+  mergeParentNotices,
   overviewRetryStudentId,
   replaceReadNotification,
   replaceReadScheduleChangeNotice,
@@ -35,8 +38,15 @@ test('待看反馈只统计等待家长处理的状态', () => {
 })
 
 test('首页未读通知数量统计普通通知和调课通知', () => {
+  const notices = mergeParentNotices(
+    [generalNotice, scheduleChangeNotice.notification],
+    [scheduleChangeNotice],
+  )
+
+  assert.equal(notices.length, 2)
+  assert.ok('notification' in notices[0]!)
   assert.equal(
-    countUnreadNotifications([generalNotice, scheduleChangeNotice]),
+    countUnreadNotifications(notices),
     2,
   )
   assert.equal(
@@ -46,6 +56,20 @@ test('首页未读通知数量统计普通通知和调课通知', () => {
     ]),
     1,
   )
+})
+
+test('通知读取和概览请求防止重复操作与旧响应回写', () => {
+  assert.equal(canMarkNotificationRead(generalNotice, null), true)
+  assert.equal(canMarkNotificationRead(generalNotice, generalNotice.id), false)
+  assert.equal(
+    canMarkNotificationRead(
+      { ...generalNotice, readAt: '2026-08-18T18:00:00+08:00' },
+      null,
+    ),
+    false,
+  )
+  assert.equal(isLatestOverviewRequest(3, 3), true)
+  assert.equal(isLatestOverviewRequest(2, 3), false)
 })
 
 test('请假三种状态显示为家长可读文案', () => {

@@ -16,9 +16,12 @@ import {
 } from './parentBusinessClient'
 import type { ParentOverview } from './parentBusinessClient'
 import {
+  canMarkNotificationRead,
   countPendingParentFeedback,
   countUnreadNotifications,
+  isLatestOverviewRequest,
   leaveStatusLabel,
+  mergeParentNotices,
   overviewRetryStudentId,
   replaceReadNotification,
   replaceReadScheduleChangeNotice,
@@ -90,10 +93,12 @@ export default defineComponent({
       )
     })
     const schedules = computed(() => overview.value?.schedules ?? [])
-    const notices = computed<(Notification | ScheduleChangeNotice)[]>(() => [
-      ...(overview.value?.scheduleChangeNotices ?? []),
-      ...(overview.value?.notifications ?? []),
-    ])
+    const notices = computed<(Notification | ScheduleChangeNotice)[]>(() =>
+      mergeParentNotices(
+        overview.value?.notifications ?? [],
+        overview.value?.scheduleChangeNotices ?? [],
+      ),
+    )
     const feedback = computed(() => overview.value?.feedback ?? [])
     const pendingFeedbackCount = computed(() =>
       countPendingParentFeedback(feedback.value),
@@ -169,17 +174,17 @@ export default defineComponent({
 
       try {
         const nextOverview = await parentBusinessClient.getOverview(studentId)
-        if (requestSeq !== overviewRequestSeq) return
+        if (!isLatestOverviewRequest(requestSeq, overviewRequestSeq)) return
 
         overview.value = nextOverview
         if (options.successMessage !== null) {
           message.value = options.successMessage ?? '学生概览已更新'
         }
       } catch (error) {
-        if (requestSeq !== overviewRequestSeq) return
+        if (!isLatestOverviewRequest(requestSeq, overviewRequestSeq)) return
         loadError.value = businessErrorMessage(error, '学生概览加载失败')
       } finally {
-        if (requestSeq === overviewRequestSeq) {
+        if (isLatestOverviewRequest(requestSeq, overviewRequestSeq)) {
           isLoadingOverview.value = false
         }
       }
@@ -370,6 +375,8 @@ export default defineComponent({
     }
 
     async function createLeaveRequest() {
+      if (isSubmittingLeave.value) return
+
       const firstScheduleId = selectedScheduleId.value ?? schedules.value[0]?.id
 
       if (selectedStudentId.value === null || firstScheduleId === undefined) {
@@ -402,7 +409,7 @@ export default defineComponent({
     }
 
     async function markNoticeRead(notification: Notification) {
-      if (notification.readAt || savingNotificationId.value === notification.id) {
+      if (!canMarkNotificationRead(notification, savingNotificationId.value)) {
         return
       }
 

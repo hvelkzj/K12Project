@@ -6,6 +6,8 @@ import type {
   StudentFeedback,
 } from '@k12/shared'
 
+export type ParentNoticeItem = Notification | ScheduleChangeNotice
+
 export function overviewRetryStudentId(
   bindings: readonly ParentStudentBinding[],
   selectedStudentId: number | null,
@@ -26,12 +28,42 @@ export function countPendingParentFeedback(
 }
 
 export function countUnreadNotifications(
-  notices: readonly (Notification | ScheduleChangeNotice)[],
+  notices: readonly ParentNoticeItem[],
 ): number {
   return notices.filter((item) => {
     const notification = 'notification' in item ? item.notification : item
     return !notification.readAt
   }).length
+}
+
+export function mergeParentNotices(
+  notifications: readonly Notification[],
+  scheduleChangeNotices: readonly ScheduleChangeNotice[],
+): ParentNoticeItem[] {
+  const scheduleNotificationIds = new Set(
+    scheduleChangeNotices.map((item) => item.notification.id),
+  )
+
+  return [
+    ...scheduleChangeNotices,
+    ...notifications.filter(
+      (notification) => !scheduleNotificationIds.has(notification.id),
+    ),
+  ]
+}
+
+export function canMarkNotificationRead(
+  notification: Notification,
+  savingNotificationId: number | null,
+): boolean {
+  return !notification.readAt && savingNotificationId !== notification.id
+}
+
+export function isLatestOverviewRequest(
+  requestSequence: number,
+  latestRequestSequence: number,
+): boolean {
+  return requestSequence === latestRequestSequence
 }
 
 export function leaveStatusLabel(status: LeaveRequest['status']): string {
