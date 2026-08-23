@@ -7,6 +7,7 @@ import type {
 } from '@k12/shared'
 
 export type ParentNoticeItem = Notification | ScheduleChangeNotice
+export type FeedbackResponseDrafts = Readonly<Record<number, string>>
 
 export function overviewRetryStudentId(
   bindings: readonly ParentStudentBinding[],
@@ -66,11 +67,42 @@ export function canSubmitFeedbackResponse(
   return !isSavingFeedback && feedback.status === 'PENDING_PARENT'
 }
 
+export function feedbackResponseDraft(
+  drafts: FeedbackResponseDrafts,
+  feedbackId: number,
+): string {
+  return drafts[feedbackId] ?? ''
+}
+
+export function updateFeedbackResponseDraft(
+  drafts: FeedbackResponseDrafts,
+  feedbackId: number,
+  value: string,
+): FeedbackResponseDrafts {
+  return { ...drafts, [feedbackId]: value }
+}
+
+export function clearFeedbackResponseDraft(
+  drafts: FeedbackResponseDrafts,
+  feedbackId: number,
+): FeedbackResponseDrafts {
+  const nextDrafts = { ...drafts }
+  delete nextDrafts[feedbackId]
+  return nextDrafts
+}
+
 export function isLatestOverviewRequest(
   requestSequence: number,
   latestRequestSequence: number,
 ): boolean {
   return requestSequence === latestRequestSequence
+}
+
+export function isCurrentStudentAction(
+  actionStudentId: number,
+  selectedStudentId: number | null,
+): boolean {
+  return actionStudentId === selectedStudentId
 }
 
 export function leaveStatusLabel(status: LeaveRequest['status']): string {

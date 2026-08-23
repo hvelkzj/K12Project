@@ -18,15 +18,20 @@ import type { ParentOverview } from './parentBusinessClient'
 import {
   canMarkNotificationRead,
   canSubmitFeedbackResponse,
+  clearFeedbackResponseDraft,
   countPendingParentFeedback,
   countUnreadNotifications,
+  feedbackResponseDraft,
+  isCurrentStudentAction,
   isLatestOverviewRequest,
   leaveStatusLabel,
   mergeParentNotices,
   overviewRetryStudentId,
   replaceReadNotification,
   replaceReadScheduleChangeNotice,
+  updateFeedbackResponseDraft,
 } from './parentViewHelpers'
+import type { FeedbackResponseDrafts } from './parentViewHelpers'
 
 const tabs = ['首页', '学生切换', '课表', '请假', '通知', '反馈'] as const
 type TabName = (typeof tabs)[number]
@@ -77,9 +82,9 @@ export default defineComponent({
     const overview = ref<ParentOverview | null>(null)
     const selectedStudentId = ref<number | null>(null)
     const selectedScheduleId = ref<number | null>(null)
-    const contactPhone = ref('13800000001')
-    const leaveReason = ref('发烧需要休息')
-    const disputeReason = ref('希望核对本周课堂记录')
+    const contactPhone = ref('')
+    const leaveReason = ref('')
+    const disputeReasons = ref<FeedbackResponseDrafts>({})
     const message = ref('')
     const loadError = ref('')
     let overviewRequestSeq = 0
@@ -130,12 +135,19 @@ export default defineComponent({
       () => currentUser.value ?? { displayName: '家长', campusName: '' },
     )
 
+    function resetStudentFormState(): void {
+      selectedScheduleId.value = null
+      contactPhone.value = ''
+      leaveReason.value = ''
+      disputeReasons.value = {}
+    }
+
     function resetBusinessState(): void {
       overviewRequestSeq += 1
       bindings.value = []
       overview.value = null
       selectedStudentId.value = null
-      selectedScheduleId.value = null
+      resetStudentFormState()
       loadError.value = ''
       message.value = ''
     }
@@ -167,8 +179,13 @@ export default defineComponent({
       const requestSeq = (overviewRequestSeq += 1)
       const clearBeforeLoad = options.clearBeforeLoad ?? true
       const resetSchedule = options.resetSchedule ?? clearBeforeLoad
+      const studentChanged = selectedStudentId.value !== studentId
       selectedStudentId.value = studentId
-      if (resetSchedule) selectedScheduleId.value = null
+      if (studentChanged) {
+        resetStudentFormState()
+      } else if (resetSchedule) {
+        selectedScheduleId.value = null
+      }
       if (clearBeforeLoad) overview.value = null
       loadError.value = ''
       isLoadingOverview.value = true
@@ -378,9 +395,10 @@ export default defineComponent({
     async function createLeaveRequest() {
       if (isSubmittingLeave.value) return
 
+      const studentId = selectedStudentId.value
       const firstScheduleId = selectedScheduleId.value ?? schedules.value[0]?.id
 
-      if (selectedStudentId.value === null || firstScheduleId === undefined) {
+      if (studentId === null || firstScheduleId === undefined) {
         message.value = '当前学生没有可请假的课程'
         return
       }
@@ -388,11 +406,13 @@ export default defineComponent({
       isSubmittingLeave.value = true
       try {
         const request = await parentBusinessClient.submitLeaveRequest({
-          studentId: selectedStudentId.value,
+          studentId,
           scheduleId: firstScheduleId,
           reason: leaveReason.value,
           contactPhone: contactPhone.value,
         })
+
+        if (!isCurrentStudentAction(studentId, selectedStudentId.value)) return
 
         if (overview.value) {
           overview.value = {
@@ -400,10 +420,22 @@ export default defineComponent({
             leaveRequests: [...overview.value.leaveRequests, request],
           }
         }
+        leaveReason.value = ''
+        contactPhone.value = ''
+        selectedScheduleId.value = null
         message.value = `请假已提交，状态：${request.status}`
         await refreshCurrentOverview('请假已提交，审批状态已刷新')
       } catch (error) {
-        message.value = businessErrorMessage(error, '请假提交失败，请稍后重试')
+        const errorText = businessErrorMessage(
+          error,
+          '请假提交失败，请稍后重试',
+        )
+        if (
+          isCurrentStudentAction(studentId, selectedStudentId.value) ||
+          !isAuthenticated.value
+        ) {
+          message.value = errorText
+        }
       } finally {
         isSubmittingLeave.value = false
       }
@@ -414,11 +446,16 @@ export default defineComponent({
         return
       }
 
+      const studentId = selectedStudentId.value
+      if (studentId === null) return
+
       savingNotificationId.value = notification.id
       try {
         const updated = await parentBusinessClient.markNotificationRead(
           notification.id,
         )
+
+        if (!isCurrentStudentAction(studentId, selectedStudentId.value)) return
 
         if (overview.value) {
           overview.value = {
@@ -435,10 +472,16 @@ export default defineComponent({
         }
         message.value = '通知已查看并标记为已读'
       } catch (error) {
-        message.value = businessErrorMessage(
+        const errorText = businessErrorMessage(
           error,
           '通知查看失败，仍保持未读状态',
         )
+        if (
+          isCurrentStudentAction(studentId, selectedStudentId.value) ||
+          !isAuthenticated.value
+        ) {
+          message.value = errorText
+        }
       } finally {
         if (savingNotificationId.value === notification.id) {
           savingNotificationId.value = null
@@ -458,7 +501,14 @@ export default defineComponent({
         return
       }
 
-      if (status === 'DISPUTED' && !disputeReason.value.trim()) {
+      const studentId = selectedStudentId.value
+      if (studentId === null) return
+
+      const parentResponse = feedbackResponseDraft(
+        disputeReasons.value,
+        feedbackId,
+      ).trim()
+      if (status === 'DISPUTED' && !parentResponse) {
         message.value = '提出异议时必须填写异议内容'
         return
       }
@@ -467,8 +517,10 @@ export default defineComponent({
       try {
         const updated = await parentBusinessClient.respondToFeedback(feedbackId, {
           status,
-          parentResponse: status === 'DISPUTED' ? disputeReason.value : '',
+          parentResponse: status === 'DISPUTED' ? parentResponse : '',
         })
+
+        if (!isCurrentStudentAction(studentId, selectedStudentId.value)) return
 
         if (overview.value) {
           overview.value = {
@@ -478,12 +530,25 @@ export default defineComponent({
             ),
           }
         }
+        disputeReasons.value = clearFeedbackResponseDraft(
+          disputeReasons.value,
+          feedbackId,
+        )
         message.value =
           updated.status === 'CONFIRMED'
             ? '已确认反馈'
             : '已提交异议，等待教务处理'
       } catch (error) {
-        message.value = businessErrorMessage(error, '反馈处理失败，请稍后重试')
+        const errorText = businessErrorMessage(
+          error,
+          '反馈处理失败，请稍后重试',
+        )
+        if (
+          isCurrentStudentAction(studentId, selectedStudentId.value) ||
+          !isAuthenticated.value
+        ) {
+          message.value = errorText
+        }
       } finally {
         isSavingFeedback.value = false
       }
@@ -809,11 +874,21 @@ export default defineComponent({
                             '异议说明',
                             h('textarea', {
                               rows: 2,
-                              value: disputeReason.value,
+                              disabled: !canSubmitFeedbackResponse(
+                                item,
+                                isSavingFeedback.value,
+                              ),
+                              placeholder: '提出异议时填写具体说明',
+                              value: feedbackResponseDraft(
+                                disputeReasons.value,
+                                item.id,
+                              ),
                               onInput: (event: Event) => {
-                                disputeReason.value = (
-                                  event.target as HTMLTextAreaElement
-                                ).value
+                                disputeReasons.value = updateFeedbackResponseDraft(
+                                  disputeReasons.value,
+                                  item.id,
+                                  (event.target as HTMLTextAreaElement).value,
+                                )
                               },
                             }),
                           ]),

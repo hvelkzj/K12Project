@@ -12,14 +12,18 @@ import {
 import {
   canMarkNotificationRead,
   canSubmitFeedbackResponse,
+  clearFeedbackResponseDraft,
   countPendingParentFeedback,
   countUnreadNotifications,
+  feedbackResponseDraft,
+  isCurrentStudentAction,
   isLatestOverviewRequest,
   leaveStatusLabel,
   mergeParentNotices,
   overviewRetryStudentId,
   replaceReadNotification,
   replaceReadScheduleChangeNotice,
+  updateFeedbackResponseDraft,
 } from './parentViewHelpers'
 
 test('概览失败后重试当前绑定学生', () => {
@@ -73,10 +77,29 @@ test('通知读取和概览请求防止重复操作与旧响应回写', () => {
   assert.equal(isLatestOverviewRequest(2, 3), false)
 })
 
+test('学生写操作响应只回写发起操作的学生页面', () => {
+  assert.equal(isCurrentStudentAction(101, 101), true)
+  assert.equal(isCurrentStudentAction(101, 102), false)
+  assert.equal(isCurrentStudentAction(101, null), false)
+})
+
 test('反馈响应防止已处理或保存中的重复提交', () => {
   assert.equal(canSubmitFeedbackResponse(pendingFeedback, false), true)
   assert.equal(canSubmitFeedbackResponse(pendingFeedback, true), false)
   assert.equal(canSubmitFeedbackResponse(confirmedFeedback, false), false)
+})
+
+test('反馈异议草稿按反馈隔离且成功后只清除对应草稿', () => {
+  const firstDrafts = updateFeedbackResponseDraft({}, 5001, '核对课堂记录')
+  const twoDrafts = updateFeedbackResponseDraft(firstDrafts, 5002, '核对作业记录')
+
+  assert.equal(feedbackResponseDraft(twoDrafts, 5001), '核对课堂记录')
+  assert.equal(feedbackResponseDraft(twoDrafts, 5002), '核对作业记录')
+  assert.equal(feedbackResponseDraft(twoDrafts, 9999), '')
+
+  const remainingDrafts = clearFeedbackResponseDraft(twoDrafts, 5001)
+  assert.equal(feedbackResponseDraft(remainingDrafts, 5001), '')
+  assert.equal(feedbackResponseDraft(remainingDrafts, 5002), '核对作业记录')
 })
 
 test('请假三种状态显示为家长可读文案', () => {
