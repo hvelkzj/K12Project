@@ -2,7 +2,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Assignment, CourseSummary, FileSummary, Submission, UserSummary } from '@k12/shared'
 import { listAssignmentRows } from '../assignmentListService'
-import { getSubmissionHistory, selectDisplayedSubmission } from '../studentService'
+import {
+  getSubmissionHistory,
+  normalizeAttachmentMimeType,
+  selectDisplayedSubmission,
+} from '../studentService'
 import { getSubmissionStatusLabel, isAssignmentSubmissionClosed } from '../assignmentPresentation'
 import type { AssignmentListRow } from '../assignmentPresentation'
 import { assignmentDrafts } from '../assignmentDrafts'
@@ -92,7 +96,13 @@ function beginSubmission(): void {
 }
 function handleFileChange(event: Event): void {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
-  attachments.value = files.map((file, index) => ({ id: Date.now() + index, originalName: file.name, mimeType: file.type || 'application/octet-stream', byteSize: file.size, createdAt: new Date().toISOString() }))
+  attachments.value = files.map((file, index) => ({
+    id: Date.now() + index,
+    originalName: file.name,
+    mimeType: normalizeAttachmentMimeType(file.name, file.type),
+    byteSize: file.size,
+    createdAt: new Date().toISOString(),
+  }))
 }
 async function submit(): Promise<void> {
   if (!assignment.value || !canSubmit.value) { errorMessage.value = '该作业已截止，不能继续提交。'; return }

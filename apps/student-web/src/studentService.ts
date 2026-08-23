@@ -22,6 +22,41 @@ const allowedAttachmentTypes = new Set([
   'image/png',
 ])
 
+const attachmentMimeTypeByExtension: Readonly<Record<string, string>> = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+}
+
+export function normalizeAttachmentMimeType(
+  originalName: string,
+  browserMimeType: string,
+): string {
+  const normalizedBrowserType = browserMimeType.trim().toLowerCase()
+  const aliasedBrowserType =
+    normalizedBrowserType === 'image/jpg'
+      ? 'image/jpeg'
+      : normalizedBrowserType
+
+  if (allowedAttachmentTypes.has(aliasedBrowserType)) {
+    return aliasedBrowserType
+  }
+
+  if (
+    aliasedBrowserType &&
+    aliasedBrowserType !== 'application/octet-stream'
+  ) {
+    return aliasedBrowserType
+  }
+
+  const extensionIndex = originalName.lastIndexOf('.')
+  const extension =
+    extensionIndex >= 0 ? originalName.slice(extensionIndex).toLowerCase() : ''
+  return attachmentMimeTypeByExtension[extension] ?? 'application/octet-stream'
+}
+
 export function validateAttachments(attachments: FileSummary[]): void {
   for (const attachment of attachments) {
     if (!allowedAttachmentTypes.has(attachment.mimeType)) {

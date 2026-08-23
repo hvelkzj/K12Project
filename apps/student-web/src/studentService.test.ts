@@ -13,6 +13,7 @@ import {
   getSubmissionHistory,
   getSubmissionViewStatus,
   listCourseware,
+  normalizeAttachmentMimeType,
   selectDisplayedSubmission,
   validateSubmissionInput,
 } from './studentService'
@@ -267,6 +268,26 @@ test('恰好 10 MB 的附件可以通过校验', () => {
 
   assert.doesNotThrow(() =>
     validateSubmissionInput({ content: '', attachments: [boundaryAttachment] }),
+  )
+})
+
+test('浏览器未提供 MIME 时按允许的文件扩展名归一化', () => {
+  assert.equal(
+    normalizeAttachmentMimeType('homework.DOCX', ''),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  )
+  assert.equal(
+    normalizeAttachmentMimeType('photo.jpg', 'application/octet-stream'),
+    'image/jpeg',
+  )
+  assert.equal(normalizeAttachmentMimeType('photo.jpeg', 'image/jpg'), 'image/jpeg')
+  assert.equal(
+    normalizeAttachmentMimeType('script.exe', ''),
+    'application/octet-stream',
+  )
+  assert.equal(
+    normalizeAttachmentMimeType('fake.pdf', 'application/x-msdownload'),
+    'application/x-msdownload',
   )
 })
 

@@ -138,16 +138,18 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
         <button
           class="c-header-button c-icon-button"
           type="button"
-          aria-label="日历"
-          @click="emit('placeholder', '日历')"
+          aria-label="日历（暂未开放）"
+          title="日历暂未开放"
+          disabled
         >
           <span aria-hidden="true">□</span>
         </button>
         <button
           class="c-header-button c-icon-button"
           type="button"
-          aria-label="消息通知"
-          @click="emit('placeholder', '消息通知')"
+          aria-label="消息通知（暂未开放）"
+          title="消息通知暂未开放"
+          disabled
         >
           <span aria-hidden="true">♢</span>
         </button>
@@ -361,6 +363,11 @@ function assignmentAriaLabel(row: AssignmentListRow): string {
 .c-header-button:hover,
 .c-user-profile:hover {
   background: #eeeff8;
+}
+
+.c-header-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .c-dashboard-button {
