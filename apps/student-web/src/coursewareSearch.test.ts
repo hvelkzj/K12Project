@@ -61,3 +61,7 @@ test('英文标题搜索不区分大小写', () => {
 test('没有匹配结果时返回空数组', () => {
   assert.deepEqual(filterCoursewareByTitle(materials, '不存在的课件'), [])
 })
+
+test('空课件列表搜索返回空数组', () => {
+  assert.deepEqual(filterCoursewareByTitle([], '分数'), [])
+})

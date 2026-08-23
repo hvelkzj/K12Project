@@ -12,6 +12,7 @@ import {
   getLatestSubmission,
   getSubmissionHistory,
   getSubmissionViewStatus,
+  listCourseware,
   selectDisplayedSubmission,
   validateSubmissionInput,
 } from './studentService'
@@ -253,4 +254,56 @@ test('客户端校验失败时不调用接口', async () => {
     /不能同时为空/,
   )
   assert.equal(submitted.length, 0)
+})
+
+test('恰好 10 MB 的附件可以通过校验', () => {
+  const boundaryAttachment: FileSummary = {
+    id: 9003,
+    originalName: 'boundary.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 10 * 1024 * 1024,
+    createdAt: mockNow,
+  }
+
+  assert.doesNotThrow(() =>
+    validateSubmissionInput({ content: '', attachments: [boundaryAttachment] }),
+  )
+})
+
+test('提交历史即使输入乱序也按 attempt 升序返回', () => {
+  const overview = createStudentOverviewFixture()
+  const shuffled = {
+    ...overview,
+    submissions: [
+      submission(3003, { id: 4003, attempt: 2 }),
+      submission(3003, { id: 4002, attempt: 1 }),
+    ],
+  }
+
+  assert.deepEqual(
+    getSubmissionHistory(shuffled, 3003).map((item) => item.attempt),
+    [1, 2],
+  )
+})
+
+test('空概览派生空作业列表和空课件列表', () => {
+  const empty: StudentOverview = {
+    student: {
+      id: studentId,
+      displayName: '林晓雨',
+      classId: 101,
+      className: '六年级 1 班',
+      campusId: 1,
+      campusName: '滨江校区',
+    },
+    courses: [],
+    teachers: [],
+    courseware: [],
+    assignments: [],
+    submissions: [],
+  }
+
+  assert.deepEqual(listAssignmentRows(empty), [])
+  assert.deepEqual(listCourseware(empty), [])
+  assert.equal(calculateGlobalProgress([]), 0)
 })

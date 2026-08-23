@@ -161,6 +161,39 @@ test('403、404、409、422 显示服务端信息且不清除 Token', async () =
   }
 })
 
+test('服务端 500 返回非 JSON 时使用稳定回退且不清除 Token', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(new Response('Internal Server Error', { status: 500 }))
+  const auth = createFakeAuth('token-101')
+  const client = createStudentBusinessClient({ fetchImpl, authClient: auth })
+
+  await assert.rejects(
+    client.getOverview(),
+    (error: unknown) =>
+      error instanceof StudentBusinessError &&
+      error.status === 500 &&
+      error.code === 'HTTP_ERROR',
+  )
+  assert.equal(auth.clearedCount, 0)
+})
+
+test('服务端 500 返回 JSON 时显示服务端消息', async () => {
+  const { fetchImpl } = createFakeFetch(() =>
+    jsonResponse(500, { code: 'INTERNAL_ERROR', message: '服务器开小差了' }),
+  )
+  const auth = createFakeAuth('token-101')
+  const client = createStudentBusinessClient({ fetchImpl, authClient: auth })
+
+  await assert.rejects(
+    client.getOverview(),
+    (error: unknown) =>
+      error instanceof StudentBusinessError &&
+      error.status === 500 &&
+      error.message === '服务器开小差了',
+  )
+  assert.equal(auth.clearedCount, 0)
+})
+
 test('重复提交与截止后提交的冲突消息来自服务端', async () => {
   const conflictMessage = '作业已截止，不能继续提交'
   const { fetchImpl } = createFakeFetch(() =>
