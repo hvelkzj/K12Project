@@ -1,4 +1,8 @@
-import type { LeaveRequest, UserAccountSummary } from '@k12/shared'
+import type {
+  FeedbackWorkOrder,
+  LeaveRequest,
+  UserAccountSummary,
+} from '@k12/shared'
 
 export interface ManagementActionState {
   pendingKey: string | null
@@ -45,6 +49,12 @@ export function canReviewLeaveRequest(
   status: LeaveRequest['status'],
 ): boolean {
   return status === 'PENDING'
+}
+
+export function canCloseWorkOrder(
+  status: FeedbackWorkOrder['status'],
+): boolean {
+  return status === 'PROCESSING'
 }
 
 export function isScheduleIdentityLocked(

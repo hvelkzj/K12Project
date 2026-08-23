@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  canCloseWorkOrder,
   canDisableCurrentAdmin,
   canManageUser,
   canReviewLeaveRequest,
@@ -144,4 +145,10 @@ test('拒绝请假必须填写原因且已审批请假不能重复处理', () =>
 
   assert.equal(validateRequiredText('   ', '拒绝请假时必须填写原因'), '拒绝请假时必须填写原因')
   assert.equal(validateRequiredText('孩子确实生病', '拒绝请假时必须填写原因'), null)
+})
+
+test('只有处理中工单可以关闭', () => {
+  assert.equal(canCloseWorkOrder('OPEN'), false)
+  assert.equal(canCloseWorkOrder('PROCESSING'), true)
+  assert.equal(canCloseWorkOrder('CLOSED'), false)
 })

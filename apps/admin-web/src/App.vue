@@ -38,6 +38,7 @@ import {
   countPendingScheduleChanges,
 } from './adminStatistics'
 import {
+  canCloseWorkOrder,
   canDisableCurrentAdmin,
   canManageUser,
   canReviewLeaveRequest,
@@ -777,6 +778,17 @@ async function closeSelectedWorkOrder() {
   const selected = selectedWorkOrder.value
   if (!selected) {
     showError(new Error('请先查看一条反馈工单'))
+    return
+  }
+
+  if (!canCloseWorkOrder(selected.status)) {
+    showError(
+      new Error(
+        selected.status === 'OPEN'
+          ? '请先开始处理工单'
+          : '该工单已经关闭',
+      ),
+    )
     return
   }
 
@@ -1845,7 +1857,13 @@ async function toggleUserActive(user: UserAccount) {
               >
                 标记处理中
               </button>
-              <button class="primary" type="button" @click="closeSelectedWorkOrder">
+              <button
+                v-if="canCloseWorkOrder(selectedWorkOrder.status)"
+                class="primary"
+                type="button"
+                :disabled="managementActionState.pendingKey !== null"
+                @click="closeSelectedWorkOrder"
+              >
                 保存结果并关闭
               </button>
             </div>
