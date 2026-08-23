@@ -30,3 +30,10 @@
 - 学生端 typecheck / build：通过。
 - 根目录 `npm run check`：通过（全部 workspace 的 lint、typecheck、test、build）。
 - 未修改 API、公共类型或其他前端。
+
+## PR #24 评审修复
+
+- 同一 attempt 的最新 overview 批改记录现在会覆盖提交时的本地 `SUBMITTED` 快照。
+- 单次提交被批改后，结果页直接显示得分，不再要求存在两次历史记录。
+- 新增展示记录选择测试，覆盖新 attempt 和后续批改。
+- 修复后学生端 59/59 项测试通过。

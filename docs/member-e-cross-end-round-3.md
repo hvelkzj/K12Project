@@ -64,3 +64,10 @@
 
 - 未修改 API、公共类型或其他前端。
 - 仅修改 `apps/admin-web` 和本人交付记录。
+
+## PR #23 评审修复
+
+- 删除未被页面调用的重复 `countTodaySchedules` 实现及其测试。
+- 页面继续使用已接入且覆盖 Asia/Shanghai 边界的 `countSchedulesForBusinessDate`。
+- 其余校区统计和并发状态锁保持不变。
+- 修复后后台 48/48 项测试通过。
