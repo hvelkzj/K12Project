@@ -1,69 +1,49 @@
 # K12 教育培训综合管理平台
 
-五人协作完成的课程项目，包含家长、学生、教师/班主任、教务和系统后台。
+五人协作完成的课程项目。项目本体包含家长端、学生端、教师/班主任端、教务/系统后台和统一 API。
 
-## 核心功能
+## 完成状态
 
-- 排课与调课：教师申请，教务审批并安排代课，家长收到通知。
-- 家校反馈：教师填写反馈，家长确认或提出异议，教务处理。
-- 作业：教师发布和批改，学生提交并查看结果。
-- 权限：不同角色只能查看和操作自己范围内的数据。
-
-## 文档
-
-- [项目分工与四周计划](docs/project-plan.md)
-- [第一周执行计划](docs/week-1-execution-plan.md)
-- [参考产品](docs/reference-products.md)
-- [业务规则](docs/business-rules.md)
-- [7/28 字段汇总](docs/a-field-summary-2026-07-28.md)
-- [ABCDE 字段联合决议](docs/abcde-field-decisions-2026-08-07.md)
-- [公共字段契约](docs/api-field-contract.md)
-- [公共数据模型](docs/data-model.md)
-- [7/29 公共类型与登录交付](docs/a-7-29-public-types-and-auth.md)
-- [模块页面总清单](docs/module-page-inventory.md)
-- [实验报告材料](docs/report-evidence.md)
-- [协作规则](AGENTS.md)
-
-## 项目目录
-
-| 目录 | 负责人 | 本地地址 |
+| 模块 | 位置 | 状态 |
 |---|---|---|
-| `packages/shared` | A | 公共类型、状态和测试账号，不单独启动 |
-| `apps/api` | A | `http://127.0.0.1:3000` |
-| `apps/parent-web` | B | `http://127.0.0.1:5173` |
-| `apps/student-web` | C | `http://127.0.0.1:5174` |
-| `apps/teacher-web` | D | `http://127.0.0.1:5175` |
-| `apps/admin-web` | E | `http://127.0.0.1:5176` |
+| 公共类型与状态 | `packages/shared` | 已完成 |
+| 认证、业务 API 与内存数据仓库 | `apps/api` | 已完成 |
+| 家长端 | `apps/parent-web` | 7/7 页面已接入 API |
+| 学生端 | `apps/student-web` | 7/7 页面已接入 API |
+| 教师/班主任端 | `apps/teacher-web` | 7/7 页面已接入 API |
+| 教务/系统后台 | `apps/admin-web` | 8/8 页面已接入 API |
 
-教务后台和系统后台共用 `admin-web`，登录后再按角色显示功能。
+已连通作业发布、提交、订正和批改；调课审批、代课和家长通知；教师反馈、家长异议和工单处理；请假审批与签到；排课维护和账号启停。
 
-## 本地启动
+## 环境
 
-支持 macOS 和 Windows。两种系统都需要 Node.js 22.12 或更高版本、npm 10 或更高版本。
+- Node.js 22.12 或更高版本。
+- npm 10 或更高版本。
+- macOS 终端和 Windows PowerShell 使用相同的 npm 命令。
+
+## 安装、检查和启动
 
 ```bash
 node -v
 npm -v
 npm ci
+npm run check
 npm run dev
 ```
 
-`npm run dev` 会同时启动后端和四个前端。后端健康检查地址为
-`http://127.0.0.1:3000/health`。
+`npm run dev` 同时启动 API 和四个前端：
 
-认证接口：
+| 服务 | 地址 |
+|---|---|
+| API | `http://127.0.0.1:3000` |
+| 家长端 | `http://127.0.0.1:5173` |
+| 学生端 | `http://127.0.0.1:5174` |
+| 教师端 | `http://127.0.0.1:5175` |
+| 后台 | `http://127.0.0.1:5176` |
 
-- `POST /auth/login`
-- `GET /auth/me`
-- `POST /auth/logout`
+健康检查：`GET http://127.0.0.1:3000/health`。
 
-六角色测试账号和请求格式见 [7/29 公共类型与登录交付](docs/a-7-29-public-types-and-auth.md)。
-
-四个前端统一从 `VITE_API_BASE_URL` 读取 API 地址，默认值为
-`http://127.0.0.1:3000`。登录令牌保存在 `sessionStorage` 的
-`k12AccessToken` 中；收到 401 或退出时必须清除。
-
-只启动一个项目：
+只启动一个工作区：
 
 ```bash
 npm run dev:api
@@ -73,8 +53,22 @@ npm run dev:teacher
 npm run dev:admin
 ```
 
-需要修改端口或 API 地址时，先复制对应项目中的 `.env.example` 为
-`.env`，再修改本地文件。不要提交 `.env`。
+## 本地测试账号
+
+六个账号的密码均为 `K12Demo123!`。账号只用于本地课程项目，认证、会话恢复和退出均调用真实 API。
+
+| 角色 | 用户名 |
+|---|---|
+| 家长 | `parent_201` |
+| 学生 | `student_101` |
+| 教师 | `teacher_301` |
+| 班主任 | `teacher_302` |
+| 教务 | `academic_901` |
+| 系统管理员 | `system_999` |
+
+## 环境变量
+
+默认配置可直接运行。如需修改端口或 API 地址，先复制对应工作区的 `.env.example`。
 
 macOS：
 
@@ -88,30 +82,21 @@ Windows PowerShell：
 Copy-Item apps/parent-web/.env.example apps/parent-web/.env
 ```
 
-其他模块只需替换路径中的模块名。默认配置可直接运行时，不需要创建 `.env`。
+其他前端只需替换路径中的工作区名。不要提交 `.env`。
 
-## 提交前检查
+## 数据说明
 
-```bash
-npm run check
-```
+- 当前运行时使用可注入的进程内数据仓库和内存会话。
+- API 重启后恢复初始数据，已登录会话失效。
+- `apps/api/db/migrations/001_initial.sql` 保留 PostgreSQL 结构，不是当前运行时依赖。
+- 附件只保存元数据，不上传真实文件。
 
-该命令在 macOS 终端和 Windows PowerShell 中相同，会运行代码规范、类型检查、测试和生产构建。
+## 有效文档
 
-依赖发生变化时运行 `npm install` 并提交 `package-lock.json`；仅同步别人已提交的依赖时运行 `npm ci`。
-
-## 数据库结构
-
-7/28 初始迁移位于 `apps/api/db/migrations/001_initial.sql`。安装 PostgreSQL 客户端后，macOS 终端和 Windows PowerShell 使用相同命令创建本地结构：
-
-```bash
-psql -d k12 -f apps/api/db/migrations/001_initial.sql
-```
-
-不连接数据库也可以运行迁移结构测试：
-
-```bash
-npm run test --workspace @k12/api
-```
-
-初始迁移不包含真实账号或个人信息。
+- [项目分工与完成状态](docs/project-plan.md)
+- [模块页面总清单](docs/module-page-inventory.md)
+- [核心业务规则](docs/business-rules.md)
+- [公共字段与 API 契约](docs/api-field-contract.md)
+- [公共数据模型](docs/data-model.md)
+- [最终 A 交付记录](docs/member-a-final-integration-round-4.md)
+- [AI 与 Git 协作规范](AGENTS.md)
