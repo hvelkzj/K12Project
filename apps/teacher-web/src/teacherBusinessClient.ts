@@ -164,9 +164,9 @@ export function createTeacherBusinessClient(
           Authorization: `Bearer ${accessToken}`,
         },
       })
-    } catch (error) {
+    } catch {
       throw new TeacherBusinessError(
-        error instanceof Error ? error.message : '网络请求失败',
+        '网络请求失败，请稍后重试',
         0,
         'NETWORK_ERROR',
       )
