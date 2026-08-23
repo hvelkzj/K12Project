@@ -64,16 +64,16 @@ npm run dev:admin
 
 ## 本地测试账号
 
-六个账号的密码均为 `K12Demo123!`。账号只用于本地课程项目，认证、会话恢复和退出均调用真实 API。
+十三个账号的密码均为 `K12Demo123!`。账号只用于本地课程项目，认证、会话恢复和退出均调用真实 API。完整说明见 [本地测试账号清单](docs/demo-accounts.md)。
 
-| 角色 | 用户名 |
-|---|---|
-| 家长 | `parent_201` |
-| 学生 | `student_101` |
-| 教师 | `teacher_301` |
-| 班主任 | `teacher_302` |
-| 教务 | `academic_901` |
-| 系统管理员 | `system_999` |
+| 角色 | 滨江校区 | 城北校区 |
+|---|---|---|
+| 家长 | `parent_201` | `parent_202` |
+| 学生 | `student_101`、`student_102` | `student_103` |
+| 任课教师 | `teacher_301` | `teacher_401` |
+| 班主任 | `teacher_302`、`teacher_303` | `teacher_402` |
+| 教务 | `academic_901` | `academic_902` |
+| 系统管理员 | `system_999` | 全校区访问 |
 
 ## 注册账号
 
@@ -119,6 +119,8 @@ Copy-Item apps/parent-web/.env.example apps/parent-web/.env
 - [核心业务规则](docs/business-rules.md)
 - [公共字段与 API 契约](docs/api-field-contract.md)
 - [公共数据模型](docs/data-model.md)
+- [本地测试账号清单](docs/demo-accounts.md)
+- [真实业务验收记录](docs/business-validation-2026-08-24.md)
 - [最终 A 交付记录](docs/member-a-final-integration-round-4.md)
 - [A 统一入口与注册交付](docs/member-a-portal-registration.md)
 - [AI 与 Git 协作规范](AGENTS.md)
