@@ -18,6 +18,8 @@
 
 ![统一入口首屏](docs/screenshots/portal-home.jpg)
 
+![学生登录页返回统一首页](docs/screenshots/login-return-home.jpg)
+
 ## 环境
 
 - Node.js 22.12 或更高版本。
@@ -44,6 +46,8 @@ npm run dev
 | 学生端 | `http://127.0.0.1:5174` |
 | 教师端 | `http://127.0.0.1:5175` |
 | 后台 | `http://127.0.0.1:5176` |
+
+四个业务端的登录页都提供“返回统一首页”入口。部署地址变化时，可在对应前端的 `.env` 中通过 `VITE_PORTAL_URL` 配置统一入口地址。
 
 健康检查：`GET http://127.0.0.1:3000/health`。
 
