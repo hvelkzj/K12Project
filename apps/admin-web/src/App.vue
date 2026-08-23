@@ -33,6 +33,11 @@ import {
   countSchedulesForBusinessDate,
 } from './adminViewHelpers'
 import {
+  countOpenWorkOrders,
+  countPendingLeaveRequests,
+  countPendingScheduleChanges,
+} from './adminStatistics'
+import {
   canDisableCurrentAdmin,
   canManageUser,
   canReviewLeaveRequest,
@@ -257,12 +262,16 @@ const selectedWorkOrder = computed(() =>
   ),
 )
 
-const visibleLeaveRequests = computed(() => {
-  const scoped = currentRole.value === 'SYSTEM_ADMIN'
+const scopedLeaveRequests = computed(() =>
+  currentRole.value === 'SYSTEM_ADMIN'
     ? leaveRequests.value
     : leaveRequests.value.filter(
         (leave) => scheduleCampusForLeave(leave) === homeCampusId.value,
-      )
+      ),
+)
+
+const visibleLeaveRequests = computed(() => {
+  const scoped = scopedLeaveRequests.value
 
   if (leaveStatusFilter.value === 'PENDING') {
     return scoped.filter((leave) => leave.status === 'PENDING')
@@ -285,10 +294,14 @@ const dashboardStats = computed(() => [
   },
   {
     label: '待审批',
-    value: visibleScheduleChanges.value.filter(
-      (change) => change.status === 'PENDING',
-    ).length,
-    helper: '需要教务处理',
+    value:
+      visibleScheduleChanges.value.filter(
+        (change) => change.status === 'PENDING',
+      ).length +
+      scopedLeaveRequests.value.filter(
+        (leave) => leave.status === 'PENDING',
+      ).length,
+    helper: '调课与请假',
   },
   {
     label: '待安排代课',
@@ -311,12 +324,16 @@ const boardMetrics = computed(() =>
       (item) => item.campusId === campus.id,
     ).length,
     users: users.value.filter((item) => item.campusId === campus.id).length,
-    pendingApprovals: scheduleChanges.value.filter(
-      (item) => item.campusId === campus.id && item.status === 'PENDING',
-    ).length,
-    openTickets: workOrders.value.filter(
-      (item) => item.campusId === campus.id && item.status !== 'CLOSED',
-    ).length,
+    pendingApprovals: countPendingScheduleChanges(
+      scheduleChanges.value,
+      campus.id,
+    ),
+    pendingLeaveRequests: countPendingLeaveRequests(
+      leaveRequests.value,
+      campus.id,
+      scheduleCampusForLeave,
+    ),
+    openTickets: countOpenWorkOrders(workOrders.value, campus.id),
   })),
 )
 
@@ -571,11 +588,17 @@ async function submitReview(decision: 'APPROVED' | 'REJECTED') {
   }
 
   try {
-    const reviewed = await adminApiClient.reviewScheduleChange({
-      changeId: selected.id,
-      decision,
-      decisionNote: decisionNote.value,
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `review-${selected.id}`,
+      () => adminApiClient.reviewScheduleChange({
+        changeId: selected.id,
+        decision,
+        decisionNote: decisionNote.value,
+      }),
+    )
+    if (!action.started) return
+    const reviewed = action.value
     const index = scheduleChanges.value.findIndex((item) => item.id === selected.id)
     scheduleChanges.value[index] = reviewed
     decisionNote.value = ''
@@ -669,11 +692,17 @@ async function submitSubstitute() {
   }
 
   try {
-    const assigned = await adminApiClient.assignSubstitute({
-      changeId: selected.id,
-      substituteTeacherId: selectedTeacher.id,
-      substituteNote: substituteNote.value,
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `substitute-${selected.id}`,
+      () => adminApiClient.assignSubstitute({
+        changeId: selected.id,
+        substituteTeacherId: selectedTeacher.id,
+        substituteNote: substituteNote.value,
+      }),
+    )
+    if (!action.started) return
+    const assigned = action.value
     const index = scheduleChanges.value.findIndex((item) => item.id === selected.id)
     scheduleChanges.value[index] = assigned
 
@@ -713,10 +742,16 @@ async function beginSelectedWorkOrder() {
   if (!selected) return
 
   try {
-    const updated = await adminApiClient.updateWorkOrder({
-      workOrderId: selected.id,
-      action: 'START',
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `workorder-${selected.id}`,
+      () => adminApiClient.updateWorkOrder({
+        workOrderId: selected.id,
+        action: 'START',
+      }),
+    )
+    if (!action.started) return
+    const updated = action.value
     const index = workOrders.value.findIndex((item) => item.id === selected.id)
     workOrders.value[index] = updated
     showNotice('工单已进入处理中状态')
@@ -738,11 +773,17 @@ async function closeSelectedWorkOrder() {
   }
 
   try {
-    const closed = await adminApiClient.updateWorkOrder({
-      workOrderId: selected.id,
-      action: 'CLOSE',
-      result: workOrderResult.value,
-    })
+    const action = await runManagementAction(
+      managementActionState,
+      `workorder-${selected.id}`,
+      () => adminApiClient.updateWorkOrder({
+        workOrderId: selected.id,
+        action: 'CLOSE',
+        result: workOrderResult.value,
+      }),
+    )
+    if (!action.started) return
+    const closed = action.value
     const index = workOrders.value.findIndex((item) => item.id === selected.id)
     workOrders.value[index] = closed
     workOrderResult.value = ''
@@ -1834,6 +1875,9 @@ async function toggleUserActive(user: UserAccount) {
             <span>调课申请</span><strong>{{ visibleScheduleChanges.length }}</strong><small>含历史记录</small>
           </article>
           <article>
+            <span>请假申请</span><strong>{{ visibleLeaveRequests.length }}</strong><small>按当前过滤</small>
+          </article>
+          <article>
             <span>反馈工单</span><strong>{{ visibleWorkOrders.length }}</strong><small>含已关闭工单</small>
           </article>
         </section>
@@ -1859,7 +1903,8 @@ async function toggleUserActive(user: UserAccount) {
               <div class="metric-row"><span>用户</span><b>{{ metric.users }}</b></div>
               <div class="metric-bar blue"><i :style="{ width: `${Math.min(metric.users * 13, 100)}%` }"></i></div>
               <dl class="mini-metrics">
-                <div><dt>待审批</dt><dd>{{ metric.pendingApprovals }}</dd></div>
+                <div><dt>调课待审</dt><dd>{{ metric.pendingApprovals }}</dd></div>
+                <div><dt>请假待审</dt><dd>{{ metric.pendingLeaveRequests }}</dd></div>
                 <div><dt>未关闭工单</dt><dd>{{ metric.openTickets }}</dd></div>
               </dl>
             </article>
