@@ -5,7 +5,6 @@ import {
   countOpenWorkOrders,
   countPendingLeaveRequests,
   countPendingScheduleChanges,
-  countTodaySchedules,
 } from './adminStatistics'
 import type {
   FeedbackWorkOrder,
@@ -127,15 +126,4 @@ test('待审批请假按校区统计', () => {
 test('未关闭工单按校区统计', () => {
   assert.equal(countOpenWorkOrders(workOrders, 1), 1)
   assert.equal(countOpenWorkOrders(workOrders, 2), 0)
-})
-
-test('今日排课按业务日期统计', () => {
-  const schedules = [
-    { lessonDate: '2026-08-22' },
-    { lessonDate: '2026-08-22' },
-    { lessonDate: '2026-08-23' },
-  ]
-
-  assert.equal(countTodaySchedules(schedules, '2026-08-22'), 2)
-  assert.equal(countTodaySchedules(schedules, '2026-08-24'), 0)
 })

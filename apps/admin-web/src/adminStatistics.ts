@@ -32,10 +32,3 @@ export function countOpenWorkOrders(
       workOrder.campusId === campusId && workOrder.status !== 'CLOSED',
   ).length
 }
-
-export function countTodaySchedules(
-  schedules: ReadonlyArray<{ lessonDate: string }>,
-  dateKey: string,
-): number {
-  return schedules.filter((schedule) => schedule.lessonDate === dateKey).length
-}
