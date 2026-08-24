@@ -6,12 +6,12 @@
 
 | 成员 | 模块 | 页面 | 业务数据 | 工作区测试 |
 |---|---|---:|---|---:|
-| A | 统一入口、公共层、认证、API、集成 | 1 | 真实 API、内存仓库 | portal 7，shared 15，API 70 |
+| A | 统一入口、公共层、认证、API、集成 | 1 | 真实 API、内存仓库 | portal 7，shared 16，API 70 |
 | B | 家长端和通知 | 7/7 | 真实 API | 39 |
 | C | 学生端和作业 | 7/7 | 真实 API | 69 |
 | D | 教师/班主任端 | 7/7 | 真实 API | 52 |
 | E | 教务/系统后台 | 8/8 | 真实 API | 57 |
-| 合计 | 统一入口和四个业务端 | 30/30 | 统一 API | 309 |
+| 合计 | 统一入口和四个业务端 | 30/30 | 统一 API | 310 |
 
 ## A：统一入口与注册
 
@@ -86,9 +86,10 @@
 ## 最终验证
 
 - macOS `npm ci`：通过。
-- macOS `npm run check`：通过，全仓 309 项测试通过、0 失败、0 跳过。
+- macOS `npm run check`：通过，全仓 310 项测试通过、0 失败、0 跳过。
 - 根目录 `npm run dev`：API、统一入口和四个业务前端全部启动。
 - 真实 HTTP 十三个本地账号登录、当前用户、退出和旧令牌失效：通过。
 - 七条跨端业务流程：通过。
 - 真实 HTTP 注册、登录和学生概览：`201`、`200`、`200`。
-- Windows PowerShell：待一名 Windows 成员补跑 `npm ci`、`npm run check` 和 `npm run dev`。
+- Windows PowerShell：最新 `develop` 基线的 `npm ci`、`npm run check`、`npm run dev`、六服务 HTTP 和十三账号会话验证通过；当时全仓 300 项测试通过。
+- 本轮附件功能把测试增加到 310 项，合并前仍需在 Windows PowerShell 重跑上述命令。

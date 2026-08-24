@@ -147,6 +147,21 @@ test('根目录五个前端启动命令统一监听回环地址', () => {
   )
 })
 
+test('统一启动通过 Node 调用当前 npm CLI 且不启用 shell', () => {
+  const unifiedDevScript = readFileSync(
+    new URL('scripts/dev.mjs', repositoryRoot),
+    'utf8',
+  )
+
+  assert.match(
+    unifiedDevScript,
+    /const npmCli = process\.env\.npm_execpath/,
+  )
+  assert.match(unifiedDevScript, /Run the project with npm run dev/)
+  assert.match(unifiedDevScript, /spawn\(process\.execPath, \[npmCli, \.\.\.args\],/)
+  assert.doesNotMatch(unifiedDevScript, /\bshell\s*:/)
+})
+
 test('公共 npm 脚本不使用单系统命令或本机绝对路径', () => {
   const manifests = [
     readPackageManifest('.'),

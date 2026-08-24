@@ -53,7 +53,7 @@
 - 真实 HTTP：十三个本地账号登录、会话恢复、退出和旧令牌失效通过。
 - 四个前端运行时业务数据均来自 API，测试夹具不进入运行时数据流。
 - 未发现未解决的 P0 或 P1 问题。
-- Windows：仍需一名成员在 Windows PowerShell 运行 `npm ci`、`npm run check` 和 `npm run dev` 后回填结果。
+- Windows：最新 `develop` 基线的 `npm ci`、`npm run check`、根目录 `npm run dev`、六服务 HTTP、十三账号会话和注册流程验证通过；见 [Windows 项目测试记录](windows-test-2026-08-24.md)。本轮附件功能合并前仍需重跑 310 项检查。
 
 ## 历史归档
 
