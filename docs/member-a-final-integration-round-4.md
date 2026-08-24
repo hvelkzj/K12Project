@@ -50,31 +50,31 @@ npm run dev
 - `127.0.0.1:3000`、`5173`、`5174`、`5175`、`5176` 均返回 HTTP 200。
 - 六角色实际登录和会话恢复返回 200，退出返回 204，退出后旧令牌返回 401。
 
-## Windows PowerShell 待复核
+## Windows PowerShell 验证
+
+复核日期：2026-08-24。环境：Windows 11 专业版、PowerShell 7.6.4、Node.js 24.17.0、npm 11.8.0。
 
 ```text
 npm ci
 npm run check
 npm run dev
+npm audit
 ```
 
-Windows 成员需确认：
-
-1. 五个服务均成功启动。
-2. `http://127.0.0.1:3000/health` 返回 200。
-3. 四个前端均可通过 `127.0.0.1` 地址打开。
-4. PowerShell 停止根启动后没有残留的 Node.js 服务。
-
-Windows 复核未完成前，不将该项标记为通过。
+- `npm ci`：通过，按根锁文件完成干净安装。
+- `npm run check`：通过，全仓 271 项测试通过、0 失败、0 跳过，lint、类型检查和五个工作区构建通过。
+- 工作区测试：shared 10、API 51、家长端 38、学生端 67、教师端 48、后台 57。
+- 根目录启动：API 和四个前端均启动，`3000`、`5173`、`5174`、`5175`、`5176` 均返回 HTTP 200。
+- 六角色实际登录返回 200 且角色匹配，当前用户返回 200，退出返回 204，退出后旧令牌返回 401。
+- PowerShell 停止根启动后，五个端口均已释放。
+- `npm audit` 和 `npm audit --omit=dev`：均为 0 漏洞。
+- Node.js 24 发现的 `DEP0190` 启动警告已修复，统一启动不再启用 shell。
+- 完整过程见 [Windows 项目测试记录](windows-test-2026-08-24.md)。
 
 ## 公共影响
 
-- 修改根目录启动参数和统一启动脚本。
-- 未新增业务接口、公共字段、角色、状态或依赖。
+- `scripts/dev.mjs` 改为通过当前 Node.js 进程调用 npm CLI，保留跨平台启动。
+- `packages/shared/test/frontendIntegration.test.ts` 增加无 shell 启动回归测试。
+- `package-lock.json` 仅更新 4 个受安全公告影响的间接依赖补丁版本。
+- 未新增业务接口、公共字段、角色、状态或直接依赖。
 - 未修改 B、C、D、E 页面代码。
-- 未修改根锁文件。
-
-## 需要配合
-
-- 一名 Windows 成员完成上述 PowerShell 复核并把结果回复到 A 的最终 PR。
-- Windows 通过后再合并 A 的最终 PR 到 `develop`。

@@ -123,4 +123,5 @@ Copy-Item apps/parent-web/.env.example apps/parent-web/.env
 - [真实业务验收记录](docs/business-validation-2026-08-24.md)
 - [最终 A 交付记录](docs/member-a-final-integration-round-4.md)
 - [A 统一入口与注册交付](docs/member-a-portal-registration.md)
+- [Windows 项目测试记录](docs/windows-test-2026-08-24.md)
 - [AI 与 Git 协作规范](AGENTS.md)

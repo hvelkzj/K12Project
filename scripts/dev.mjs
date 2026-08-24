@@ -8,6 +8,11 @@ const workspaces = [
   '@k12/teacher-web',
   '@k12/admin-web',
 ]
+const npmCli = process.env.npm_execpath
+
+if (!npmCli) {
+  throw new Error('Run the project with npm run dev')
+}
 
 const children = workspaces.map((workspace) => {
   const args = ['run', 'dev', '--workspace', workspace]
@@ -15,9 +20,8 @@ const children = workspaces.map((workspace) => {
     args.push('--', '--host', '127.0.0.1')
   }
 
-  const child = spawn('npm', args, {
+  const child = spawn(process.execPath, [npmCli, ...args], {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
   })
 
   child.on('exit', (code) => {
