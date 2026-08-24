@@ -261,6 +261,21 @@ td select { min-width: 110px; }
   font-weight: 700;
 }
 .auth-form button { width: 100%; }
+.portal-return-link {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  border: 1px solid #dce6e0;
+  border-radius: 9px;
+  color: #276458;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.portal-return-link:hover { border-color: #358373; background: #f2f8f5; }
 .auth-message {
   margin: 0;
   padding: 11px 13px;

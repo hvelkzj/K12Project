@@ -75,6 +75,8 @@ const username = ref('')
 const password = ref('')
 const authMessage = ref('')
 const notice = ref('')
+const portalUrl =
+  import.meta.env.VITE_PORTAL_URL ?? 'http://127.0.0.1:5172'
 const selectedScheduleId = ref<number | null>(null)
 
 const attendanceDrafts = ref<AttendanceDraft[]>([])
@@ -478,7 +480,7 @@ onMounted(async () => {
 
   <main v-else-if="!currentUser" class="auth-page">
     <section class="auth-card">
-      <p class="eyebrow">真实认证</p>
+      <p class="eyebrow">教师工作空间</p>
       <h1>K12 教师登录</h1>
       <p class="muted">请使用任课教师或班主任账号登录。</p>
       <form class="auth-form" @submit.prevent="login">
@@ -487,6 +489,7 @@ onMounted(async () => {
         <p v-if="authMessage" class="auth-message" role="status">{{ authMessage }}</p>
         <button class="primary" type="submit" :disabled="isAuthenticating">{{ isAuthenticating ? '登录中…' : '登录' }}</button>
       </form>
+      <a class="portal-return-link" :href="portalUrl">← 返回统一首页</a>
     </section>
   </main>
 

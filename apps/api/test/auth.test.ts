@@ -45,7 +45,7 @@ async function login(
   return parseJsonBody<LoginResponse>(response)
 }
 
-test('六种角色都可以使用统一 Mock 账号登录', async () => {
+test('全部本地账号均可登录并覆盖六种角色', async () => {
   const { handler } = setup()
 
   for (const account of MOCK_ACCOUNTS) {

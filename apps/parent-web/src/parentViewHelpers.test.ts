@@ -17,6 +17,7 @@ import {
   countUnreadNotifications,
   feedbackResponseDraft,
   isCurrentStudentAction,
+  isLeaveEligibleSchedule,
   isLatestOverviewRequest,
   leaveStatusLabel,
   mergeParentNotices,
@@ -106,6 +107,39 @@ test('请假三种状态显示为家长可读文案', () => {
   assert.equal(leaveStatusLabel(leaveRequest.status), '待审批')
   assert.equal(leaveStatusLabel('APPROVED'), '已批准')
   assert.equal(leaveStatusLabel('REJECTED'), '已拒绝')
+})
+
+test('请假课程只包含尚未结束的正常或已调课课次', () => {
+  const baseSchedule = {
+    id: 1001,
+    campusId: 1,
+    classId: 101,
+    courseId: 11,
+    teacherId: 301,
+    lessonDate: '2026-08-25',
+    startTime: '09:00:00',
+    endTime: '10:30:00',
+    room: 'A-302',
+    status: 'SCHEDULED' as const,
+  }
+  const now = Date.parse('2026-08-24T10:00:00+08:00')
+
+  assert.equal(isLeaveEligibleSchedule(baseSchedule, now), true)
+  assert.equal(
+    isLeaveEligibleSchedule({ ...baseSchedule, status: 'CHANGED' }, now),
+    true,
+  )
+  assert.equal(
+    isLeaveEligibleSchedule({ ...baseSchedule, status: 'COMPLETED' }, now),
+    false,
+  )
+  assert.equal(
+    isLeaveEligibleSchedule(
+      { ...baseSchedule, lessonDate: '2026-08-23' },
+      now,
+    ),
+    false,
+  )
 })
 
 test('通知已读只替换匹配的普通通知', () => {

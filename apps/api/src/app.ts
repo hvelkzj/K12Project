@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {
   CurrentUserResponse,
   LoginRequest,
+  RegisterResponse,
 } from '@k12/shared'
 
 import { createAuthService } from './authService.js'
@@ -25,6 +26,7 @@ import {
   sendNoContent,
   setCorsHeaders,
 } from './http.js'
+import { parseRegisterRequest } from './registration.js'
 
 type RequestHandler = (
   request: IncomingMessage,
@@ -87,6 +89,7 @@ export function createRequestHandler(
       const path = requestPath(request)
       const knownPath =
         path === '/health' ||
+        path === '/auth/register' ||
         path === '/auth/login' ||
         path === '/auth/me' ||
         path === '/auth/logout' ||
@@ -161,6 +164,47 @@ export function createRequestHandler(
         }
 
         sendJson(response, 200, login)
+        return
+      }
+
+      if (path === '/auth/register') {
+        if (method !== 'POST') {
+          methodNotAllowed(response, 'POST')
+          return
+        }
+
+        if (!isJsonRequest(request)) {
+          sendError(
+            response,
+            415,
+            'UNSUPPORTED_MEDIA_TYPE',
+            '注册接口只接受 application/json',
+          )
+          return
+        }
+
+        const body = await readJsonBody(request)
+        if (!body.ok) {
+          sendJson(response, body.status, body.error)
+          return
+        }
+        const parsed = parseRegisterRequest(body.value)
+        if (!parsed.ok) {
+          sendError(response, 422, 'VALIDATION_ERROR', parsed.message)
+          return
+        }
+        if (!businessStore.isUsernameAvailable(parsed.value.username)) {
+          sendError(response, 409, 'USERNAME_TAKEN', '该用户名已经被使用')
+          return
+        }
+
+        const account = authService.register(parsed.value)
+        if (!account) {
+          sendError(response, 409, 'USERNAME_TAKEN', '该用户名已经被使用')
+          return
+        }
+        businessStore.registerPublicAccount(account)
+        sendJson(response, 201, { user: account } satisfies RegisterResponse)
         return
       }
 

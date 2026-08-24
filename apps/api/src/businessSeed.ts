@@ -65,6 +65,7 @@ function publicAccounts(): UserAccountSummary[] {
 export function createBusinessSeed(timestamp: number): BusinessSeed {
   const tomorrow = shanghaiDate(timestamp + dayMs)
   const dayAfterTomorrow = shanghaiDate(timestamp + 2 * dayMs)
+  const lastWeek = shanghaiDate(timestamp - 7 * dayMs)
   const createdAt = dateAt(timestamp, -7, '09:00:00')
   const now = new Date(timestamp).toISOString()
 
@@ -82,54 +83,7 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
     { id: 12, campusId: 1, name: '英语阅读班', subject: '英语' },
     { id: 13, campusId: 2, name: '科学探索班', subject: '科学' },
   ]
-  const users: UserAccountSummary[] = [
-    ...publicAccounts(),
-    {
-      id: 102,
-      campusId: 1,
-      campusName: '滨江校区',
-      displayName: '林晓晨',
-      username: 'student_102',
-      role: 'STUDENT',
-      active: true,
-    },
-    {
-      id: 103,
-      campusId: 2,
-      campusName: '城北校区',
-      displayName: '陈安然',
-      username: 'student_103',
-      role: 'STUDENT',
-      active: true,
-    },
-    {
-      id: 303,
-      campusId: 1,
-      campusName: '滨江校区',
-      displayName: '王老师',
-      username: 'teacher_303',
-      role: 'TEACHER',
-      active: true,
-    },
-    {
-      id: 401,
-      campusId: 2,
-      campusName: '城北校区',
-      displayName: '陈老师',
-      username: 'teacher_401',
-      role: 'TEACHER',
-      active: true,
-    },
-    {
-      id: 402,
-      campusId: 2,
-      campusName: '城北校区',
-      displayName: '赵老师',
-      username: 'teacher_402',
-      role: 'HOMEROOM_TEACHER',
-      active: true,
-    },
-  ]
+  const users: UserAccountSummary[] = publicAccounts()
   const students: StudentSummary[] = [
     {
       id: 101,
@@ -159,6 +113,7 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
   const parentBindings: ParentStudentBinding[] = [
     { parentId: 201, student: students[0]!, relationship: '母亲', createdAt },
     { parentId: 201, student: students[1]!, relationship: '母亲', createdAt },
+    { parentId: 202, student: students[2]!, relationship: '父亲', createdAt },
   ]
   const schedules: ScheduleSummary[] = [
     {
@@ -221,12 +176,51 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       room: 'C-101',
       status: 'SCHEDULED',
     },
+    {
+      id: 1101,
+      campusId: 1,
+      classId: 101,
+      courseId: 11,
+      teacherId: 301,
+      lessonDate: lastWeek,
+      startTime: '09:00:00',
+      endTime: '10:30:00',
+      room: 'A-302',
+      status: 'COMPLETED',
+    },
+    {
+      id: 2101,
+      campusId: 2,
+      classId: 201,
+      courseId: 13,
+      teacherId: 401,
+      lessonDate: lastWeek,
+      startTime: '10:00:00',
+      endTime: '11:30:00',
+      room: 'C-101',
+      status: 'COMPLETED',
+    },
   ]
   const firstFile = {
     id: 9001,
     originalName: '分数练习.pdf',
     mimeType: 'application/pdf',
     byteSize: 640_000,
+    createdAt,
+  }
+  const secondFile = {
+    id: 9002,
+    originalName: '英语阅读方法.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 520_000,
+    createdAt,
+  }
+  const thirdFile = {
+    id: 9003,
+    originalName: '水循环观察表.docx',
+    mimeType:
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    byteSize: 180_000,
     createdAt,
   }
   const courseware: Courseware[] = [
@@ -238,6 +232,26 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       title: '分数混合运算讲义',
       description: '复习运算顺序并完成课堂例题。',
       attachments: [firstFile],
+      publishedAt: createdAt,
+    },
+    {
+      id: 2002,
+      classId: 102,
+      courseId: 12,
+      teacherId: 303,
+      title: '英语阅读方法讲义',
+      description: '学习定位关键词并概括段落大意。',
+      attachments: [secondFile],
+      publishedAt: createdAt,
+    },
+    {
+      id: 2003,
+      classId: 201,
+      courseId: 13,
+      teacherId: 401,
+      title: '水循环观察记录',
+      description: '记录蒸发、凝结和降水三个阶段的实验现象。',
+      attachments: [thirdFile],
       publishedAt: createdAt,
     },
   ]
@@ -290,6 +304,54 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       createdAt,
       updatedAt: createdAt,
     },
+    {
+      id: 3004,
+      campusId: 1,
+      classId: 102,
+      courseId: 12,
+      scheduleId: 1002,
+      teacherId: 303,
+      title: '阅读理解要点整理',
+      description: '阅读讲义并归纳三条定位关键信息的方法。',
+      attachments: [secondFile],
+      dueAt: dateAt(timestamp, 3, '20:00:00'),
+      allowLate: true,
+      publishedAt: createdAt,
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: 3005,
+      campusId: 2,
+      classId: 201,
+      courseId: 13,
+      scheduleId: 2001,
+      teacherId: 401,
+      title: '水循环实验预习',
+      description: '根据观察表写出实验预测和需要记录的现象。',
+      attachments: [thirdFile],
+      dueAt: dateAt(timestamp, 3, '19:00:00'),
+      allowLate: false,
+      publishedAt: createdAt,
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: 3006,
+      campusId: 2,
+      classId: 201,
+      courseId: 13,
+      scheduleId: 2101,
+      teacherId: 401,
+      title: '科学观察周记',
+      description: '整理上周实验观察结果并写出结论。',
+      attachments: [],
+      dueAt: dateAt(timestamp, -4, '19:00:00'),
+      allowLate: true,
+      publishedAt: createdAt,
+      createdAt,
+      updatedAt: createdAt,
+    },
   ]
   const submissions: Submission[] = [
     {
@@ -319,6 +381,71 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       gradedAt: now,
       updatedAt: now,
     },
+    {
+      id: 4003,
+      assignmentId: 3004,
+      studentId: 102,
+      attempt: 1,
+      content: '我会先读问题，再圈出文章中的关键词，最后联系上下文作答。',
+      attachments: [],
+      status: 'GRADED',
+      submittedAt: dateAt(timestamp, -1, '19:10:00'),
+      score: 92,
+      teacherComment: '归纳清楚，继续注意用完整句表达。',
+      gradedBy: 303,
+      gradedAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 4004,
+      assignmentId: 3005,
+      studentId: 103,
+      attempt: 1,
+      content: '预测加热后水会蒸发，遇冷后形成小水滴。',
+      attachments: [],
+      status: 'SUBMITTED',
+      submittedAt: dateAt(timestamp, 0, '08:30:00'),
+      score: null,
+      teacherComment: '',
+      gradedBy: null,
+      gradedAt: null,
+      updatedAt: dateAt(timestamp, 0, '08:30:00'),
+    },
+    {
+      id: 4005,
+      assignmentId: 3006,
+      studentId: 103,
+      attempt: 1,
+      content: '实验中瓶壁出现水珠，说明水蒸气遇冷凝结。',
+      attachments: [],
+      status: 'GRADED',
+      submittedAt: dateAt(timestamp, -5, '18:20:00'),
+      score: 88,
+      teacherComment: '现象记录准确，可以再说明变量条件。',
+      gradedBy: 401,
+      gradedAt: dateAt(timestamp, -4, '09:00:00'),
+      updatedAt: dateAt(timestamp, -4, '09:00:00'),
+    },
+  ]
+  const attendance: AttendanceRecord[] = [
+    {
+      id: 10_001,
+      scheduleId: 1101,
+      studentId: 101,
+      status: 'PRESENT',
+      note: '按时到课',
+      recordedBy: 301,
+      recordedAt: dateAt(timestamp, -7, '09:05:00'),
+    },
+    {
+      id: 10_002,
+      scheduleId: 2101,
+      studentId: 103,
+      status: 'LATE',
+      note: '迟到 5 分钟，已与家长沟通',
+      recordedBy: 401,
+      recordedAt: dateAt(timestamp, -7, '10:05:00'),
+    },
   ]
   const feedback: StudentFeedback[] = [
     {
@@ -335,6 +462,40 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       parentResponse: '',
       sentAt: createdAt,
       updatedAt: createdAt,
+    },
+    {
+      id: 5002,
+      campusId: 1,
+      scheduleId: 1101,
+      studentId: 101,
+      teacherId: 301,
+      performance: '能够独立完成课堂练习并主动讲解思路。',
+      strengths: '计算步骤完整，表达清晰。',
+      improvements: '检查答案时可以再耐心一些。',
+      suggestion: '每天安排十分钟进行口算检查。',
+      status: 'CONFIRMED',
+      parentResponse: '已了解，会在家提醒孩子检查。',
+      respondedBy: 201,
+      respondedAt: dateAt(timestamp, -6, '20:00:00'),
+      sentAt: dateAt(timestamp, -7, '11:00:00'),
+      updatedAt: dateAt(timestamp, -6, '20:00:00'),
+    },
+    {
+      id: 5003,
+      campusId: 2,
+      scheduleId: 2101,
+      studentId: 103,
+      teacherId: 401,
+      performance: '实验记录认真，但小组讨论参与度不足。',
+      strengths: '能够准确描述实验现象。',
+      improvements: '需要更主动地表达自己的判断。',
+      suggestion: '下次实验承担小组汇报任务。',
+      status: 'DISPUTED',
+      parentResponse: '孩子反馈当天身体不适，希望老师结合实际情况复核。',
+      respondedBy: 202,
+      respondedAt: dateAt(timestamp, -6, '20:30:00'),
+      sentAt: dateAt(timestamp, -7, '12:00:00'),
+      updatedAt: dateAt(timestamp, -6, '20:30:00'),
     },
   ]
   const scheduleChanges: ScheduleChange[] = [
@@ -390,6 +551,44 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       readAt: null,
       createdAt,
     },
+    {
+      id: 8002,
+      userId: 201,
+      studentId: 101,
+      type: 'FEEDBACK',
+      title: '课后反馈已确认',
+      content: '您已确认林晓雨的数学课堂反馈。',
+      relatedType: 'StudentFeedback',
+      relatedId: 5002,
+      readAt: dateAt(timestamp, -6, '20:00:00'),
+      createdAt: dateAt(timestamp, -7, '11:00:00'),
+    },
+    {
+      id: 8003,
+      userId: 202,
+      studentId: 103,
+      type: 'FEEDBACK',
+      title: '反馈异议处理中',
+      content: '学校已收到您对科学课反馈的补充说明。',
+      relatedType: 'FeedbackWorkOrder',
+      relatedId: 6001,
+      readAt: null,
+      createdAt: dateAt(timestamp, -6, '20:30:00'),
+    },
+  ]
+  const workOrders: FeedbackWorkOrder[] = [
+    {
+      id: 6001,
+      feedbackId: 5003,
+      campusId: 2,
+      issue: '孩子反馈当天身体不适，希望老师结合实际情况复核。',
+      status: 'OPEN',
+      handlerId: null,
+      result: '',
+      createdAt: dateAt(timestamp, -6, '20:30:00'),
+      updatedAt: dateAt(timestamp, -6, '20:30:00'),
+      closedAt: null,
+    },
   ]
 
   return {
@@ -400,7 +599,7 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
     students,
     parentBindings,
     schedules,
-    attendance: [],
+    attendance,
     leaveRequests: [],
     courseware,
     assignments,
@@ -409,6 +608,6 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
     scheduleChanges,
     notifications,
     scheduleChangeNotices: [],
-    workOrders: [],
+    workOrders,
   }
 }

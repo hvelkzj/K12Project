@@ -68,6 +68,8 @@ export interface AdminOverview {
 export type BusinessInput = Record<string, unknown>
 
 export interface BusinessStore {
+  isUsernameAvailable(username: string): boolean
+  registerPublicAccount(account: UserAccountSummary): void
   listParentStudents(user: UserSummary): ParentStudentBinding[]
   getParentOverview(user: UserSummary, studentId: number): ParentOverview
   submitLeaveRequest(user: UserSummary, input: BusinessInput): LeaveRequest

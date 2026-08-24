@@ -175,6 +175,29 @@ test('家长只能读取绑定学生并且请假身份来自会话', async () =>
   assert.equal(parseJsonBody<ApiError>(duplicate).code, 'CONFLICT')
 })
 
+test('已结束课次即使状态未更新也不能补交请假', async () => {
+  const seed = createBusinessSeed(fixedNow)
+  const historicalSchedule = seed.schedules.find((item) => item.id === 1101)
+  assert.ok(historicalSchedule)
+  historicalSchedule.status = 'SCHEDULED'
+  const { handler } = setup({ seed })
+  const parent = await login(handler, 'parent_201')
+
+  const response = await authorizedCall(handler, parent, {
+    method: 'POST',
+    url: '/parent/leave-requests',
+    jsonBody: {
+      studentId: 101,
+      scheduleId: 1101,
+      reason: '补交历史请假',
+      contactPhone: '13800000001',
+    },
+  })
+
+  assert.equal(response.status, 409)
+  assert.match(parseJsonBody<ApiError>(response).message, /已结束/)
+})
+
 test('作业发布、学生提交和教师批改共享同一数据', async () => {
   const { handler } = setup()
   const teacher = await login(handler, 'teacher_301')

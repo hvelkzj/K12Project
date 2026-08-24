@@ -9,6 +9,11 @@ export const USER_ROLES = [
 
 export type UserRole = (typeof USER_ROLES)[number]
 
+export const PUBLIC_REGISTRATION_ROLES = ['PARENT', 'STUDENT'] as const
+
+export type PublicRegistrationRole =
+  (typeof PUBLIC_REGISTRATION_ROLES)[number]
+
 export const SCHEDULE_STATUSES = [
   'SCHEDULED',
   'CHANGED',

@@ -3,6 +3,7 @@ import type {
   FeedbackStatus,
   LeaveStatus,
   NotificationType,
+  PublicRegistrationRole,
   ScheduleChangeStatus,
   ScheduleStatus,
   SubmissionStatus,
@@ -229,6 +230,17 @@ export interface FeedbackWorkOrder {
 export interface LoginRequest {
   username: string
   password: string
+}
+
+export interface RegisterRequest {
+  username: string
+  password: string
+  displayName: string
+  role: PublicRegistrationRole
+}
+
+export interface RegisterResponse {
+  user: UserAccountSummary
 }
 
 export interface LoginResponse {

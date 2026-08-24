@@ -209,6 +209,25 @@ textarea:focus {
   width: 100%;
 }
 
+.portal-return-link {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d9e1ec;
+  border-radius: 9px;
+  color: #315177;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.portal-return-link:hover {
+  border-color: #2469c0;
+  color: #2469c0;
+}
+
 .shell {
   min-height: 100vh;
 }

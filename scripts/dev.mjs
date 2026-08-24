@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 
 const workspaces = [
   '@k12/api',
+  '@k12/portal-web',
   '@k12/parent-web',
   '@k12/student-web',
   '@k12/teacher-web',

@@ -151,6 +151,8 @@ const visiblePages = computed(() =>
 
 const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000'
+const portalUrl =
+  import.meta.env.VITE_PORTAL_URL ?? 'http://127.0.0.1:5172'
 
 const authClient = createAuthClient({ apiBaseUrl })
 
@@ -1134,7 +1136,7 @@ async function toggleUserActive(user: UserAccount) {
     <main class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">教务 / 系统后台 · 业务 API 接入</p>
+          <p class="eyebrow">教务 / 系统后台</p>
           <h1>{{ currentPage?.label }}</h1>
         </div>
         <div class="topbar-user">
@@ -1165,7 +1167,7 @@ async function toggleUserActive(user: UserAccount) {
           <span class="feature-kicker">后台登录</span>
           <h2>进入教务后台</h2>
           <p>
-            使用真实认证接口登录。教务仅能访问所属校区，系统管理员可访问
+            教务人员可以处理所属校区事务，系统管理员可以查看和管理
             单一机构下的全部校区。
           </p>
           <ul class="check-list">
@@ -1194,6 +1196,7 @@ async function toggleUserActive(user: UserAccount) {
           >
             {{ isLoggingIn ? '登录中…' : '登录并进入工作台' }}
           </button>
+          <a class="portal-return-link" :href="portalUrl">← 返回统一首页</a>
         </form>
       </section>
 
