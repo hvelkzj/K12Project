@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { getBusinessStatusLabel } from '@k12/shared'
 import type {
   LeaveRequest,
   UserSummary,
@@ -1117,7 +1118,6 @@ async function toggleUserActive(user: UserAccount) {
         >
           <span class="nav-mark" aria-hidden="true"></span>
           <span>{{ page.label }}</span>
-          <small>{{ page.path }}</small>
         </button>
       </nav>
 
@@ -1231,7 +1231,7 @@ async function toggleUserActive(user: UserAccount) {
             <strong>{{ roleLabels[currentRole] }}</strong>
             <p>{{ scopeDescription }}</p>
           </div>
-          <span class="scope-code">{{ currentRole }}</span>
+          <span class="scope-code">当前身份：{{ roleLabels[currentRole] }}</span>
         </section>
 
         <section class="summary-grid" aria-label="工作台统计">
@@ -1450,7 +1450,7 @@ async function toggleUserActive(user: UserAccount) {
                   <td>{{ courseName(schedule.courseId) }}</td>
                   <td>{{ teacherName(schedule.teacherId) }}</td>
                   <td>{{ schedule.room }}</td>
-                  <td><span class="status-pill tone-info">{{ schedule.status }}</span></td>
+                  <td><span class="status-pill tone-info">{{ getBusinessStatusLabel(schedule.status) }}</span></td>
                   <td>
                     <div class="row-actions">
                       <button
