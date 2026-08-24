@@ -80,6 +80,8 @@ export interface ScheduleChangeInput {
 
 export interface TeacherBusinessClient {
   loadOverview(): Promise<TeacherOverview>
+  uploadFile(file: File, mimeType?: string): Promise<FileSummary>
+  downloadFile(fileId: number): Promise<Blob>
   saveAttendance(input: AttendanceInput): Promise<AttendanceRecord[]>
   publishAssignment(input: AssignmentInput): Promise<Assignment>
   gradeSubmission(submissionId: number, input: GradeInput): Promise<Submission>
@@ -185,9 +187,54 @@ export function createTeacherBusinessClient(
     return (await response.json()) as T
   }
 
+  async function requestBlob(path: string): Promise<Blob> {
+    const accessToken = authClient.getAccessToken()
+    if (!accessToken) {
+      authClient.clearAccessToken()
+      throw new TeacherBusinessError('请重新登录', 401, 'AUTH_REQUIRED')
+    }
+    let response: Response
+    try {
+      response = await fetchImpl(`${apiBaseUrl}${path}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      throw new TeacherBusinessError(
+        '网络请求失败，请稍后重试',
+        0,
+        'NETWORK_ERROR',
+      )
+    }
+    if (response.status === 401) authClient.clearAccessToken()
+    if (!response.ok) {
+      const apiError = await readApiError(response)
+      throw new TeacherBusinessError(
+        apiError.message,
+        response.status,
+        apiError.code,
+      )
+    }
+    return response.blob()
+  }
+
   return {
     loadOverview() {
       return requestJson<TeacherOverview>('/teacher/overview')
+    },
+
+    uploadFile(file, mimeType = file.type) {
+      return requestJson<FileSummary>(
+        `/teacher/files?name=${encodeURIComponent(file.name)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': mimeType },
+          body: file,
+        },
+      )
+    },
+
+    downloadFile(fileId) {
+      return requestBlob(`/files/${fileId}`)
     },
 
     saveAttendance(input) {

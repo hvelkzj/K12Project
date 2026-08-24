@@ -216,6 +216,64 @@ td select { min-width: 110px; }
   font-weight: 700;
 }
 .form-grid .full { grid-column: 1 / -1; }
+.attachment-upload small { display: block; margin-top: 7px; color: #7b8781; font-size: 12px; }
+.uploaded-files { display: grid; gap: 8px; }
+.uploaded-files > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid #dde6e1;
+  border-radius: 10px;
+  background: #f8faf9;
+}
+.uploaded-files span, .uploaded-files strong, .uploaded-files small { display: block; }
+.uploaded-files small { margin-top: 3px; color: #7b8781; font-size: 12px; }
+.submission-link {
+  border: 0;
+  padding: 0;
+  color: #17614f;
+  background: transparent;
+  font-weight: 800;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.grade-actions { display: grid; gap: 7px; min-width: 110px; }
+.submission-overlay {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(18 35 30 / 42%);
+  backdrop-filter: blur(2px);
+}
+.submission-detail {
+  width: min(560px, 94vw);
+  min-height: 100%;
+  overflow-y: auto;
+  padding: 34px;
+  background: #fff;
+  box-shadow: -18px 0 45px rgb(18 35 30 / 20%);
+}
+.detail-close {
+  float: right;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  color: #53615b;
+  background: #edf2ef;
+  font-size: 24px;
+}
+.submission-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }
+.submission-meta div { padding: 13px; border-radius: 10px; background: #f6f8f7; }
+.submission-meta .full { grid-column: 1 / -1; }
+.submission-meta dt { color: #7a857f; font-size: 12px; }
+.submission-meta dd { margin: 6px 0 0; line-height: 1.6; }
+.detail-files { border-top: 1px solid #e7ece9; padding-top: 22px; }
 .check-field { align-self: end; min-height: 40px; }
 .check-field > span { margin-bottom: 0 !important; }
 .time-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -311,6 +369,8 @@ td select { min-width: 110px; }
   .course-card { grid-template-columns: 1fr auto; }
   .course-main, .course-card .card-actions { grid-column: 1 / -1; }
   .form-grid, .login-panel { grid-template-columns: 1fr; }
+  .submission-meta { grid-template-columns: 1fr; }
+  .submission-meta .full { grid-column: auto; }
   .login-panel { gap: 28px; }
   .form-grid label, .time-fields { grid-column: 1 / -1; }
   .panel-footer, .section-heading { align-items: flex-start; }

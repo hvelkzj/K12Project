@@ -41,6 +41,8 @@ export interface StudentBusinessClientOptions {
 
 export interface StudentBusinessClient {
   getOverview(): Promise<StudentOverview>
+  uploadFile(file: File, mimeType?: string): Promise<FileSummary>
+  downloadFile(fileId: number): Promise<Blob>
   submitWork(input: SubmitWorkInput): Promise<Submission>
 }
 
@@ -143,9 +145,50 @@ export function createStudentBusinessClient(
     return (await response.json()) as T
   }
 
+  async function requestBlob(path: string): Promise<Blob> {
+    const accessToken = authClient.getAccessToken()
+    if (!accessToken) {
+      authClient.clearAccessToken()
+      throw new StudentBusinessError('请重新登录', 401, 'AUTH_REQUIRED')
+    }
+    let response: Response
+    try {
+      response = await fetchImpl(`${apiBaseUrl}${path}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      throw new StudentBusinessError('网络请求失败', 0, 'NETWORK_ERROR')
+    }
+    if (response.status === 401) authClient.clearAccessToken()
+    if (!response.ok) {
+      const apiError = await readApiError(response)
+      throw new StudentBusinessError(
+        apiError.message,
+        response.status,
+        apiError.code,
+      )
+    }
+    return response.blob()
+  }
+
   return {
     getOverview() {
       return requestJson<StudentOverview>('/student/overview')
+    },
+
+    uploadFile(file, mimeType = file.type) {
+      return requestJson<FileSummary>(
+        `/student/files?name=${encodeURIComponent(file.name)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': mimeType },
+          body: file,
+        },
+      )
+    },
+
+    downloadFile(fileId) {
+      return requestBlob(`/files/${fileId}`)
     },
 
     submitWork(input) {

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ApiError } from '@k12/shared'
 
 const maximumJsonBodyBytes = 16 * 1024
+export const maximumFileBodyBytes = 10 * 1024 * 1024
 
 export interface JsonBodyResult {
   ok: true
@@ -25,6 +26,10 @@ export function setCorsHeaders(response: ServerResponse): void {
     'Access-Control-Allow-Headers',
     'Content-Type, Authorization',
   )
+  response.setHeader(
+    'Access-Control-Expose-Headers',
+    'Content-Disposition, Content-Length',
+  )
 }
 
 export function sendJson(
@@ -43,6 +48,22 @@ export function sendNoContent(
 ): void {
   response.writeHead(status)
   response.end()
+}
+
+export function sendFile(
+  response: ServerResponse,
+  content: Uint8Array,
+  mimeType: string,
+  originalName: string,
+): void {
+  response.setHeader('Content-Type', mimeType)
+  response.setHeader('Content-Length', content.byteLength)
+  response.setHeader(
+    'Content-Disposition',
+    `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(originalName)}`,
+  )
+  response.writeHead(200)
+  response.end(Buffer.from(content))
 }
 
 export function sendError(
@@ -107,6 +128,39 @@ export async function readJsonBody(
       },
     }
   }
+}
+
+export async function readFileBody(
+  request: IncomingMessage,
+): Promise<
+  | { ok: true; value: Uint8Array }
+  | { ok: false; status: 413; error: ApiError }
+> {
+  const chunks: Buffer[] = []
+  let byteLength = 0
+  let tooLarge = false
+
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    byteLength += buffer.byteLength
+    if (byteLength > maximumFileBodyBytes) {
+      tooLarge = true
+      continue
+    }
+    chunks.push(buffer)
+  }
+
+  if (tooLarge) {
+    return {
+      ok: false,
+      status: 413,
+      error: {
+        code: 'PAYLOAD_TOO_LARGE',
+        message: '单个附件不能超过 10 MB',
+      },
+    }
+  }
+  return { ok: true, value: Buffer.concat(chunks) }
 }
 
 export function getBearerToken(

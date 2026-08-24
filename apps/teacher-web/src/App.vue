@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import type { AttendanceStatus, ScheduleSummary, Submission } from '@k12/shared'
+import { getBusinessStatusLabel } from '@k12/shared'
+import type {
+  AttendanceStatus,
+  FileSummary,
+  ScheduleSummary,
+  Submission,
+} from '@k12/shared'
 
 import { teacherAuthClient } from './authClient'
 import {
@@ -31,6 +37,10 @@ import {
   saveAttendanceAndApply,
   visibleLeaveForStudent,
 } from './teacherLeaveRules'
+import {
+  saveTeacherDownload,
+  validateTeacherAttachment,
+} from './teacherFileTransfer'
 import type { AttendanceDraft } from './teacherWorkflow'
 
 type PageKey =
@@ -78,6 +88,9 @@ const notice = ref('')
 const portalUrl =
   import.meta.env.VITE_PORTAL_URL ?? 'http://127.0.0.1:5172'
 const selectedScheduleId = ref<number | null>(null)
+const selectedSubmissionId = ref<number | null>(null)
+const isUploadingAssignmentFiles = ref(false)
+const downloadingFileId = ref<number | null>(null)
 
 const attendanceDrafts = ref<AttendanceDraft[]>([])
 const gradeDrafts = reactive<Record<number, GradeDraft>>({})
@@ -87,6 +100,7 @@ const assignmentDraft = reactive({
   description: '',
   dueAt: '',
   allowLate: false,
+  attachments: [] as FileSummary[],
 })
 
 const feedbackDraft = reactive({
@@ -197,6 +211,12 @@ const ownAssignmentIds = computed(() => {
 const visibleSubmissions = computed(() =>
   submissions.value.filter((item) => ownAssignmentIds.value.has(item.assignmentId)),
 )
+const selectedSubmission = computed(
+  () =>
+    visibleSubmissions.value.find(
+      (item) => item.id === selectedSubmissionId.value,
+    ) ?? null,
+)
 
 function courseName(courseId: number): string {
   return overview.value?.courses.find((item) => item.id === courseId)?.name ?? `课程 #${courseId}`
@@ -212,6 +232,75 @@ function studentName(studentId: number): string {
 
 function assignmentTitle(assignmentId: number): string {
   return assignments.value.find((item) => item.id === assignmentId)?.title ?? `作业 #${assignmentId}`
+}
+
+function assignmentFor(assignmentId: number) {
+  return assignments.value.find((item) => item.id === assignmentId)
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
+}
+
+function formatBytes(byteSize: number): string {
+  return byteSize < 1024 * 1024
+    ? `${Math.max(1, Math.ceil(byteSize / 1024))} KB`
+    : `${(byteSize / 1024 / 1024).toFixed(1)} MB`
+}
+
+async function handleAssignmentFiles(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  if (files.length === 0) return
+  isUploadingAssignmentFiles.value = true
+  notice.value = ''
+  try {
+    const uploaded: FileSummary[] = []
+    for (const file of files) {
+      uploaded.push(
+        await teacherBusinessClient.uploadFile(
+          file,
+          validateTeacherAttachment(file),
+        ),
+      )
+    }
+    assignmentDraft.attachments.push(...uploaded)
+    notice.value = `已上传 ${uploaded.length} 个作业附件`
+  } catch (error) {
+    handleBusinessError(error, '作业附件上传失败')
+  } finally {
+    isUploadingAssignmentFiles.value = false
+    input.value = ''
+  }
+}
+
+function removeAssignmentFile(fileId: number): void {
+  const index = assignmentDraft.attachments.findIndex((item) => item.id === fileId)
+  if (index >= 0) assignmentDraft.attachments.splice(index, 1)
+}
+
+async function downloadAttachment(file: FileSummary): Promise<void> {
+  if (downloadingFileId.value !== null) return
+  downloadingFileId.value = file.id
+  notice.value = ''
+  try {
+    saveTeacherDownload(
+      await teacherBusinessClient.downloadFile(file.id),
+      file.originalName,
+    )
+    notice.value = `已开始下载：${file.originalName}`
+  } catch (error) {
+    handleBusinessError(error, '附件下载失败')
+  } finally {
+    downloadingFileId.value = null
+  }
 }
 
 function resetGradeDrafts(): void {
@@ -312,7 +401,7 @@ async function login(): Promise<void> {
   try {
     currentUser.value = await teacherAuthClient.login(username.value.trim(), password.value)
     activePage.value = 'today'
-    notice.value = `已使用 ${currentUser.value.displayName} 的真实账号登录`
+    notice.value = `已使用 ${currentUser.value.displayName} 的账号登录`
     await loadOverview()
   } catch (error) {
     authMessage.value = error instanceof Error ? error.message : '登录失败'
@@ -386,6 +475,7 @@ async function publishAssignment(): Promise<void> {
     if (overview.value) overview.value.assignments.push(created)
     assignmentDraft.title = ''
     assignmentDraft.description = ''
+    assignmentDraft.attachments.splice(0)
     notice.value = `作业 #${created.id} 已发布`
   } catch (error) {
     handleBusinessError(error, '作业发布失败')
@@ -448,7 +538,7 @@ async function submitScheduleChange(): Promise<void> {
       scheduleChangeInput(schedule.id, scheduleChangeDraft),
     )
     if (overview.value) overview.value.scheduleChanges.push(created)
-    notice.value = `调课申请 #${created.id} 已提交，状态：${created.status}`
+    notice.value = `调课申请 #${created.id} 已提交，状态：${getBusinessStatusLabel(created.status)}`
   } catch (error) {
     handleBusinessError(error, '调课申请提交失败')
   } finally {
@@ -526,9 +616,9 @@ onMounted(async () => {
       <template v-else-if="overview">
         <template v-if="activePage === 'today'">
           <section class="summary-grid" aria-label="今日概览">
-            <article><span>可见课程</span><strong>{{ visibleSchedules.length }}</strong><small>由服务端按角色过滤</small></article>
+            <article><span>可见课程</span><strong>{{ visibleSchedules.length }}</strong><small>按当前身份显示</small></article>
             <article><span>本人授课</span><strong>{{ ownScheduleCount }}</strong><small>可执行教学写操作</small></article>
-            <article><span>签到记录</span><strong>{{ attendanceRecords.length }}</strong><small>服务端保存结果</small></article>
+            <article><span>签到记录</span><strong>{{ attendanceRecords.length }}</strong><small>记录已同步</small></article>
             <article><span>调课申请</span><strong>{{ scheduleChanges.length }}</strong><small>实时处理状态</small></article>
           </section>
           <section class="panel">
@@ -569,7 +659,7 @@ onMounted(async () => {
                       v-model="draft.status"
                       :disabled="recordedStudentIds.has(draft.studentId) || getStudentLeave(draft.studentId)?.status === 'APPROVED' || selectedScheduleCancelled"
                     >
-                      <option v-for="status in attendanceStatuses" :key="status" :value="status">{{ status }}</option>
+                      <option v-for="status in attendanceStatuses" :key="status" :value="status">{{ getBusinessStatusLabel(status) }}</option>
                     </select>
                   </td>
                   <td>
@@ -583,36 +673,38 @@ onMounted(async () => {
               </tbody>
             </table>
           </div>
-          <div class="panel-footer"><p class="muted">已批准请假固定为 LEAVE；已保存学生将被锁定。</p><button class="primary" type="button" :disabled="pendingAction !== null || unrecordedAttendanceCount === 0 || selectedScheduleCancelled" @click="saveAttendance">{{ pendingAction === 'attendance' ? '保存中…' : '保存签到' }}</button></div>
+          <div class="panel-footer"><p class="muted">已批准请假的学生固定显示为“请假”；已保存学生将被锁定。</p><button class="primary" type="button" :disabled="pendingAction !== null || unrecordedAttendanceCount === 0 || selectedScheduleCancelled" @click="saveAttendance">{{ pendingAction === 'attendance' ? '保存中…' : '保存签到' }}</button></div>
         </section>
 
         <section v-else-if="activePage === 'publish'" class="panel">
-          <div class="section-heading"><div><p class="eyebrow">教师发布</p><h2>新建作业</h2></div><span class="status">服务端 Assignment</span></div>
+          <div class="section-heading"><div><p class="eyebrow">教师发布</p><h2>新建作业</h2></div><span class="status">发布后学生可查看</span></div>
           <form class="form-grid" @submit.prevent="publishAssignment">
             <label class="full"><span>当前课次</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · #${selectedSchedule.id}` : '请先选择课次'" readonly /></label>
             <label class="full"><span>作业标题</span><input v-model="assignmentDraft.title" required /></label>
             <label class="full"><span>作业内容</span><textarea v-model="assignmentDraft.description" rows="4" required></textarea></label>
+            <label class="full attachment-upload"><span>作业附件</span><input type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png" :disabled="isUploadingAssignmentFiles" @change="handleAssignmentFiles" /><small>{{ isUploadingAssignmentFiles ? '附件上传中…' : '支持 PDF、DOCX、JPG、PNG，单个文件不超过 10 MB' }}</small></label>
+            <div v-if="assignmentDraft.attachments.length" class="full uploaded-files"><div v-for="file in assignmentDraft.attachments" :key="file.id"><span><strong>{{ file.originalName }}</strong><small>{{ formatBytes(file.byteSize) }}</small></span><button class="secondary" type="button" :disabled="pendingAction !== null" @click="removeAssignmentFile(file.id)">移除</button></div></div>
             <label><span>截止时间</span><input v-model="assignmentDraft.dueAt" type="datetime-local" required /></label>
             <label class="check-field"><input v-model="assignmentDraft.allowLate" type="checkbox" /><span>允许截止后提交</span></label>
-            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedScheduleCancelled">{{ pendingAction === 'assignment' ? '发布中…' : '发布作业' }}</button></div>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || isUploadingAssignmentFiles || selectedScheduleCancelled">{{ pendingAction === 'assignment' ? '发布中…' : isUploadingAssignmentFiles ? '等待附件上传' : '发布作业' }}</button></div>
           </form>
         </section>
 
         <section v-else-if="activePage === 'grading'" class="panel">
-          <div class="section-heading"><div><p class="eyebrow">真实提交记录</p><h2>学生提交与批改</h2></div><span class="status">{{ visibleSubmissions.length }} 份提交</span></div>
+          <div class="section-heading"><div><p class="eyebrow">学生提交记录</p><h2>学生提交与批改</h2></div><span class="status">{{ visibleSubmissions.length }} 份提交</span></div>
           <p v-if="visibleSubmissions.length === 0" class="muted empty-state">当前没有可批改提交。</p>
           <div v-else class="table-wrap"><table><thead><tr><th>作业 / 学生</th><th>分数与评语</th><th>订正</th><th>操作</th></tr></thead>
             <tbody><tr v-for="item in visibleSubmissions" :key="item.id">
-              <td><strong>{{ assignmentTitle(item.assignmentId) }}</strong><small>{{ studentName(item.studentId) }} · attempt {{ item.attempt }} · {{ item.status }}</small></td>
+              <td><button class="submission-link" type="button" @click="selectedSubmissionId = item.id">{{ assignmentTitle(item.assignmentId) }}</button><small>{{ studentName(item.studentId) }} · 第 {{ item.attempt }} 次提交 · {{ getBusinessStatusLabel(item.status) }}</small></td>
               <td><input v-model.number="gradeDrafts[item.id]!.score" class="score-input" type="number" min="0" max="100" :disabled="item.status !== 'SUBMITTED'" /><input v-model="gradeDrafts[item.id]!.teacherComment" placeholder="教师评语" :disabled="item.status !== 'SUBMITTED'" /></td>
               <td><label class="inline-check"><input v-model="gradeDrafts[item.id]!.correctionRequired" type="checkbox" :disabled="item.status !== 'SUBMITTED'" />需要订正</label></td>
-              <td><button class="primary" type="button" :disabled="item.status !== 'SUBMITTED' || pendingAction !== null" @click="saveGrade(item)">{{ pendingAction === `grade-${item.id}` ? '保存中…' : '保存批改' }}</button></td>
+              <td><div class="grade-actions"><button class="secondary" type="button" @click="selectedSubmissionId = item.id">查看详情</button><button class="primary" type="button" :disabled="item.status !== 'SUBMITTED' || pendingAction !== null" @click="saveGrade(item)">{{ pendingAction === `grade-${item.id}` ? '保存中…' : '保存批改' }}</button></div></td>
             </tr></tbody>
           </table></div>
         </section>
 
         <section v-else-if="activePage === 'feedback'" class="panel">
-          <div class="section-heading"><div><p class="eyebrow">课后家校沟通</p><h2>发送学生反馈</h2></div><span class="status">PENDING_PARENT</span></div>
+          <div class="section-heading"><div><p class="eyebrow">课后家校沟通</p><h2>发送学生反馈</h2></div><span class="status">待家长确认</span></div>
           <form class="form-grid" @submit.prevent="sendFeedback">
             <label><span>课次</span><input :value="selectedSchedule?.id ?? ''" readonly /></label>
             <label><span>学生</span><select v-model.number="feedbackDraft.studentId"><option v-for="student in selectedStudents" :key="student.id" :value="student.id">{{ student.displayName }} · {{ student.id }}</option></select></label>
@@ -625,7 +717,7 @@ onMounted(async () => {
         </section>
 
         <section v-else class="panel">
-          <div class="section-heading"><div><p class="eyebrow">课次 #{{ selectedSchedule?.id ?? '—' }}</p><h2>提交调课申请</h2></div><span class="status">服务端 ScheduleChange</span></div>
+          <div class="section-heading"><div><p class="eyebrow">课次 #{{ selectedSchedule?.id ?? '—' }}</p><h2>提交调课申请</h2></div><span class="status">提交后由教务审批</span></div>
           <form class="form-grid" @submit.prevent="submitScheduleChange">
             <label class="full"><span>课程</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · ${selectedSchedule.room}` : '请先选择课次'" readonly /></label>
             <label><span>申请日期</span><input v-model="scheduleChangeDraft.proposedDate" type="date" required /></label>
@@ -633,11 +725,32 @@ onMounted(async () => {
             <label class="full"><span>调课原因</span><textarea v-model="scheduleChangeDraft.reason" rows="4" required></textarea></label>
             <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || selectedScheduleCancelled">{{ pendingAction === 'schedule-change' ? '提交中…' : '提交调课申请' }}</button></div>
           </form>
-          <div v-if="scheduleChanges.length" class="request-list"><article v-for="item in scheduleChanges" :key="item.id"><strong>申请 #{{ item.id }} · {{ item.status }}</strong><span>{{ item.proposedDate }} {{ item.proposedStartTime }}–{{ item.proposedEndTime }}</span><small>{{ item.reason }}</small></article></div>
+          <div v-if="scheduleChanges.length" class="request-list"><article v-for="item in scheduleChanges" :key="item.id"><strong>申请 #{{ item.id }} · {{ getBusinessStatusLabel(item.status) }}</strong><span>{{ item.proposedDate }} {{ item.proposedStartTime }}–{{ item.proposedEndTime }}</span><small>{{ item.reason }}</small></article></div>
           <p v-else class="muted empty-state">当前没有调课申请。</p>
         </section>
       </template>
     </main>
+
+    <div v-if="selectedSubmission" class="submission-overlay" @click.self="selectedSubmissionId = null">
+      <aside class="submission-detail" role="dialog" aria-modal="true" aria-label="学生作业提交详情">
+        <button class="detail-close" type="button" aria-label="关闭提交详情" @click="selectedSubmissionId = null">×</button>
+        <p class="eyebrow">提交 #{{ selectedSubmission.id }}</p>
+        <h2>{{ assignmentTitle(selectedSubmission.assignmentId) }}</h2>
+        <dl class="submission-meta">
+          <div><dt>学生</dt><dd>{{ studentName(selectedSubmission.studentId) }}</dd></div>
+          <div><dt>提交状态</dt><dd>{{ getBusinessStatusLabel(selectedSubmission.status) }}</dd></div>
+          <div><dt>提交次数</dt><dd>第 {{ selectedSubmission.attempt }} 次</dd></div>
+          <div><dt>提交时间</dt><dd>{{ formatDateTime(selectedSubmission.submittedAt) }}</dd></div>
+          <div><dt>作业要求</dt><dd>{{ assignmentFor(selectedSubmission.assignmentId)?.description ?? '暂无' }}</dd></div>
+          <div class="full"><dt>学生正文</dt><dd>{{ selectedSubmission.content || '学生未填写正文，请查看附件。' }}</dd></div>
+        </dl>
+        <section class="detail-files">
+          <div class="section-heading"><div><p class="eyebrow">学生提交材料</p><h3>附件</h3></div><span class="status">{{ selectedSubmission.attachments.length }} 个</span></div>
+          <p v-if="selectedSubmission.attachments.length === 0" class="muted">本次提交没有附件。</p>
+          <div v-else class="uploaded-files"><div v-for="file in selectedSubmission.attachments" :key="file.id"><span><strong>{{ file.originalName }}</strong><small>{{ formatBytes(file.byteSize) }}</small></span><button class="secondary" type="button" :disabled="downloadingFileId !== null" @click="downloadAttachment(file)">{{ downloadingFileId === file.id ? '下载中…' : '下载到本地' }}</button></div></div>
+        </section>
+      </aside>
+    </div>
 
     <nav class="mobile-nav" aria-label="移动端教师端页面">
       <button v-for="page in pages" :key="page.key" :class="{ active: activePage === page.key }" type="button" @click="goTo(page.key)">{{ page.shortLabel }}</button>
