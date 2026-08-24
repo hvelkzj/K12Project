@@ -52,6 +52,24 @@ test('作业请求包含课次、班级、课程和带时区截止时间', () =>
   )
 })
 
+test('作业请求保留已经上传成功的附件元数据', () => {
+  const attachment = {
+    id: 10_001,
+    originalName: '作业要求.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 1024,
+    createdAt: '2026-08-24T02:00:00.000Z',
+  }
+  const input = assignmentInput(schedule, {
+    title: '附件作业',
+    description: '下载附件后完成',
+    dueAt: '2026-08-26T20:00',
+    allowLate: false,
+    attachments: [attachment],
+  })
+  assert.deepEqual(input.attachments, [attachment])
+})
+
 test('批改分数限制为 0 到 100 并保留订正状态', () => {
   assert.deepEqual(
     gradeInput({ score: 0, teacherComment: ' 需要订正 ', correctionRequired: true }),

@@ -54,7 +54,7 @@ function withSubmission(
 
 function createFakeBusinessClient() {
   const submitted: SubmitWorkInput[] = []
-  const client: StudentBusinessClient = {
+  const client: Pick<StudentBusinessClient, 'getOverview' | 'submitWork'> = {
     getOverview() {
       return Promise.resolve(createStudentOverviewFixture())
     },

@@ -85,6 +85,7 @@ test('初始业务数据保持账号、校区、班级和业务记录引用完�
   const scheduleById = new Map(seed.schedules.map((item) => [item.id, item]))
   const assignmentById = new Map(seed.assignments.map((item) => [item.id, item]))
   const feedbackById = new Map(seed.feedback.map((item) => [item.id, item]))
+  const fileById = new Map(seed.files.map((item) => [item.summary.id, item]))
 
   assert.equal(seed.users.length, MOCK_ACCOUNTS.length)
   assert.deepEqual(
@@ -131,6 +132,19 @@ test('初始业务数据保持账号、校区、班级和业务记录引用完�
     assert.equal(courseById.get(assignment.courseId)?.campusId, assignment.campusId)
     assert.equal(scheduleById.get(assignment.scheduleId ?? -1)?.classId, assignment.classId)
     assert.equal(userById.get(assignment.teacherId)?.campusId, assignment.campusId)
+    for (const attachment of assignment.attachments) {
+      const storedFile = fileById.get(attachment.id)
+      assert.ok(storedFile, `作业附件 ${attachment.id} 必须有真实文件内容`)
+      assert.equal(storedFile.summary.byteSize, storedFile.content.byteLength)
+    }
+  }
+
+  for (const courseware of seed.courseware) {
+    for (const attachment of courseware.attachments) {
+      const storedFile = fileById.get(attachment.id)
+      assert.ok(storedFile, `课件附件 ${attachment.id} 必须有真实文件内容`)
+      assert.equal(storedFile.summary.byteSize, storedFile.content.byteLength)
+    }
   }
 
   const submissionKeys = new Set<string>()
@@ -143,6 +157,11 @@ test('初始业务数据保持账号、校区、班级和业务记录引用完�
     const key = `${submission.assignmentId}:${submission.studentId}:${submission.attempt}`
     assert.equal(submissionKeys.has(key), false)
     submissionKeys.add(key)
+    for (const attachment of submission.attachments) {
+      const storedFile = fileById.get(attachment.id)
+      assert.ok(storedFile, `学生附件 ${attachment.id} 必须有真实文件内容`)
+      assert.equal(storedFile.summary.byteSize, storedFile.content.byteLength)
+    }
   }
 
   for (const workOrder of seed.workOrders) {

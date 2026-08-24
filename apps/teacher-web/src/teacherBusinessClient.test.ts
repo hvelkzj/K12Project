@@ -3,6 +3,7 @@ import test from 'node:test'
 import type {
   Assignment,
   AttendanceRecord,
+  FileSummary,
   ScheduleChange,
   StudentFeedback,
   Submission,
@@ -91,6 +92,48 @@ test('教师概览使用 Bearer token 和规范化 API 地址', async () => {
   })
 
   assert.equal((await client.loadOverview()).schedules[0]?.id, 1001)
+})
+
+test('教师可以上传发布附件并下载学生提交附件', async () => {
+  const uploaded: FileSummary = {
+    id: 10_001,
+    originalName: '作业要求.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 7,
+    createdAt: '2026-08-24T02:00:00.000Z',
+  }
+  const calls: Array<{ url: string; init?: RequestInit }> = []
+  const client = createTeacherBusinessClient({
+    apiBaseUrl: 'http://api.test',
+    authClient: authClient(),
+    fetchImpl: async (input, init) => {
+      const url = String(input)
+      calls.push({ url, init })
+      return url.includes('/teacher/files')
+        ? jsonResponse(uploaded, 201)
+        : new Response('student-file', { status: 200 })
+    },
+  })
+  const file = new File(['content'], '作业要求.pdf', {
+    type: 'application/pdf',
+  })
+
+  assert.deepEqual(await client.uploadFile(file), uploaded)
+  assert.equal(await (await client.downloadFile(10_002)).text(), 'student-file')
+  assert.equal(
+    calls[0]?.url,
+    'http://api.test/teacher/files?name=%E4%BD%9C%E4%B8%9A%E8%A6%81%E6%B1%82.pdf',
+  )
+  assert.equal(calls[0]?.init?.body, file)
+  assert.equal(
+    new Headers(calls[0]?.init?.headers).get('Content-Type'),
+    'application/pdf',
+  )
+  assert.equal(calls[1]?.url, 'http://api.test/files/10002')
+  assert.equal(
+    new Headers(calls[1]?.init?.headers).get('Authorization'),
+    'Bearer teacher-token',
+  )
 })
 
 test('五个教师写接口发送正确方法与请求体', async (context) => {
