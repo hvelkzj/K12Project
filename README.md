@@ -2,6 +2,8 @@
 
 五人协作完成的课程项目。项目本体包含统一入口、家长端、学生网页端、学生 Android APP、学生微信小程序、教师/班主任端、教务/系统后台和统一服务。
 
+公开仓库：[https://github.com/hvelkzj/K12Project](https://github.com/hvelkzj/K12Project)
+
 ## 完成状态
 
 | 模块 | 位置 | 状态 |
@@ -74,6 +76,7 @@ npm run build:mp-weixin
 ```
 
 - APP 资源输出到 `apps/student-mobile/dist/build/app/`，导入 HBuilderX 后可运行和生成 Android 测试安装包。
+- 最终 Android 测试包为 `K12学习空间-Android-0.1.2.apk`；内置版本号 102 与 Camera 模块，SHA-256 为 `482f70027dbcc7d4f7bc3b9f053064a9b973109caa40fc434496f3c43c010099`。
 - 微信小程序输出到 `apps/student-mobile/dist/build/mp-weixin/`，可导入微信开发者工具。
 - Android 模拟器默认连接 `http://10.0.2.2:3000`；Android 真机在登录页填写服务启动日志中的“手机访问地址”；微信开发者工具默认连接 `http://127.0.0.1:3000`。
 - 详细端侧说明见 [学生移动端说明](apps/student-mobile/README.md)。

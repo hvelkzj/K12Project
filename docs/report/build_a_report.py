@@ -21,6 +21,7 @@ OUTPUT_DIR = ROOT / "artifacts" / "report"
 FIGURE_DIR = OUTPUT_DIR / "figures"
 SCREENSHOT_DIR = ROOT / "docs" / "screenshots"
 REPORT_NAME = "黄章杰+黄章杰_实验报告.docx"
+REPOSITORY_URL = "https://github.com/hvelkzj/K12Project"
 
 BLUE = "2E74B5"
 DARK_BLUE = "1F4D78"
@@ -524,13 +525,14 @@ def add_cover(doc: Document, branch: str, commit: str) -> None:
     run = lead.add_run("面向家长、学生、教师与校区管理人员的\n多端家校教学协同系统")
     set_run_font(run, size=13, color=MUTED)
 
-    meta = doc.add_table(rows=5, cols=2)
+    meta = doc.add_table(rows=6, cols=2)
     set_table_geometry(meta, [2600, 6760])
     meta.style = "Table Grid"
     values = [
         ("姓名", "黄章杰"),
         ("项目职责", "A：公共契约、统一服务、跨端集成与质量收口"),
         ("项目基线", f"{branch} · {commit}"),
+        ("公开仓库", REPOSITORY_URL),
         ("完成日期", date.today().isoformat()),
         ("技术栈", "TypeScript · Vue 3 · uni-app · Node.js · npm workspaces"),
     ]
@@ -581,6 +583,7 @@ def build_report(output_path: Path) -> None:
     add_heading(doc, "报告摘要", 1)
     add_text(doc, "本项目围绕 K12 课后教学与家校协同场景，建设统一入口、家长端、学生端、教师端、管理后台、Android APP 与微信小程序。系统以六类角色、双校区数据、统一认证、公共实体与状态为基础，完成请假、签到、作业、课件、反馈、调课、工单和账号管理等跨端联动。")
     add_text(doc, "A 成员负责项目框架、公共契约、认证与业务服务、跨端集成、PR 评审收口、统一入口与注册、附件传输、移动端、课件与考勤闭环、压力测试和最终质量验证。报告中的功能、数据、截图、测试与 Git 记录均来自最终仓库和实际执行结果。")
+    add_text(doc, f"项目源代码与完整提交历史公开保存在 GitHub：{REPOSITORY_URL}。最终 main 分支作为课程项目发布基线。")
     add_callout(doc, "最终质量摘要", "全仓 332 项有效测试通过、0 失败；2 项真实 HTTP 测试仅因受限测试进程禁止监听回环端口而跳过。500 次概览请求在并发 50 下失败数为 0，4 个越权探针全部被拒绝。", fill=PALE_GREEN)
     add_table(doc, ["交付面", "实际结果", "证据"], [
         ("网页端", "统一入口 + 家长、学生、教师、后台四个工作区", "npm run check；真实浏览器走查"),
@@ -715,9 +718,9 @@ def build_report(output_path: Path) -> None:
     add_table(doc, ["指标", "结果", "说明"], [
         ("业务请求", "500", "家长、学生、教师和后台概览"),
         ("最高并发", "50", "六类账号先登录并复用会话"),
-        ("吞吐量", "5760.16 请求/秒", "当前 macOS 测试设备记录"),
-        ("平均 / P50", "8.35 / 3.96 ms", "真实 HTTP 进程内仓库"),
-        ("P95 / 最大", "48.33 / 81.59 ms", "不设依赖设备性能的硬门槛"),
+        ("吞吐量", "6449.64 请求/秒", "最终 macOS 复验记录"),
+        ("平均 / P50", "7.46 / 3.65 ms", "真实 HTTP 进程内仓库"),
+        ("P95 / 最大", "42.39 / 72.71 ms", "不设依赖设备性能的硬门槛"),
         ("失败数", "0", "服务未中断，无非预期响应"),
         ("越权探针", "4/4 被拒绝", "跨角色入口均返回 403"),
     ], [1900, 2350, 5110])
@@ -792,7 +795,7 @@ def build_report(output_path: Path) -> None:
     if apk_candidates and android_screenshot.exists():
         add_callout(doc, "Android 验收", f"已生成测试 APK：{apk_candidates[0].name}，并保存安装/运行证据。", fill=PALE_GREEN)
     elif apk_candidates:
-        add_callout(doc, "Android APK", f"已使用正式 AppID、云端证书和快速安心模式免费生成测试 APK：{apk_candidates[0].name}。0.1.1 增加局域网连接设置、健康检查和 10 秒超时；0.1.2 固定中国时区中文时间并启用 Camera 原生模块。新版完整业务流程仍待真机复验。", fill=PALE_GREEN)
+        add_callout(doc, "Android APK", f"已使用正式 AppID、云端证书和快速安心模式免费生成测试 APK：{apk_candidates[0].name}。压缩结构和签名验证通过，内置版本为 0.1.2 / 102 并包含 Camera 模块；SHA-256 为 482f70027dbcc7d4f7bc3b9f053064a9b973109caa40fc434496f3c43c010099。真实相机流程需安装新包后复验。", fill=PALE_GREEN)
     else:
         add_callout(doc, "Android 验收状态", "App 运行资源与自动化构建已经通过，HBuilderX 5.24 已识别工程并安装真机运行插件。云打包继续操作时要求 DCloud 登录，本机也未连接 Android 真机/模拟器，因此未生成 APK，安装和原生业务流程不记为通过。", fill=PALE_GOLD)
 
@@ -851,10 +854,12 @@ def build_report(output_path: Path) -> None:
         ("业务规则", "docs/business-rules.md", "状态机、权限与跨端联动"),
         ("测试证据", "docs/windows-test-2026-08-24.md、docs/load-test-2026-08-25.md", "环境、命令、指标和修复"),
         ("页面证据", "docs/screenshots/", "统一入口、注册、课件、考勤与端侧页面"),
+        ("公开仓库", REPOSITORY_URL, "最终 main、完整提交历史和协作记录"),
     ], [1700, 4050, 3610], font_size=8.9)
     add_text(doc, "代码目录保留完整项目文件、测试、文档和锁文件。打开提交 ZIP 后可直接看到实验报告 Word 和代码目录；代码目录排除 .git、node_modules、缓存、覆盖率、临时文件、环境密钥与编辑器配置。")
 
-    add_callout(doc, "结论与复查", "项目已形成统一入口、公共契约、服务端权限、跨端业务联动、真实附件和中文业务状态。A 的交付覆盖架构、公共服务、成员接口衔接、移动端扩展与质量验证。运行 npm ci 后，可用 npm run check 验证全部工作区，用 npm run test:load 复现压力测试，并用 build:app 与 build:mp-weixin 重新生成移动端目录。", fill=PALE_GREEN)
+    add_heading(doc, "7.3 结论与复查", 2)
+    add_callout(doc, "结论与复查", f"项目已形成统一入口、公共契约、服务端权限、跨端业务联动、真实附件和中文业务状态。A 的交付覆盖架构、公共服务、成员接口衔接、移动端扩展与质量验证。运行 npm ci 后，可用 npm run check 验证全部工作区，用 npm run test:load 复现压力测试，并用 build:app 与 build:mp-weixin 重新生成移动端目录。公开仓库：{REPOSITORY_URL}", fill=PALE_GREEN)
 
     doc.core_properties.title = "K12 教育协同平台 A 成员实验报告"
     doc.core_properties.subject = "高级程序设计课程项目"

@@ -43,7 +43,7 @@
 |---|---|
 | `apps/student-mobile/dist/build/app/` | uni-app APP 运行资源已生成 |
 | `apps/student-mobile/dist/build/mp-weixin/` | 已导入微信开发者工具并完成真实业务流程 |
-| Android 测试 APK | 免费云打包成功；约 14 MB，签名与压缩结构验证通过 |
+| Android 测试 APK | `0.1.2` 免费云打包成功；15,077,556 字节，签名、压缩结构、版本和 Camera 模块验证通过 |
 
 构建目录受根 `.gitignore` 管理，不进入源码提交；最终交付时按课程要求单独保存证据。
 
@@ -58,8 +58,8 @@
 - `npm run build:mp-weixin`：通过。
 - `npm run test:load`：500 请求、并发 50、失败 0；详细指标见 `docs/load-test-2026-08-25.md`。
 - 微信开发者工具：通过。使用 `student_101` 完成登录、课件读取、作业详情、提交、状态回写、个人中心和退出；提交后待完成数量由 2 更新为 1。
-- HBuilderX 5.24：工程导入和 uni-app 识别通过；真机运行插件已安装；使用正式 AppID、云端证书和快速安心模式免费生成约 14 MB APK。
-- APK：`0.1.2` 在 `0.1.1` 真机网络修复基础上增加 Camera 原生模块与中文时区显示；安装包继续执行压缩结构和签名验证，完整流程等待新版真机复验。
+- HBuilderX 5.24：工程导入和 uni-app 识别通过；真机运行插件已安装；使用正式 AppID、云端证书和快速安心模式免费生成 `0.1.2` APK。
+- APK：压缩结构无错误，`jarsigner` 验证通过；内置版本为 `0.1.2`/`102` 并包含 Camera 模块。SHA-256 为 `482f70027dbcc7d4f7bc3b9f053064a9b973109caa40fc434496f3c43c010099`。
 
 ## 公共文件影响
 
