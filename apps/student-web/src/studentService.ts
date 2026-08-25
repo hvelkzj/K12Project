@@ -158,7 +158,8 @@ export interface StudentDataService {
 }
 
 export function createStudentDataService(
-  client: StudentBusinessClient = studentBusinessClient,
+  client: Pick<StudentBusinessClient, 'getOverview' | 'submitWork'> =
+    studentBusinessClient,
 ): StudentDataService {
   return {
     loadOverview() {

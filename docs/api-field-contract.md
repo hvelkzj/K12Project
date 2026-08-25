@@ -1,6 +1,6 @@
 # 公共字段契约
 
-版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口；8/24 公开注册。
+版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口；8/24 公开注册与附件传输。
 
 本文件记录跨端字段和已确认接口。接口 JSON 使用 camelCase，数据库列使用 snake_case。
 
@@ -77,7 +77,7 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 
 ## 2026-08-17 共享业务 API
 
-本轮业务 API 使用进程内共享仓库。服务启动时根据公共账号和业务契约建立初始数据；服务重启后恢复初始状态。本轮不连接 PostgreSQL，不处理真实文件内容。
+本轮业务 API 使用进程内共享仓库。服务启动时根据公共账号和业务契约建立初始数据；服务重启后恢复初始状态。本轮不连接 PostgreSQL。附件的元数据和真实字节都保存在当前进程内，重启后恢复初始附件。
 
 所有业务接口要求 Bearer Token。`parentId`、`studentId`、`teacherId`、`requestedBy`、`reviewedBy`、`handlerId`、`gradedBy` 和 `recordedBy` 等身份字段由当前会话或后端关联生成，不接受请求体覆盖。
 
@@ -109,6 +109,20 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 | `PATCH /admin/schedule-changes/:changeId/substitute` | `substituteTeacherId`、`substituteNote` | `200 ScheduleChange` |
 | `PATCH /admin/work-orders/:workOrderId` | `action: 'START' \| 'CLOSE'`、`result?` | `200 FeedbackWorkOrder` |
 
+### 附件上传与下载
+
+| 接口 | 请求 | 成功响应 |
+|---|---|---|
+| `POST /student/files?name=:originalName` | 原始文件字节；`Content-Type` 为文件 MIME | `201 FileSummary` |
+| `POST /teacher/files?name=:originalName` | 原始文件字节；`Content-Type` 为文件 MIME | `201 FileSummary` |
+| `GET /files/:fileId` | Bearer Token | 文件字节；响应包含 MIME、长度和下载文件名 |
+
+- 支持 PDF、DOCX、JPG、JPEG 和 PNG，单个文件不超过 10 MB，空文件返回错误。
+- 作业或提交只能引用当前用户刚上传的附件，不能伪造其他文件的 `FileSummary`。
+- 学生只能下载本班作业、课件和本人提交附件；教师只能下载本人发布内容及本人作业对应的学生提交附件。
+- 家长不能下载作业文件；教务按所属校区访问，系统管理员按关联业务范围访问。
+- 上传、下载和业务写接口都使用 Bearer Token；浏览器下载会保存为原始文件名。
+
 ### 2026-08-20 第二轮管理接口
 
 | 接口 | 请求字段 | 成功响应 |
@@ -139,6 +153,8 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 | `404` | `NOT_FOUND` | 学生、课程、课次或业务记录不存在 |
 | `409` | `CONFLICT` | 重复提交、重复签到、重复审批、状态不允许或代课时间冲突 |
 | `422` | `VALIDATION_ERROR` | 字段格式、必填值、时间、分数或业务规则错误 |
+
+文件请求体超过 10 MB 时返回 `413 PAYLOAD_TOO_LARGE`。
 
 - 教师发布作业后学生概览立即可见；学生提交后教师概览立即可见；教师批改后学生概览返回新状态、分数和评语。
 - 家长提出异议后创建 `OPEN` 反馈工单。

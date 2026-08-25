@@ -6,6 +6,7 @@ import type {
   CourseSummary,
   Courseware,
   FeedbackWorkOrder,
+  FileSummary,
   LeaveRequest,
   Notification,
   ParentStudentBinding,
@@ -67,6 +68,17 @@ export interface AdminOverview {
 
 export type BusinessInput = Record<string, unknown>
 
+export interface FileUploadInput {
+  originalName: string
+  mimeType: string
+  content: Uint8Array
+}
+
+export interface FileDownload {
+  file: FileSummary
+  content: Uint8Array
+}
+
 export interface BusinessStore {
   isUsernameAvailable(username: string): boolean
   registerPublicAccount(account: UserAccountSummary): void
@@ -85,6 +97,8 @@ export interface BusinessStore {
   ): Notification
   getStudentOverview(user: UserSummary): StudentOverview
   submitStudentWork(user: UserSummary, input: BusinessInput): Submission
+  uploadFile(user: UserSummary, input: FileUploadInput): FileSummary
+  downloadFile(user: UserSummary, fileId: number): FileDownload
   getTeacherOverview(user: UserSummary): TeacherOverview
   saveAttendance(
     user: UserSummary,

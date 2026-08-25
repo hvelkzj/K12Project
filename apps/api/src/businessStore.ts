@@ -19,11 +19,13 @@ import {
   createBusinessSeed,
   type BusinessSeed,
   type ClassRecord,
+  type SeedFileAsset,
 } from './businessSeed.js'
 import type {
   AdminOverview,
   BusinessInput,
   BusinessStore,
+  FileUploadInput,
   ParentOverview,
   StudentOverview,
   TeacherOverview,
@@ -223,6 +225,16 @@ function requireFiles(input: BusinessInput, field: string): FileSummary[] {
   })
 }
 
+function sameFileSummary(left: FileSummary, right: FileSummary): boolean {
+  return (
+    left.id === right.id &&
+    left.originalName === right.originalName &&
+    left.mimeType === right.mimeType &&
+    left.byteSize === right.byteSize &&
+    left.createdAt === right.createdAt
+  )
+}
+
 function nextId<T extends { id: number }>(items: readonly T[], minimum: number): number {
   return Math.max(minimum - 1, ...items.map((item) => item.id)) + 1
 }
@@ -275,6 +287,106 @@ export function createBusinessStore(
 
   function currentIso(): string {
     return new Date(now()).toISOString()
+  }
+
+  function findFileAsset(fileId: number): SeedFileAsset {
+    const asset = data.files.find((item) => item.summary.id === fileId)
+    if (!asset) notFound('附件不存在或已经失效')
+    return asset
+  }
+
+  function requireUploadedFiles(
+    user: UserSummary,
+    input: BusinessInput,
+    field: string,
+  ): FileSummary[] {
+    const files = requireFiles(input, field)
+    for (const file of files) {
+      const asset = findFileAsset(file.id)
+      if (asset.uploadedBy !== user.id || !sameFileSummary(asset.summary, file)) {
+        invalid('附件必须先由当前账号上传，且不能修改附件信息')
+      }
+    }
+    return files
+  }
+
+  function includesFile(
+    files: readonly FileSummary[],
+    fileId: number,
+  ): boolean {
+    return files.some((file) => file.id === fileId)
+  }
+
+  function canDownloadFile(user: UserSummary, fileId: number): boolean {
+    const asset = findFileAsset(fileId)
+    if (asset.uploadedBy === user.id) return true
+
+    if (user.role === 'STUDENT') {
+      const student = findStudent(user.id)
+      return (
+        data.assignments.some(
+          (item) =>
+            item.classId === student.classId &&
+            includesFile(item.attachments, fileId),
+        ) ||
+        data.courseware.some(
+          (item) =>
+            item.classId === student.classId &&
+            includesFile(item.attachments, fileId),
+        ) ||
+        data.submissions.some(
+          (item) =>
+            item.studentId === user.id && includesFile(item.attachments, fileId),
+        )
+      )
+    }
+
+    if (user.role === 'TEACHER' || user.role === 'HOMEROOM_TEACHER') {
+      const ownAssignmentIds = new Set(
+        data.assignments
+          .filter((item) => item.teacherId === user.id)
+          .map((item) => item.id),
+      )
+      return (
+        data.assignments.some(
+          (item) =>
+            item.teacherId === user.id && includesFile(item.attachments, fileId),
+        ) ||
+        data.courseware.some(
+          (item) =>
+            item.teacherId === user.id && includesFile(item.attachments, fileId),
+        ) ||
+        data.submissions.some(
+          (item) =>
+            ownAssignmentIds.has(item.assignmentId) &&
+            includesFile(item.attachments, fileId),
+        )
+      )
+    }
+
+    const linkedCampusIds = new Set<number>()
+    for (const assignment of data.assignments) {
+      if (includesFile(assignment.attachments, fileId)) {
+        linkedCampusIds.add(assignment.campusId)
+      }
+    }
+    for (const material of data.courseware) {
+      if (includesFile(material.attachments, fileId)) {
+        linkedCampusIds.add(findClass(material.classId).campusId)
+      }
+    }
+    for (const submission of data.submissions) {
+      if (!includesFile(submission.attachments, fileId)) continue
+      const assignment = data.assignments.find(
+        (item) => item.id === submission.assignmentId,
+      )
+      if (assignment) linkedCampusIds.add(assignment.campusId)
+    }
+    if (user.role === 'SYSTEM_ADMIN') return linkedCampusIds.size > 0
+    if (user.role === 'ACADEMIC_ADMIN') {
+      return linkedCampusIds.has(user.campusId)
+    }
+    return false
   }
 
   function findStudent(studentId: number) {
@@ -722,7 +834,7 @@ export function createBusinessStore(
       const student = findStudent(user.id)
       const assignmentId = requirePositiveInteger(input, 'assignmentId')
       const content = requireString(input, 'content').trim()
-      const attachments = requireFiles(input, 'attachments')
+      const attachments = requireUploadedFiles(user, input, 'attachments')
       const assignment = data.assignments.find((item) => item.id === assignmentId)
 
       if (!assignment) notFound('作业不存在')
@@ -766,6 +878,50 @@ export function createBusinessStore(
       return clone(submission)
     },
 
+    uploadFile(user, input: FileUploadInput) {
+      requireRole(user, ['STUDENT', 'TEACHER', 'HOMEROOM_TEACHER'])
+      const originalName = input.originalName.trim()
+      const mimeType = input.mimeType.trim().toLowerCase()
+      const hasControlCharacter = [...originalName].some(
+        (character) => character.charCodeAt(0) < 32,
+      )
+      if (!originalName || originalName.length > 120 || hasControlCharacter) {
+        invalid('附件名称不能为空、不能超过 120 个字符或包含控制字符')
+      }
+      if (!allowedAttachmentTypes.has(mimeType)) {
+        invalid('附件仅支持 PDF、DOCX、JPG 或 PNG')
+      }
+      if (input.content.byteLength === 0) invalid('附件内容不能为空')
+      if (input.content.byteLength > maximumAttachmentBytes) {
+        invalid('单个附件不能超过 10 MB')
+      }
+
+      const summary: FileSummary = {
+        id: nextId(
+          data.files.map((item) => item.summary),
+          10_001,
+        ),
+        originalName,
+        mimeType,
+        byteSize: input.content.byteLength,
+        createdAt: currentIso(),
+      }
+      data.files.push({
+        summary,
+        content: new Uint8Array(input.content),
+        uploadedBy: user.id,
+      })
+      return clone(summary)
+    },
+
+    downloadFile(user, fileId) {
+      const asset = findFileAsset(fileId)
+      if (!canDownloadFile(user, fileId)) {
+        forbidden('当前账号不能下载该附件')
+      }
+      return clone({ file: asset.summary, content: asset.content })
+    },
+
     getTeacherOverview(user) {
       return teacherOverview(user)
     },
@@ -807,7 +963,7 @@ export function createBusinessStore(
             leaveRequest.status === 'APPROVED',
         )
         if (hasApprovedLeave && status !== 'LEAVE') {
-          invalid('已批准请假的学生只能登记为 LEAVE')
+          invalid('已批准请假的学生只能登记为“请假”')
         }
         if (
           data.attendance.some(
@@ -842,7 +998,7 @@ export function createBusinessStore(
       const scheduleId = optionalPositiveInteger(input, 'scheduleId')
       const title = requireText(input, 'title')
       const description = requireText(input, 'description')
-      const attachments = requireFiles(input, 'attachments')
+      const attachments = requireUploadedFiles(user, input, 'attachments')
       const dueAt = requireIsoTimestamp(input, 'dueAt')
       const allowLate = requireBoolean(input, 'allowLate')
       const classRecord = findClass(classId)

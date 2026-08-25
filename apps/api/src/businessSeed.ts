@@ -6,6 +6,7 @@ import type {
   CourseSummary,
   Courseware,
   FeedbackWorkOrder,
+  FileSummary,
   LeaveRequest,
   Notification,
   ParentStudentBinding,
@@ -21,6 +22,12 @@ import { MOCK_ACCOUNTS } from '@k12/shared/mock-accounts'
 
 export interface ClassRecord extends ClassSummary {
   homeroomTeacherId: number
+}
+
+export interface SeedFileAsset {
+  summary: FileSummary
+  content: Uint8Array
+  uploadedBy?: number | null
 }
 
 export interface BusinessSeed {
@@ -41,6 +48,7 @@ export interface BusinessSeed {
   notifications: Notification[]
   scheduleChangeNotices: ScheduleChangeNotice[]
   workOrders: FeedbackWorkOrder[]
+  files: SeedFileAsset[]
 }
 
 const shanghaiOffsetMs = 8 * 60 * 60 * 1000
@@ -60,6 +68,50 @@ function publicAccounts(): UserAccountSummary[] {
     username: account.username,
     active: account.active,
   }))
+}
+
+function simplePdf(text: string): Uint8Array {
+  const escaped = text.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)')
+  const stream = `BT /F1 16 Tf 72 720 Td (${escaped}) Tj ET\n`
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+    `5 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}endstream\nendobj\n`,
+  ]
+  let body = '%PDF-1.4\n'
+  const offsets = objects.map((object) => {
+    const offset = Buffer.byteLength(body)
+    body += object
+    return offset
+  })
+  const xrefOffset = Buffer.byteLength(body)
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  body += offsets
+    .map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`)
+    .join('')
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return Buffer.from(body)
+}
+
+function seedFile(
+  id: number,
+  originalName: string,
+  mimeType: string,
+  content: Uint8Array,
+  createdAt: string,
+): SeedFileAsset {
+  return {
+    summary: {
+      id,
+      originalName,
+      mimeType,
+      byteSize: content.byteLength,
+      createdAt,
+    },
+    content,
+  }
 }
 
 export function createBusinessSeed(timestamp: number): BusinessSeed {
@@ -201,28 +253,53 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       status: 'COMPLETED',
     },
   ]
-  const firstFile = {
-    id: 9001,
-    originalName: '分数练习.pdf',
-    mimeType: 'application/pdf',
-    byteSize: 640_000,
-    createdAt,
-  }
-  const secondFile = {
-    id: 9002,
-    originalName: '英语阅读方法.pdf',
-    mimeType: 'application/pdf',
-    byteSize: 520_000,
-    createdAt,
-  }
-  const thirdFile = {
-    id: 9003,
-    originalName: '水循环观察表.docx',
-    mimeType:
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    byteSize: 180_000,
-    createdAt,
-  }
+  const fileAssets = [
+    seedFile(
+      9001,
+      '分数练习.pdf',
+      'application/pdf',
+      simplePdf('K12 Math Practice - Fraction Exercises'),
+      createdAt,
+    ),
+    seedFile(
+      9002,
+      '英语阅读方法.pdf',
+      'application/pdf',
+      simplePdf('K12 English Reading - Key Word Practice'),
+      createdAt,
+    ),
+    seedFile(
+      9003,
+      '水循环观察表.png',
+      'image/png',
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+      createdAt,
+    ),
+    seedFile(
+      9004,
+      '林晓雨分数订正.pdf',
+      'application/pdf',
+      simplePdf('Student 101 - Fraction correction work'),
+      dateAt(timestamp, -1, '19:00:00'),
+    ),
+    seedFile(
+      9005,
+      '陈安然实验预测.pdf',
+      'application/pdf',
+      simplePdf('Student 103 - Water cycle experiment prediction'),
+      dateAt(timestamp, 0, '08:30:00'),
+    ),
+  ]
+  const [firstAsset, secondAsset, thirdAsset, fourthAsset, fifthAsset] =
+    fileAssets
+  const firstFile = firstAsset!.summary
+  const secondFile = secondAsset!.summary
+  const thirdFile = thirdAsset!.summary
+  const fourthFile = fourthAsset!.summary
+  const fifthFile = fifthAsset!.summary
   const courseware: Courseware[] = [
     {
       id: 2001,
@@ -360,7 +437,7 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       studentId: 101,
       attempt: 1,
       content: '第一次计算过程。',
-      attachments: [],
+      attachments: [fourthFile],
       status: 'SUBMITTED',
       submittedAt: dateAt(timestamp, -1, '19:00:00'),
       teacherComment: '',
@@ -402,7 +479,7 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
       studentId: 103,
       attempt: 1,
       content: '预测加热后水会蒸发，遇冷后形成小水滴。',
-      attachments: [],
+      attachments: [fifthFile],
       status: 'SUBMITTED',
       submittedAt: dateAt(timestamp, 0, '08:30:00'),
       score: null,
@@ -609,5 +686,6 @@ export function createBusinessSeed(timestamp: number): BusinessSeed {
     notifications,
     scheduleChangeNotices: [],
     workOrders,
+    files: fileAssets,
   }
 }

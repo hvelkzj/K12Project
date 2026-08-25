@@ -111,7 +111,7 @@ test('已有签到保留，但批准请假不能被改成其他状态', () => {
         leaveRequests,
         scheduleId: schedule.id,
       }),
-    /只能登记为 LEAVE/,
+    /只能登记为“请假”/,
   )
 })
 

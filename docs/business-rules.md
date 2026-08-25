@@ -23,6 +23,10 @@
 
 - 截止后默认不能提交。
 - 教师可以要求学生订正后重新提交。
+- 教师可以上传 PDF、DOCX、JPG、JPEG 或 PNG 作业附件，单个文件不超过 10 MB。
+- 学生可以下载本班作业和课件附件，也可以上传自己的提交附件。
+- 教师可以打开本人作业的学生提交详情，查看正文并下载学生附件。
+- 附件必须先由当前账号上传，业务提交不能引用或伪造他人的文件元数据。
 
 ## 权限
 
@@ -51,4 +55,5 @@
 - 调课申请、审批和代课使用一条流程记录，状态依次为 `PENDING`、`APPROVED`、`REJECTED`、`SUBSTITUTE_ASSIGNED`、`COMPLETED`。
 - 家校反馈状态为 `PENDING_PARENT`、`CONFIRMED`、`DISPUTED`；反馈工单状态为 `OPEN`、`PROCESSING`、`CLOSED`。
 - 作业“未提交”和请假草稿是页面状态，不写入数据库；订正提交通过递增 `attempt` 保留历史。
+- 状态代码用于跨端传输，业务页面必须显示中文标签；未知状态保留原值，避免页面空白。
 - 完整字段见 `docs/api-field-contract.md`，数据库关系见 `docs/data-model.md`。

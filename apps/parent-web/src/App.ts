@@ -1,4 +1,5 @@
 import { computed, defineComponent, h, onMounted, ref } from 'vue'
+import { getBusinessStatusLabel } from '@k12/shared'
 import type {
   LeaveRequest,
   Notification,
@@ -283,7 +284,7 @@ export default defineComponent({
         isAuthenticated.value = true
         activeTab.value = '首页'
         loginMessage.value = ''
-        message.value = `已使用 ${user.displayName} 的真实认证账号登录`
+        message.value = `已使用 ${user.displayName} 的账号登录`
         await loadStudentsAndDefaultOverview()
       } catch (error) {
         loginMessage.value =
@@ -436,7 +437,7 @@ export default defineComponent({
         leaveReason.value = ''
         contactPhone.value = ''
         selectedScheduleId.value = null
-        message.value = `请假已提交，状态：${request.status}`
+        message.value = `请假已提交，状态：${getBusinessStatusLabel(request.status)}`
         await refreshCurrentOverview('请假已提交，审批状态已刷新')
       } catch (error) {
         const errorText = businessErrorMessage(
@@ -571,7 +572,7 @@ export default defineComponent({
       if (isLoadingStudents.value || isLoadingOverview.value) {
         return h('section', { class: 'panel state-panel' }, [
           h('h3', '正在加载数据'),
-          h('p', { class: 'muted' }, '正在从业务 API 获取最新家长端数据。'),
+          h('p', { class: 'muted' }, '正在获取最新的学生信息。'),
         ])
       }
 
@@ -642,7 +643,7 @@ export default defineComponent({
             ),
           ),
           h('div', { class: 'account-actions' }, [
-            h('span', '真实认证登录状态'),
+            h('span', '已安全登录'),
             h(
               'button',
               { class: 'logout-button', type: 'button', onClick: () => void logout() },
@@ -890,7 +891,7 @@ export default defineComponent({
                           h('p', `优点：${item.strengths}`),
                           h('p', `改进：${item.improvements}`),
                           h('p', `建议：${item.suggestion}`),
-                          h('p', `状态：${item.status}`),
+                          h('p', `状态：${getBusinessStatusLabel(item.status)}`),
                           h('label', [
                             '异议说明',
                             h('textarea', {

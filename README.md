@@ -110,7 +110,7 @@ Copy-Item apps/parent-web/.env.example apps/parent-web/.env
 - 当前运行时使用可注入的进程内数据仓库、注册账号仓库和内存会话。
 - API 重启后恢复初始数据，已登录会话失效。
 - `apps/api/db/migrations/001_initial.sql` 保留 PostgreSQL 结构，不是当前运行时依赖。
-- 附件只保存元数据，不上传真实文件。
+- 作业和课件附件会传输真实文件内容；当前保存在进程内仓库，API 重启后恢复初始附件。
 
 ## 有效文档
 
@@ -123,5 +123,6 @@ Copy-Item apps/parent-web/.env.example apps/parent-web/.env
 - [真实业务验收记录](docs/business-validation-2026-08-24.md)
 - [最终 A 交付记录](docs/member-a-final-integration-round-4.md)
 - [A 统一入口与注册交付](docs/member-a-portal-registration.md)
+- [A 跨端附件与中文状态交付](docs/member-a-business-ui-completion.md)
 - [Windows 项目测试记录](docs/windows-test-2026-08-24.md)
 - [AI 与 Git 协作规范](AGENTS.md)

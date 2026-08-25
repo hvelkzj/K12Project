@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { Submission, UserSummary } from '@k12/shared'
+import type { FileSummary, Submission, UserSummary } from '@k12/shared'
 
 import { listAssignmentRows } from './assignmentListService'
 import { getSubmissionStatusLabel } from './assignmentPresentation'
 import { filterCoursewareByTitle } from './coursewareSearch'
 import { getCourseDisplayName } from './coursePresentation'
+import { saveBlobAsFile } from './fileDownload'
 import { authService } from './services/authService'
 import { studentBusinessClient, StudentBusinessError } from './studentBusinessClient'
 import type { StudentOverview } from './studentBusinessClient'
@@ -26,6 +27,7 @@ const overview = ref<StudentOverview | null>(null)
 const isOverviewLoading = ref(false)
 const overviewError = ref('')
 const coursewareQuery = ref('')
+const downloadingFileId = ref<number | null>(null)
 
 onMounted(async () => {
   const hadStoredSession = Boolean(authService.getAccessToken())
@@ -158,7 +160,27 @@ function formatDateTime(value: string): string {
 }
 
 function formatBytes(byteSize: number): string {
-  return `${(byteSize / 1024 / 1024).toFixed(1)} MB`
+  return byteSize < 1024 * 1024
+    ? `${Math.max(1, Math.ceil(byteSize / 1024))} KB`
+    : `${(byteSize / 1024 / 1024).toFixed(1)} MB`
+}
+
+async function downloadMaterial(file: FileSummary): Promise<void> {
+  if (downloadingFileId.value !== null) return
+  downloadingFileId.value = file.id
+  notice.value = ''
+  try {
+    saveBlobAsFile(await studentBusinessClient.downloadFile(file.id), file.originalName)
+    notice.value = `已开始下载：${file.originalName}`
+  } catch (error) {
+    if (error instanceof StudentBusinessError && error.status === 401) {
+      handleSessionExpired('登录已失效，请重新登录')
+      return
+    }
+    notice.value = error instanceof Error ? error.message : '课件下载失败'
+  } finally {
+    downloadingFileId.value = null
+  }
 }
 </script>
 
@@ -337,14 +359,19 @@ function formatBytes(byteSize: number): string {
                   <h3>{{ material.title }}</h3>
                   <p>{{ material.description }}</p>
                   <div class="material-files">
-                    <div
+                    <button
                       v-for="file in material.attachments"
                       :key="file.id"
                       class="material-file"
+                      type="button"
+                      :disabled="downloadingFileId !== null"
+                      :aria-label="`下载 ${file.originalName}`"
+                      @click="downloadMaterial(file)"
                     >
                       <span>{{ file.originalName }}</span>
                       <small>{{ formatBytes(file.byteSize) }}</small>
-                    </div>
+                      <strong>{{ downloadingFileId === file.id ? '下载中…' : '下载' }}</strong>
+                    </button>
                   </div>
                 </div>
               </article>
@@ -386,7 +413,8 @@ function formatBytes(byteSize: number): string {
 
 .material-file {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
   gap: 10px;
   width: 100%;
   border: 1px solid #e4e7ef;
@@ -395,6 +423,7 @@ function formatBytes(byteSize: number): string {
   color: #4c5870;
   background: #fafbfe;
   text-align: left;
+  cursor: pointer;
 }
 
 .material-file:hover {
@@ -405,6 +434,8 @@ function formatBytes(byteSize: number): string {
 .material-file small {
   min-height: auto;
 }
+
+.material-file strong { color: #625bcf; font-size: 13px; }
 
 .state-panel {
   padding: 32px;

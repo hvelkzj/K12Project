@@ -124,6 +124,49 @@ test('提交请求只发送 assignmentId、content 和 attachments', async () =>
   assert.equal(authHeaders(call.init)['Content-Type'], 'application/json')
 })
 
+test('学生附件上传发送真实文件内容并返回服务端元数据', async () => {
+  const uploaded: FileSummary = {
+    id: 10_001,
+    originalName: '我的作业.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 7,
+    createdAt: mockNow,
+  }
+  const { calls, fetchImpl } = createFakeFetch(() => jsonResponse(201, uploaded))
+  const client = createStudentBusinessClient({
+    fetchImpl,
+    authClient: createFakeAuth('token-101'),
+  })
+  const file = new File(['content'], '我的作业.pdf', {
+    type: 'application/pdf',
+  })
+
+  assert.deepEqual(await client.uploadFile(file), uploaded)
+  const call = singleCall(calls)
+  assert.equal(
+    call.url,
+    'http://127.0.0.1:3000/student/files?name=%E6%88%91%E7%9A%84%E4%BD%9C%E4%B8%9A.pdf',
+  )
+  assert.equal(call.init?.method, 'POST')
+  assert.equal(call.init?.body, file)
+  assert.equal(authHeaders(call.init)['Content-Type'], 'application/pdf')
+})
+
+test('学生附件下载返回二进制内容并携带登录令牌', async () => {
+  const { calls, fetchImpl } = createFakeFetch(
+    () => new Response('download-content', { status: 200 }),
+  )
+  const client = createStudentBusinessClient({
+    fetchImpl,
+    authClient: createFakeAuth('token-101'),
+  })
+
+  assert.equal(await (await client.downloadFile(9001)).text(), 'download-content')
+  const call = singleCall(calls)
+  assert.equal(call.url, 'http://127.0.0.1:3000/files/9001')
+  assert.equal(authHeaders(call.init).Authorization, 'Bearer token-101')
+})
+
 test('业务接口返回 401 时清除 Token 并抛出会话错误', async () => {
   const { fetchImpl } = createFakeFetch(() =>
     jsonResponse(401, { code: 'INVALID_SESSION', message: '登录已失效，请重新登录' }),

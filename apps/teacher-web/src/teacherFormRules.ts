@@ -1,4 +1,4 @@
-import type { ScheduleSummary } from '@k12/shared'
+import type { FileSummary, ScheduleSummary } from '@k12/shared'
 
 import type {
   AssignmentInput,
@@ -13,6 +13,7 @@ export function resetScheduleScopedDrafts(drafts: {
     description: string
     dueAt: string
     allowLate: boolean
+    attachments?: FileSummary[]
   }
   feedback: {
     performance: string
@@ -31,6 +32,7 @@ export function resetScheduleScopedDrafts(drafts: {
   drafts.assignment.description = ''
   drafts.assignment.dueAt = ''
   drafts.assignment.allowLate = false
+  drafts.assignment.attachments?.splice(0)
   drafts.feedback.performance = ''
   drafts.feedback.strengths = ''
   drafts.feedback.improvements = ''
@@ -48,6 +50,7 @@ export function assignmentInput(
     description: string
     dueAt: string
     allowLate: boolean
+    attachments?: FileSummary[]
   },
 ): AssignmentInput {
   const title = draft.title.trim()
@@ -63,7 +66,7 @@ export function assignmentInput(
     scheduleId: schedule.id,
     title,
     description,
-    attachments: [],
+    attachments: [...(draft.attachments ?? [])],
     dueAt: `${draft.dueAt}:00+08:00`,
     allowLate: draft.allowLate,
   }

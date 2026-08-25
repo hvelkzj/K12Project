@@ -88,7 +88,7 @@ export function assertApprovedLeavesUseLeave(input: {
     ),
   )
   if (invalidDraft) {
-    throw new Error('已批准请假的学生只能登记为 LEAVE')
+    throw new Error('已批准请假的学生只能登记为“请假”')
   }
 }
 

@@ -8,8 +8,10 @@ import type { BusinessInput, BusinessStore } from './businessTypes.js'
 import {
   getBearerToken,
   isJsonRequest,
+  readFileBody,
   readJsonBody,
   sendError,
+  sendFile,
   sendJson,
 } from './http.js'
 
@@ -18,6 +20,7 @@ const parentFeedbackPattern = /^\/parent\/feedback\/(\d+)$/
 const parentNotificationReadPattern =
   /^\/parent\/notifications\/(\d+)\/read$/
 const teacherSubmissionPattern = /^\/teacher\/submissions\/(\d+)$/
+const fileDownloadPattern = /^\/files\/(\d+)$/
 const adminReviewPattern = /^\/admin\/schedule-changes\/(\d+)\/review$/
 const adminSubstitutePattern =
   /^\/admin\/schedule-changes\/(\d+)\/substitute$/
@@ -32,9 +35,11 @@ const exactBusinessPaths = new Set([
   '/parent/leave-requests',
   '/student/overview',
   '/student/submissions',
+  '/student/files',
   '/teacher/overview',
   '/teacher/attendance',
   '/teacher/assignments',
+  '/teacher/files',
   '/teacher/feedback',
   '/teacher/schedule-changes',
   '/admin/overview',
@@ -47,6 +52,7 @@ function dynamicPathMatches(path: string): boolean {
     parentFeedbackPattern,
     parentNotificationReadPattern,
     teacherSubmissionPattern,
+    fileDownloadPattern,
     adminReviewPattern,
     adminSubstitutePattern,
     adminWorkOrderPattern,
@@ -202,6 +208,52 @@ export async function handleBusinessRequest(
   if (path === '/student/overview') {
     if (method !== 'GET') methodNotAllowed(response, ['GET'])
     else sendJson(response, 200, store.getStudentOverview(user))
+    return true
+  }
+
+  if (path === '/student/files' || path === '/teacher/files') {
+    if (method !== 'POST') {
+      methodNotAllowed(response, ['POST'])
+      return true
+    }
+    const studentUpload = path === '/student/files'
+    if (
+      (studentUpload && user.role !== 'STUDENT') ||
+      (!studentUpload &&
+        user.role !== 'TEACHER' &&
+        user.role !== 'HOMEROOM_TEACHER')
+    ) {
+      throw new BusinessError(403, 'FORBIDDEN', '当前角色不能上传该业务附件')
+    }
+    const requestUrl = new URL(request.url ?? path, 'http://127.0.0.1')
+    const requestedName = requestUrl.searchParams.get('name') ?? ''
+    const originalName = requestedName.split(/[\\/]/).at(-1) ?? ''
+    const mimeType =
+      request.headers['content-type']?.split(';', 1)[0]?.trim() ?? ''
+    const body = await readFileBody(request)
+    if (!body.ok) sendJson(response, body.status, body.error)
+    else {
+      sendJson(
+        response,
+        201,
+        store.uploadFile(user, { originalName, mimeType, content: body.value }),
+      )
+    }
+    return true
+  }
+
+  const fileDownloadMatch = path.match(fileDownloadPattern)
+  if (fileDownloadMatch) {
+    if (method !== 'GET') methodNotAllowed(response, ['GET'])
+    else {
+      const downloaded = store.downloadFile(user, pathId(fileDownloadMatch))
+      sendFile(
+        response,
+        downloaded.content,
+        downloaded.file.mimeType,
+        downloaded.file.originalName,
+      )
+    }
     return true
   }
 

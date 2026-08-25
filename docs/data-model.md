@@ -22,7 +22,7 @@
 |---|---|---|
 | `attendance` | D | 每个课次、每个学生一条签到 |
 | `leave_requests` | B、E | 关联家长、学生和课次 |
-| `stored_files` | A，供 C/D 使用 | 保存附件元数据，不把文件写入数据库 |
+| `stored_files` | A，供 C/D 使用 | PostgreSQL 结构保存附件元数据；当前运行时仓库同时保存真实字节 |
 | `courseware`、`courseware_attachments` | C、D | 课件可有多个附件 |
 | `assignments`、`assignment_attachments` | C、D | 作业关联班级、课程和迟交规则 |
 | `submissions`、`submission_attachments` | C、D | `assignment + student + attempt` 唯一 |
@@ -70,3 +70,5 @@ psql -d k12 -f apps/api/db/migrations/001_initial.sql
 ```
 
 迁移只创建结构，不包含真实账号或个人信息。公共类型和登录接口见 `docs/a-7-29-public-types-and-auth.md`，当前六类角色十三个本地账号见 `docs/demo-accounts.md`。公开注册的家长和学生账号使用同一 `users`、`classes` 数据关系，但当前课程项目只写入内存账号与业务仓库；API 重启后清除注册账号并恢复已扩充的初始数据。该迁移仅作为数据库结构交付。
+
+真实附件内容本轮保存在 API 进程内，不写入 PostgreSQL，也不依赖 macOS 或 Windows 的本机文件路径。生产型对象存储不在课程项目范围内。

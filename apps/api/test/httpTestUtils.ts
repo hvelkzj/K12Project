@@ -10,14 +10,15 @@ export interface TestRequestOptions {
   method: string
   url: string
   jsonBody?: unknown
-  rawBody?: string
-  rawChunks?: readonly string[]
+  rawBody?: string | Uint8Array
+  rawChunks?: readonly (string | Uint8Array)[]
   contentType?: string | null
   headers?: IncomingHttpHeaders
 }
 
 export interface TestResponseState {
   body: string
+  bodyBuffer: Buffer
   headers: Map<string, string | number | readonly string[]>
   status: number
 }
@@ -53,6 +54,7 @@ export async function callHandler(
 
   const state: TestResponseState = {
     body: '',
+    bodyBuffer: Buffer.alloc(0),
     headers: new Map(),
     status: 0,
   }
@@ -65,8 +67,11 @@ export async function callHandler(
       state.status = status
       return this
     },
-    end(responseBody?: string | Buffer) {
-      state.body = responseBody?.toString() ?? ''
+    end(responseBody?: string | Buffer | Uint8Array) {
+      state.bodyBuffer = responseBody
+        ? Buffer.from(responseBody)
+        : Buffer.alloc(0)
+      state.body = state.bodyBuffer.toString()
       return this
     },
   }
