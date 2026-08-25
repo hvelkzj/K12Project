@@ -60,7 +60,7 @@ interface GradeDraft {
 const pages: Array<{ key: PageKey; label: string; shortLabel: string }> = [
   { key: 'today', label: '今日课程', shortLabel: '课程' },
   { key: 'attendance', label: '课堂签到', shortLabel: '签到' },
-  { key: 'publish', label: '发布作业', shortLabel: '作业' },
+  { key: 'publish', label: '教学发布', shortLabel: '发布' },
   { key: 'grading', label: '作业批改', shortLabel: '批改' },
   { key: 'feedback', label: '课后反馈', shortLabel: '反馈' },
   { key: 'schedule-change', label: '调课申请', shortLabel: '调课' },
@@ -90,7 +90,9 @@ const portalUrl =
 const selectedScheduleId = ref<number | null>(null)
 const selectedSubmissionId = ref<number | null>(null)
 const isUploadingAssignmentFiles = ref(false)
+const isUploadingCoursewareFiles = ref(false)
 const downloadingFileId = ref<number | null>(null)
+const publishMode = ref<'assignment' | 'courseware'>('assignment')
 
 const attendanceDrafts = ref<AttendanceDraft[]>([])
 const gradeDrafts = reactive<Record<number, GradeDraft>>({})
@@ -100,6 +102,12 @@ const assignmentDraft = reactive({
   description: '',
   dueAt: '',
   allowLate: false,
+  attachments: [] as FileSummary[],
+})
+
+const coursewareDraft = reactive({
+  title: '',
+  description: '',
   attachments: [] as FileSummary[],
 })
 
@@ -122,6 +130,7 @@ const visibleSchedules = computed(() => overview.value?.schedules ?? [])
 const attendanceRecords = computed(() => overview.value?.attendance ?? [])
 const scheduleChanges = computed(() => overview.value?.scheduleChanges ?? [])
 const assignments = computed(() => overview.value?.assignments ?? [])
+const courseware = computed(() => overview.value?.courseware ?? [])
 const submissions = computed(() => overview.value?.submissions ?? [])
 
 const selectedSchedule = computed(
@@ -191,6 +200,9 @@ watch(selectedScheduleId, () => {
     feedback: feedbackDraft,
     scheduleChange: scheduleChangeDraft,
   })
+  coursewareDraft.title = ''
+  coursewareDraft.description = ''
+  coursewareDraft.attachments.splice(0)
 })
 const unrecordedAttendanceCount = computed(
   () =>
@@ -284,6 +296,39 @@ async function handleAssignmentFiles(event: Event): Promise<void> {
 function removeAssignmentFile(fileId: number): void {
   const index = assignmentDraft.attachments.findIndex((item) => item.id === fileId)
   if (index >= 0) assignmentDraft.attachments.splice(index, 1)
+}
+
+async function handleCoursewareFiles(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  if (files.length === 0) return
+  isUploadingCoursewareFiles.value = true
+  notice.value = ''
+  try {
+    const uploaded: FileSummary[] = []
+    for (const file of files) {
+      uploaded.push(
+        await teacherBusinessClient.uploadFile(
+          file,
+          validateTeacherAttachment(file),
+        ),
+      )
+    }
+    coursewareDraft.attachments.push(...uploaded)
+    notice.value = `已上传 ${uploaded.length} 个课件附件`
+  } catch (error) {
+    handleBusinessError(error, '课件附件上传失败')
+  } finally {
+    isUploadingCoursewareFiles.value = false
+    input.value = ''
+  }
+}
+
+function removeCoursewareFile(fileId: number): void {
+  const index = coursewareDraft.attachments.findIndex(
+    (item) => item.id === fileId,
+  )
+  if (index >= 0) coursewareDraft.attachments.splice(index, 1)
 }
 
 async function downloadAttachment(file: FileSummary): Promise<void> {
@@ -484,6 +529,29 @@ async function publishAssignment(): Promise<void> {
   }
 }
 
+async function publishCourseware(): Promise<void> {
+  try {
+    const schedule = requireWritableSchedule()
+    pendingAction.value = 'courseware'
+    const created = await teacherBusinessClient.publishCourseware({
+      classId: schedule.classId,
+      courseId: schedule.courseId,
+      title: coursewareDraft.title,
+      description: coursewareDraft.description,
+      attachments: coursewareDraft.attachments,
+    })
+    if (overview.value) overview.value.courseware.push(created)
+    coursewareDraft.title = ''
+    coursewareDraft.description = ''
+    coursewareDraft.attachments.splice(0)
+    notice.value = `课件 #${created.id} 已发布，学生端已同步`
+  } catch (error) {
+    handleBusinessError(error, '课件发布失败')
+  } finally {
+    pendingAction.value = null
+  }
+}
+
 function replaceSubmission(updated: Submission): void {
   const list = overview.value?.submissions
   if (!list) return
@@ -677,8 +745,12 @@ onMounted(async () => {
         </section>
 
         <section v-else-if="activePage === 'publish'" class="panel">
-          <div class="section-heading"><div><p class="eyebrow">教师发布</p><h2>新建作业</h2></div><span class="status">发布后学生可查看</span></div>
-          <form class="form-grid" @submit.prevent="publishAssignment">
+          <div class="section-heading"><div><p class="eyebrow">教学内容管理</p><h2>{{ publishMode === 'assignment' ? '新建作业' : '发布课件' }}</h2></div><span class="status">发布后网页、APP 与小程序同步</span></div>
+          <div class="publish-tabs" role="tablist" aria-label="教学发布类型">
+            <button type="button" :class="{ active: publishMode === 'assignment' }" @click="publishMode = 'assignment'">发布作业</button>
+            <button type="button" :class="{ active: publishMode === 'courseware' }" @click="publishMode = 'courseware'">发布课件</button>
+          </div>
+          <form v-if="publishMode === 'assignment'" class="form-grid" @submit.prevent="publishAssignment">
             <label class="full"><span>当前课次</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · #${selectedSchedule.id}` : '请先选择课次'" readonly /></label>
             <label class="full"><span>作业标题</span><input v-model="assignmentDraft.title" required /></label>
             <label class="full"><span>作业内容</span><textarea v-model="assignmentDraft.description" rows="4" required></textarea></label>
@@ -687,6 +759,15 @@ onMounted(async () => {
             <label><span>截止时间</span><input v-model="assignmentDraft.dueAt" type="datetime-local" required /></label>
             <label class="check-field"><input v-model="assignmentDraft.allowLate" type="checkbox" /><span>允许截止后提交</span></label>
             <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || isUploadingAssignmentFiles || selectedScheduleCancelled">{{ pendingAction === 'assignment' ? '发布中…' : isUploadingAssignmentFiles ? '等待附件上传' : '发布作业' }}</button></div>
+          </form>
+          <form v-else class="form-grid" @submit.prevent="publishCourseware">
+            <label class="full"><span>当前课程</span><input :value="selectedSchedule ? `${className(selectedSchedule.classId)} · ${courseName(selectedSchedule.courseId)} · #${selectedSchedule.id}` : '请先选择课次'" readonly /></label>
+            <label class="full"><span>课件标题</span><input v-model="coursewareDraft.title" required /></label>
+            <label class="full"><span>课件说明</span><textarea v-model="coursewareDraft.description" rows="4" required></textarea></label>
+            <label class="full attachment-upload"><span>课件附件</span><input type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png" :disabled="isUploadingCoursewareFiles" @change="handleCoursewareFiles" /><small>{{ isUploadingCoursewareFiles ? '附件上传中…' : '支持 PDF、DOCX、JPG、PNG，单个文件不超过 10 MB' }}</small></label>
+            <div v-if="coursewareDraft.attachments.length" class="full uploaded-files"><div v-for="file in coursewareDraft.attachments" :key="file.id"><span><strong>{{ file.originalName }}</strong><small>{{ formatBytes(file.byteSize) }}</small></span><button class="secondary" type="button" :disabled="pendingAction !== null" @click="removeCoursewareFile(file.id)">移除</button></div></div>
+            <div class="full form-actions"><button class="primary" type="submit" :disabled="pendingAction !== null || isUploadingCoursewareFiles || selectedScheduleCancelled">{{ pendingAction === 'courseware' ? '发布中…' : isUploadingCoursewareFiles ? '等待附件上传' : '发布课件' }}</button></div>
+            <div v-if="courseware.length" class="full published-materials"><strong>已发布课件</strong><span v-for="material in courseware.filter((item) => item.teacherId === currentUser?.id).slice(-4).reverse()" :key="material.id">#{{ material.id }} · {{ material.title }} · {{ material.attachments.length }} 个附件</span></div>
           </form>
         </section>
 

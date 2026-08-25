@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { getBusinessStatusLabel } from '@k12/shared'
 import type { FileSummary, Submission, UserSummary } from '@k12/shared'
 
 import { listAssignmentRows } from './assignmentListService'
@@ -69,6 +70,15 @@ const pendingCount = computed(
 const gradedCount = computed(
   () =>
     assignmentRows.value.filter(({ status }) => status === 'GRADED').length,
+)
+const attendance = computed(() => overview.value?.attendance ?? [])
+const presentCount = computed(
+  () => attendance.value.filter((item) => item.status === 'PRESENT').length,
+)
+const recentAttendance = computed(() =>
+  [...attendance.value]
+    .sort((left, right) => Date.parse(right.recordedAt) - Date.parse(left.recordedAt))
+    .slice(0, 3),
 )
 
 async function loadOverview(): Promise<void> {
@@ -293,6 +303,9 @@ async function downloadMaterial(file: FileSummary): Promise<void> {
               <article class="summary-card green">
                 <span>新课件</span><strong>{{ materials.length }}</strong><small>份资料</small>
               </article>
+              <article class="summary-card purple">
+                <span>已出勤</span><strong>{{ presentCount }}</strong><small>次课堂</small>
+              </article>
             </div>
 
             <div class="section-heading">
@@ -321,6 +334,24 @@ async function downloadMaterial(file: FileSummary): Promise<void> {
                   {{ getSubmissionStatusLabel(row.status) }}
                 </em>
               </button>
+            </div>
+
+            <div class="section-heading attendance-heading">
+              <div><p class="eyebrow">课堂记录</p><h3>近期考勤</h3></div>
+              <span class="attendance-total">共 {{ attendance.length }} 条</span>
+            </div>
+            <p v-if="recentAttendance.length === 0" class="state-message">
+              暂无考勤记录
+            </p>
+            <div v-else class="compact-list">
+              <article v-for="record in recentAttendance" :key="record.id" class="compact-item attendance-item">
+                <span class="course-icon">勤</span>
+                <span>
+                  <strong>课次 #{{ record.scheduleId }}</strong>
+                  <small>{{ formatDateTime(record.recordedAt) }}<template v-if="record.note"> · {{ record.note }}</template></small>
+                </span>
+                <em class="attendance-status">{{ getBusinessStatusLabel(record.status) }}</em>
+              </article>
             </div>
           </section>
 

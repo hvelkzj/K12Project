@@ -423,7 +423,7 @@ textarea:focus {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 15px;
 }
 
@@ -497,6 +497,23 @@ textarea:focus {
   color: #7d8a9d;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.schedule-meta {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  color: #68778c;
+  font-size: 13px;
+}
+
+.attendance-badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #17684f;
+  background: #e8f6f0;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .primary {

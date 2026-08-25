@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  AttendanceRecord,
   CourseSummary,
   LeaveRequest,
   Notification,
@@ -23,6 +24,7 @@ export interface ParentOverview {
   notifications: Notification[]
   scheduleChangeNotices: ScheduleChangeNotice[]
   feedback: StudentFeedback[]
+  attendance: AttendanceRecord[]
 }
 
 export interface LeaveRequestInput {
