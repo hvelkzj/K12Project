@@ -5,6 +5,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { downloadAndOpen } from '../../mobileFiles'
 import { filterCourseware } from '../../mobilePresentation'
 import { mobileSession } from '../../mobileSession'
+import { formatChinaDate } from '../../mobileDateTime'
 
 const query = ref('')
 const downloadingId = ref<number | null>(null)
@@ -41,7 +42,7 @@ async function openFile(file: Parameters<typeof downloadAndOpen>[0]): Promise<vo
     <view v-if="mobileSession.state.loading && !mobileSession.state.overview" class="card empty-state">课件加载中…</view>
     <view v-else-if="materials.length === 0" class="card empty-state">{{ query.trim() ? '没有匹配的课件' : '暂无课件，老师发布后会自动显示' }}</view>
     <view v-for="material in materials" :key="material.id" class="card material-card">
-      <view class="material-head"><view><text class="course-tag">课程 #{{ material.courseId }}</text><strong>{{ material.title }}</strong></view><text class="date">{{ new Date(material.publishedAt).toLocaleDateString('zh-CN') }}</text></view>
+      <view class="material-head"><view><text class="course-tag">课程 #{{ material.courseId }}</text><strong>{{ material.title }}</strong></view><text class="date">{{ formatChinaDate(material.publishedAt) }}</text></view>
       <text class="description">{{ material.description }}</text>
       <view v-if="material.attachments.length" class="attachments">
         <view v-for="file in material.attachments" :key="file.id" class="file-row">

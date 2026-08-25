@@ -4,11 +4,13 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 
 import {
-  chooseImages,
+  capturePhoto,
+  chooseAlbumImages,
   chooseWechatFiles,
   downloadAndOpen,
   uploadSelectedFiles,
 } from '../../mobileFiles'
+import { formatChinaDateTime } from '../../mobileDateTime'
 import type { MobileFileInput } from '../../mobileClient'
 import {
   assignmentStatusLabel,
@@ -41,9 +43,15 @@ const submissions = computed(() => (mobileSession.state.overview?.submissions ??
 const current = computed(() => latestSubmission(submissions.value, assignmentId.value))
 const canSubmit = computed(() => !current.value || current.value.status === 'REVISION_REQUIRED')
 
-async function addImages(): Promise<void> {
+async function takePhoto(): Promise<void> {
   message.value = ''
-  try { selectedFiles.value.push(...await chooseImages()) }
+  try { selectedFiles.value.push(...await capturePhoto()) }
+  catch (error) { message.value = error instanceof Error ? error.message : '拍照失败' }
+}
+
+async function addAlbumImages(): Promise<void> {
+  message.value = ''
+  try { selectedFiles.value.push(...await chooseAlbumImages()) }
   catch (error) { message.value = error instanceof Error ? error.message : '选择图片失败' }
 }
 
@@ -97,7 +105,7 @@ async function submit(): Promise<void> {
         <view class="hero-head"><text>作业 #{{ assignment.id }}</text><text class="status">{{ assignmentStatusLabel(current?.status ?? 'NOT_SUBMITTED') }}</text></view>
         <text class="detail-title">{{ assignment.title }}</text>
         <text class="detail-copy">{{ assignment.description }}</text>
-        <view class="meta"><text>截止：{{ new Date(assignment.dueAt).toLocaleString('zh-CN') }}</text><text>{{ assignment.allowLate ? '允许迟交' : '截止后不可提交' }}</text></view>
+        <view class="meta"><text>截止：{{ formatChinaDateTime(assignment.dueAt) }}</text><text>{{ assignment.allowLate ? '允许迟交' : '截止后不可提交' }}</text></view>
       </view>
 
       <view v-if="assignment.attachments.length" class="card">
@@ -118,7 +126,7 @@ async function submit(): Promise<void> {
       <view v-if="canSubmit" class="card submit-card">
         <text class="section-title">{{ current?.status === 'REVISION_REQUIRED' ? '提交订正' : '提交作业' }}</text>
         <textarea v-model="content" maxlength="4000" placeholder="填写解题过程、答案或学习说明" />
-        <view class="file-actions"><button class="secondary-button" :disabled="submitting" @click="addImages">拍照或选择图片</button><!-- #ifdef MP-WEIXIN --><button class="secondary-button" :disabled="submitting" @click="addWechatFiles">选择微信文件</button><!-- #endif --></view>
+        <view class="file-actions"><button class="secondary-button" :disabled="submitting" @click="takePhoto">拍照</button><button class="secondary-button" :disabled="submitting" @click="addAlbumImages">选择图片</button><!-- #ifdef MP-WEIXIN --><button class="secondary-button" :disabled="submitting" @click="addWechatFiles">选择微信文件</button><!-- #endif --></view>
         <view v-if="selectedFiles.length" class="selected-files"><view v-for="(file,index) in selectedFiles" :key="`${file.name}-${index}`"><text>{{ file.name }}</text><button @click="selectedFiles.splice(index,1)">移除</button></view></view>
         <view v-if="message" class="status-message">{{ message }}</view>
         <button class="primary-button submit-button" :disabled="submitting" @click="submit">{{ submitting ? '正在上传并提交…' : '确认提交' }}</button>
@@ -150,8 +158,8 @@ async function submit(): Promise<void> {
 .grade strong { color: #1f7a62; font-size: 30rpx; }
 .grade text { flex: 1; color: #5e6f82; font-size: 24rpx; }
 .submit-card textarea { width: 100%; min-height: 220rpx; box-sizing: border-box; padding: 24rpx; border: 1rpx solid #dfe5ee; border-radius: 20rpx; background: #f8fafc; font-size: 26rpx; }
-.file-actions { display: flex; gap: 16rpx; margin-top: 20rpx; }
-.file-actions button { flex: 1; font-size: 24rpx; }
+.file-actions { display: flex; flex-wrap: wrap; gap: 16rpx; margin-top: 20rpx; }
+.file-actions button { flex: 1 1 200rpx; font-size: 24rpx; }
 .selected-files { margin-top: 18rpx; }
 .selected-files view { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 14rpx 0; font-size: 23rpx; }
 .submit-button { margin-top: 24rpx; }

@@ -8,6 +8,7 @@ import {
   type MobileAssignmentStatus,
 } from '../../mobilePresentation'
 import { mobileSession } from '../../mobileSession'
+import { formatChinaShortDateTime } from '../../mobileDateTime'
 
 type Filter = 'ALL' | MobileAssignmentStatus
 const activeFilter = ref<Filter>('ALL')
@@ -54,7 +55,7 @@ function openAssignment(assignmentId: number): void {
       <view class="assignment-head"><text class="course">课程 #{{ row.assignment.courseId }}</text><text class="status">{{ assignmentStatusLabel(row.status) }}</text></view>
       <text class="assignment-title">{{ row.assignment.title }}</text>
       <text class="description">{{ row.assignment.description }}</text>
-      <view class="assignment-foot"><text>{{ new Date(row.assignment.dueAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }} 截止</text><text>查看详情 →</text></view>
+      <view class="assignment-foot"><text>{{ formatChinaShortDateTime(row.assignment.dueAt) }} 截止</text><text>查看详情 →</text></view>
     </view>
   </view>
 </template>

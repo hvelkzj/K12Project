@@ -4,6 +4,10 @@ import { onShow } from '@dcloudio/uni-app'
 
 import { mobileSession } from '../../mobileSession'
 import {
+  formatChinaDateTime,
+  formatChinaShortDateTime,
+} from '../../mobileDateTime'
+import {
   assignmentRows,
   assignmentStatusLabel,
   attendanceStatusLabel,
@@ -67,7 +71,7 @@ function openAssignment(assignmentId: number): void {
       <view class="section-heading"><text>近期作业</text><text class="muted">按截止时间</text></view>
       <view v-if="rows.length" class="card list-card">
         <view v-for="row in rows.slice(0, 3)" :key="row.assignment.id" class="list-row" @click="openAssignment(row.assignment.id)">
-          <view class="row-main"><strong>{{ row.assignment.title }}</strong><text>{{ new Date(row.assignment.dueAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }} 截止</text></view>
+          <view class="row-main"><strong>{{ row.assignment.title }}</strong><text>{{ formatChinaShortDateTime(row.assignment.dueAt) }} 截止</text></view>
           <text class="status-chip">{{ assignmentStatusLabel(row.status) }}</text>
         </view>
       </view>
@@ -76,7 +80,7 @@ function openAssignment(assignmentId: number): void {
       <view class="section-heading"><text>近期考勤</text><text class="muted">共 {{ overview.attendance.length }} 条</text></view>
       <view v-if="recentAttendance.length" class="card list-card">
         <view v-for="record in recentAttendance" :key="record.id" class="list-row">
-          <view class="row-main"><strong>课次 #{{ record.scheduleId }}</strong><text>{{ new Date(record.recordedAt).toLocaleString('zh-CN') }}</text></view>
+          <view class="row-main"><strong>课次 #{{ record.scheduleId }}</strong><text>{{ formatChinaDateTime(record.recordedAt) }}</text></view>
           <text class="attendance-chip">{{ attendanceStatusLabel(record.status) }}</text>
         </view>
       </view>

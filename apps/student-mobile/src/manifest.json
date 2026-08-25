@@ -1,39 +1,51 @@
 {
-  "name": "K12 学习空间",
-  "appid": "__UNI__1F755D6",
-  "description": "K12 学生移动学习空间",
-  "versionName": "0.1.1",
-  "versionCode": "101",
-  "transformPx": false,
-  "app-plus": {
-    "usingComponents": true,
-    "nvueStyleCompiler": "uni-app",
-    "compilerVersion": 3,
-    "splashscreen": {
-      "alwaysShowBeforeRender": true,
-      "waiting": true,
-      "autoclose": true,
-      "delay": 0
+    "name" : "K12 学习空间",
+    "appid" : "__UNI__1F755D6",
+    "description" : "K12 学生移动学习空间",
+    "versionName" : "0.1.2",
+    "versionCode" : "102",
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "modules" : {
+            "Camera" : {
+                "description" : "用于拍摄作业图片或从相册选择图片",
+                "privacyDescription" : {
+                    "NSCameraUsageDescription" : "用于拍摄并提交作业图片",
+                    "NSPhotoLibraryUsageDescription" : "用于选择并提交作业图片"
+                }
+            }
+        },
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
+        },
+        "distribute" : {
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+                    "<uses-feature android:name=\"android.hardware.camera.any\" android:required=\"false\"/>"
+                ]
+            },
+            "ios" : {
+                "dSYMs" : false
+            }
+        }
     },
-    "distribute": {
-      "android": {
-        "permissions": [
-          "<uses-permission android:name=\"android.permission.INTERNET\"/>",
-          "<uses-permission android:name=\"android.permission.CAMERA\"/>"
-        ]
-      },
-      "ios": {}
-    }
-  },
-  "mp-weixin": {
-    "appid": "touristappid",
-    "setting": {
-      "urlCheck": false,
-      "es6": true,
-      "postcss": true,
-      "minified": true
+    "mp-weixin" : {
+        "appid" : "touristappid",
+        "setting" : {
+            "urlCheck" : false,
+            "es6" : true,
+            "postcss" : true,
+            "minified" : true
+        },
+        "usingComponents" : true
     },
-    "usingComponents": true
-  },
-  "vueVersion": "3"
+    "vueVersion" : "3"
 }

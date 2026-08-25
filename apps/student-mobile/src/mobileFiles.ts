@@ -61,6 +61,58 @@ function imageName(path: string, index: number): string {
   return `作业照片-${index + 1}.${suffix}`
 }
 
+export type ImageSource = 'camera' | 'album'
+
+interface ImagePickerRuntime {
+  chooseImage(options: {
+    count: number
+    sizeType: ['compressed']
+    sourceType: ImageSource[]
+    success(result: { tempFilePaths: string | string[] }): void
+    fail(result?: { errMsg?: string }): void
+  }): void
+}
+
+export function imagePickerErrorMessage(
+  source: ImageSource,
+  errorMessage = '',
+): string {
+  if (/cancel/i.test(errorMessage)) {
+    return source === 'camera' ? '已取消拍照' : '已取消选择图片'
+  }
+  if (/auth|permission|authorize|denied|deny|权限|授权/i.test(errorMessage)) {
+    return source === 'camera'
+      ? '未获得相机权限，请在手机或微信设置中允许使用相机后重试'
+      : '未获得图片访问权限，请在手机或微信设置中允许访问图片后重试'
+  }
+  return source === 'camera'
+    ? '相机启动失败，请检查相机权限后重试'
+    : '图片选择失败，请稍后重试'
+}
+
+export async function chooseImagePaths(
+  source: ImageSource,
+  picker: ImagePickerRuntime = uni as unknown as ImagePickerRuntime,
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    picker.chooseImage({
+      count: source === 'camera' ? 1 : 3,
+      sizeType: ['compressed'],
+      sourceType: [source],
+      success(result) {
+        resolve(
+          Array.isArray(result.tempFilePaths)
+            ? result.tempFilePaths
+            : [result.tempFilePaths],
+        )
+      },
+      fail(result) {
+        reject(new Error(imagePickerErrorMessage(source, result?.errMsg)))
+      },
+    })
+  })
+}
+
 async function appFileBase64(path: string): Promise<string> {
   return new Promise((resolve, reject) => {
     plus.io.resolveLocalFileSystemURL(
@@ -140,27 +192,21 @@ async function prepareFile(
   }
 }
 
-export async function chooseImages(): Promise<MobileFileInput[]> {
-  const paths = await new Promise<string[]>((resolve, reject) => {
-    uni.chooseImage({
-      count: 3,
-      sizeType: ['compressed'],
-      sourceType: ['album', 'camera'],
-      success(result) {
-        resolve(
-          Array.isArray(result.tempFilePaths)
-            ? result.tempFilePaths
-            : [result.tempFilePaths],
-        )
-      },
-      fail() {
-        reject(new Error('没有选择图片'))
-      },
-    })
-  })
+async function prepareImages(
+  source: ImageSource,
+): Promise<MobileFileInput[]> {
+  const paths = await chooseImagePaths(source)
   return Promise.all(
     paths.map((path, index) => prepareFile(path, imageName(path, index))),
   )
+}
+
+export async function capturePhoto(): Promise<MobileFileInput[]> {
+  return prepareImages('camera')
+}
+
+export async function chooseAlbumImages(): Promise<MobileFileInput[]> {
+  return prepareImages('album')
 }
 
 export async function chooseWechatFiles(): Promise<MobileFileInput[]> {
