@@ -4,6 +4,9 @@ import type { ApiError } from '@k12/shared'
 
 const maximumJsonBodyBytes = 16 * 1024
 export const maximumFileBodyBytes = 10 * 1024 * 1024
+export const maximumBase64FileBodyBytes = Math.ceil(
+  (maximumFileBodyBytes * 4) / 3,
+) + 4
 
 export interface JsonBodyResult {
   ok: true
@@ -24,7 +27,7 @@ export function setCorsHeaders(response: ServerResponse): void {
   )
   response.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization',
+    'Content-Type, Authorization, Content-Transfer-Encoding',
   )
   response.setHeader(
     'Access-Control-Expose-Headers',
@@ -132,6 +135,7 @@ export async function readJsonBody(
 
 export async function readFileBody(
   request: IncomingMessage,
+  maximumBytes = maximumFileBodyBytes,
 ): Promise<
   | { ok: true; value: Uint8Array }
   | { ok: false; status: 413; error: ApiError }
@@ -143,7 +147,7 @@ export async function readFileBody(
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
     byteLength += buffer.byteLength
-    if (byteLength > maximumFileBodyBytes) {
+    if (byteLength > maximumBytes) {
       tooLarge = true
       continue
     }

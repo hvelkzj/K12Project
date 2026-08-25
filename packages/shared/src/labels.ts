@@ -6,7 +6,7 @@ export const BUSINESS_STATUS_LABELS = {
   PENDING: '待审批',
   APPROVED: '已通过',
   REJECTED: '已拒绝',
-  PRESENT: '已到课',
+  PRESENT: '已出勤',
   LATE: '迟到',
   ABSENT: '缺勤',
   LEAVE: '请假',

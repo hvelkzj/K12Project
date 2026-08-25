@@ -5,12 +5,14 @@ import type {
   ApiError,
   Assignment,
   AttendanceRecord,
+  Courseware,
   FeedbackWorkOrder,
   LeaveRequest,
   LoginResponse,
   ParentStudentBinding,
   ScheduleChange,
   StudentFeedback,
+  StudentOverview,
   Submission,
 } from '@k12/shared'
 import { MOCK_ACCOUNT_PASSWORD } from '@k12/shared/mock-accounts'
@@ -25,7 +27,6 @@ import { createBusinessStore } from '../src/businessStore.js'
 import type {
   AdminOverview,
   ParentOverview,
-  StudentOverview,
   TeacherOverview,
 } from '../src/businessTypes.js'
 import {
@@ -301,6 +302,92 @@ test('作业发布、学生提交和教师批改共享同一数据', async () =>
     (item) => item.id === submission.id,
   )
   assert.equal(result?.score, 96)
+})
+
+test('教师发布课件后学生读取且重复和越权发布被拒绝', async () => {
+  const { handler } = setup()
+  const teacher = await login(handler, 'teacher_301')
+  const homeroom = await login(handler, 'teacher_302')
+  const student = await login(handler, 'student_101')
+
+  const published = await authorizedCall(handler, teacher, {
+    method: 'POST',
+    url: '/teacher/courseware',
+    jsonBody: {
+      classId: 101,
+      courseId: 11,
+      title: '移动端分数专题',
+      description: '配合课堂练习复习分数计算。',
+      attachments: [],
+      teacherId: 999,
+    },
+  })
+  assert.equal(published.status, 201)
+  const material = parseJsonBody<Courseware>(published)
+  assert.equal(material.teacherId, 301)
+
+  const overview = await authorizedCall(handler, student, {
+    method: 'GET',
+    url: '/student/overview',
+  })
+  assert.ok(
+    parseJsonBody<StudentOverview>(overview).courseware.some(
+      (item) => item.id === material.id,
+    ),
+  )
+
+  const duplicate = await authorizedCall(handler, teacher, {
+    method: 'POST',
+    url: '/teacher/courseware',
+    jsonBody: {
+      classId: 101,
+      courseId: 11,
+      title: ' 移动端分数专题 ',
+      description: '重复发布。',
+      attachments: [],
+    },
+  })
+  assert.equal(duplicate.status, 409)
+
+  const notTeaching = await authorizedCall(handler, homeroom, {
+    method: 'POST',
+    url: '/teacher/courseware',
+    jsonBody: {
+      classId: 101,
+      courseId: 11,
+      title: '越权课件',
+      description: '班主任并未教授这门课程。',
+      attachments: [],
+    },
+  })
+  assert.equal(notTeaching.status, 403)
+})
+
+test('学生和绑定家长只读取对应学生考勤', async () => {
+  const { handler } = setup()
+  const student = await login(handler, 'student_101')
+  const parent = await login(handler, 'parent_201')
+
+  const studentResponse = await authorizedCall(handler, student, {
+    method: 'GET',
+    url: '/student/overview',
+  })
+  const studentOverview = parseJsonBody<StudentOverview>(studentResponse)
+  assert.ok(studentOverview.attendance.length > 0)
+  assert.ok(studentOverview.attendance.every((item) => item.studentId === 101))
+
+  const parentResponse = await authorizedCall(handler, parent, {
+    method: 'GET',
+    url: '/parent/students/101/overview',
+  })
+  const parentOverview = parseJsonBody<ParentOverview>(parentResponse)
+  assert.deepEqual(parentOverview.attendance, studentOverview.attendance)
+
+  const otherStudentResponse = await authorizedCall(handler, parent, {
+    method: 'GET',
+    url: '/parent/students/103/overview',
+  })
+  assert.equal(otherStudentResponse.status, 403)
 })
 
 test('截止限制和订正 attempt 历史由服务端维护', async () => {

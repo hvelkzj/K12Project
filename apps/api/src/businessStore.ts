@@ -3,11 +3,13 @@ import type {
   AttendanceRecord,
   AttendanceStatus,
   ClassSummary,
+  Courseware,
   FileSummary,
   LeaveRequest,
   ScheduleChange,
   ScheduleSummary,
   StudentFeedback,
+  StudentOverview,
   Submission,
   UserAccountSummary,
   UserRole,
@@ -27,7 +29,6 @@ import type {
   BusinessStore,
   FileUploadInput,
   ParentOverview,
-  StudentOverview,
   TeacherOverview,
 } from './businessTypes.js'
 
@@ -559,6 +560,9 @@ export function createBusinessStore(
           item.notification.studentId === studentId,
       ),
       feedback,
+      attendance: data.attendance.filter(
+        (item) => item.studentId === studentId,
+      ),
     })
   }
 
@@ -589,6 +593,7 @@ export function createBusinessStore(
       courseware,
       assignments,
       submissions: data.submissions.filter((item) => item.studentId === user.id),
+      attendance: data.attendance.filter((item) => item.studentId === user.id),
     })
   }
 
@@ -604,6 +609,10 @@ export function createBusinessStore(
     })
     const assignmentIds = assignments.map((item) => item.id)
     const scheduleIds = schedules.map((item) => item.id)
+    const courseware = data.courseware.filter((item) => {
+      if (item.teacherId === user.id) return true
+      return user.role === 'HOMEROOM_TEACHER' && classIds.includes(item.classId)
+    })
 
     return clone({
       campuses: data.campuses.filter((item) => item.id === user.campusId),
@@ -616,6 +625,7 @@ export function createBusinessStore(
       attendance: data.attendance.filter((item) =>
         scheduleIds.includes(item.scheduleId),
       ),
+      courseware,
       assignments,
       submissions: data.submissions.filter((item) =>
         assignmentIds.includes(item.assignmentId),
@@ -1047,6 +1057,55 @@ export function createBusinessStore(
       }
       data.assignments.push(assignment)
       return clone(assignment)
+    },
+
+    publishCourseware(user, input) {
+      requireRole(user, ['TEACHER', 'HOMEROOM_TEACHER'])
+      const classId = requirePositiveInteger(input, 'classId')
+      const courseId = requirePositiveInteger(input, 'courseId')
+      const title = requireText(input, 'title')
+      const description = requireText(input, 'description')
+      const attachments = requireUploadedFiles(user, input, 'attachments')
+      const classRecord = findClass(classId)
+      const course = data.courses.find((item) => item.id === courseId)
+      if (!course) notFound('课程不存在')
+      if (course.campusId !== classRecord.campusId) {
+        invalid('课程和班级必须属于同一校区')
+      }
+      const teachingSchedule = data.schedules.find(
+        (item) =>
+          item.teacherId === user.id &&
+          item.classId === classId &&
+          item.courseId === courseId &&
+          item.status !== 'CANCELLED',
+      )
+      if (!teachingSchedule) {
+        forbidden('只能为本人授课的班级和课程发布课件')
+      }
+      if (
+        data.courseware.some(
+          (item) =>
+            item.teacherId === user.id &&
+            item.classId === classId &&
+            item.courseId === courseId &&
+            item.title.trim().toLocaleLowerCase('zh-CN') ===
+              title.toLocaleLowerCase('zh-CN'),
+        )
+      ) {
+        conflict('该班级和课程已经存在同名课件')
+      }
+      const courseware: Courseware = {
+        id: nextId(data.courseware, 2001),
+        classId,
+        courseId,
+        teacherId: user.id,
+        title,
+        description,
+        attachments,
+        publishedAt: currentIso(),
+      }
+      data.courseware.push(courseware)
+      return clone(courseware)
     },
 
     gradeSubmission(user, submissionId, input) {

@@ -6,6 +6,7 @@ import type {
   CampusSummary,
   ClassSummary,
   CourseSummary,
+  Courseware,
   FileSummary,
   LeaveRequest,
   ScheduleChange,
@@ -28,6 +29,7 @@ export interface TeacherOverview {
   courses: CourseSummary[]
   schedules: ScheduleSummary[]
   attendance: AttendanceRecord[]
+  courseware: Courseware[]
   assignments: Assignment[]
   submissions: Submission[]
   feedback: StudentFeedback[]
@@ -53,6 +55,14 @@ export interface AssignmentInput {
   attachments: FileSummary[]
   dueAt: string
   allowLate: boolean
+}
+
+export interface CoursewareInput {
+  classId: number
+  courseId: number
+  title: string
+  description: string
+  attachments: FileSummary[]
 }
 
 export interface GradeInput {
@@ -84,6 +94,7 @@ export interface TeacherBusinessClient {
   downloadFile(fileId: number): Promise<Blob>
   saveAttendance(input: AttendanceInput): Promise<AttendanceRecord[]>
   publishAssignment(input: AssignmentInput): Promise<Assignment>
+  publishCourseware(input: CoursewareInput): Promise<Courseware>
   gradeSubmission(submissionId: number, input: GradeInput): Promise<Submission>
   sendFeedback(input: FeedbackInput): Promise<StudentFeedback>
   requestScheduleChange(input: ScheduleChangeInput): Promise<ScheduleChange>
@@ -246,6 +257,13 @@ export function createTeacherBusinessClient(
 
     publishAssignment(input) {
       return requestJson<Assignment>('/teacher/assignments', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+    },
+
+    publishCourseware(input) {
+      return requestJson<Courseware>('/teacher/courseware', {
         method: 'POST',
         body: JSON.stringify(input),
       })

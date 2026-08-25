@@ -104,6 +104,7 @@ export default defineComponent({
       )
     })
     const schedules = computed(() => overview.value?.schedules ?? [])
+    const attendance = computed(() => overview.value?.attendance ?? [])
     const notices = computed<(Notification | ScheduleChangeNotice)[]>(() =>
       mergeParentNotices(
         overview.value?.notifications ?? [],
@@ -393,6 +394,11 @@ export default defineComponent({
       return courseNames.value.get(schedule.courseId) ?? `课程 #${schedule.courseId}`
     }
 
+    function scheduleAttendanceLabel(scheduleId: number): string {
+      const record = attendance.value.find((item) => item.scheduleId === scheduleId)
+      return record ? getBusinessStatusLabel(record.status) : '未签到'
+    }
+
     function teacherName(teacherId: number): string {
       return teacherNames.value.get(teacherId) ?? `教师 #${teacherId}`
     }
@@ -680,6 +686,10 @@ export default defineComponent({
                     h('strong', String(pendingFeedbackCount.value)),
                     h('span', '待看反馈'),
                   ]),
+                  h('article', [
+                    h('strong', String(attendance.value.length)),
+                    h('span', '考勤记录'),
+                  ]),
                 ]),
               ])
             : null,
@@ -723,7 +733,14 @@ export default defineComponent({
                               `${item.lessonDate} ${formatLessonTime(item.startTime)}-${formatLessonTime(item.endTime)}`,
                             ),
                           ]),
-                          h('span', `${teacherName(item.teacherId)} · ${item.room}`),
+                          h('div', { class: 'schedule-meta' }, [
+                            h('span', `${teacherName(item.teacherId)} · ${item.room}`),
+                            h(
+                              'span',
+                              { class: 'attendance-badge' },
+                              `考勤：${scheduleAttendanceLabel(item.id)}`,
+                            ),
+                          ]),
                         ]),
                       ),
                     ),

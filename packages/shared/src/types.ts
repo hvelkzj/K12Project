@@ -173,6 +173,16 @@ export interface AttendanceRecord {
   recordedAt: string
 }
 
+export interface StudentOverview {
+  student: StudentSummary
+  courses: CourseSummary[]
+  teachers: UserSummary[]
+  courseware: Courseware[]
+  assignments: Assignment[]
+  submissions: Submission[]
+  attendance: AttendanceRecord[]
+}
+
 export interface StudentFeedback {
   id: number
   campusId: number

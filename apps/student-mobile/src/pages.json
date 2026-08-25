@@ -1,0 +1,46 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/home/index",
+      "style": { "navigationBarTitleText": "学习首页" }
+    },
+    {
+      "path": "pages/courseware/index",
+      "style": { "navigationBarTitleText": "课程资料" }
+    },
+    {
+      "path": "pages/assignments/index",
+      "style": { "navigationBarTitleText": "我的作业" }
+    },
+    {
+      "path": "pages/assignment-detail/index",
+      "style": { "navigationBarTitleText": "作业详情" }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": { "navigationBarTitleText": "我的" }
+    }
+  ],
+  "tabBar": {
+    "color": "#7d899b",
+    "selectedColor": "#5b52d9",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/courseware/index", "text": "课件" },
+      { "pagePath": "pages/assignments/index", "text": "作业" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "K12 学习空间",
+    "navigationBarBackgroundColor": "#f4f7fb",
+    "backgroundColor": "#f4f7fb"
+  }
+}

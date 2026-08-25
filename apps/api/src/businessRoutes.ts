@@ -10,6 +10,7 @@ import {
   isJsonRequest,
   readFileBody,
   readJsonBody,
+  maximumBase64FileBodyBytes,
   sendError,
   sendFile,
   sendJson,
@@ -39,6 +40,7 @@ const exactBusinessPaths = new Set([
   '/teacher/overview',
   '/teacher/attendance',
   '/teacher/assignments',
+  '/teacher/courseware',
   '/teacher/files',
   '/teacher/feedback',
   '/teacher/schedule-changes',
@@ -230,13 +232,35 @@ export async function handleBusinessRequest(
     const originalName = requestedName.split(/[\\/]/).at(-1) ?? ''
     const mimeType =
       request.headers['content-type']?.split(';', 1)[0]?.trim() ?? ''
-    const body = await readFileBody(request)
+    const transferEncoding = request.headers['content-transfer-encoding']
+    const isBase64 =
+      (Array.isArray(transferEncoding)
+        ? transferEncoding[0]
+        : transferEncoding
+      )?.trim().toLowerCase() === 'base64'
+    const body = await readFileBody(
+      request,
+      isBase64 ? maximumBase64FileBodyBytes : undefined,
+    )
     if (!body.ok) sendJson(response, body.status, body.error)
     else {
+      let content = body.value
+      if (isBase64) {
+        const encoded = Buffer.from(body.value).toString('ascii').trim()
+        if (
+          !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+            encoded,
+          )
+        ) {
+          sendError(response, 422, 'VALIDATION_ERROR', '附件编码内容不合法')
+          return true
+        }
+        content = Buffer.from(encoded, 'base64')
+      }
       sendJson(
         response,
         201,
-        store.uploadFile(user, { originalName, mimeType, content: body.value }),
+        store.uploadFile(user, { originalName, mimeType, content }),
       )
     }
     return true
@@ -286,6 +310,15 @@ export async function handleBusinessRequest(
     else {
       const input = await readBusinessInput(request, response)
       if (input) sendJson(response, 201, store.publishAssignment(user, input))
+    }
+    return true
+  }
+
+  if (path === '/teacher/courseware') {
+    if (method !== 'POST') methodNotAllowed(response, ['POST'])
+    else {
+      const input = await readBusinessInput(request, response)
+      if (input) sendJson(response, 201, store.publishCourseware(user, input))
     }
     return true
   }

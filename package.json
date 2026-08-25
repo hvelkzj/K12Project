@@ -18,12 +18,18 @@
     "dev:student": "npm run dev --workspace @k12/student-web -- --host 127.0.0.1",
     "dev:teacher": "npm run dev --workspace @k12/teacher-web -- --host 127.0.0.1",
     "dev:admin": "npm run dev --workspace @k12/admin-web -- --host 127.0.0.1",
+    "dev:app": "npm run dev:app --workspace @k12/student-mobile",
+    "dev:mp-weixin": "npm run dev:mp-weixin --workspace @k12/student-mobile",
+    "build:app": "npm run build:app --workspace @k12/student-mobile",
+    "build:mp-weixin": "npm run build:mp-weixin --workspace @k12/student-mobile",
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint .",
     "pretypecheck": "npm run build --workspace @k12/shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "pretest": "npm run build --workspace @k12/shared",
     "test": "npm run test --workspaces --if-present",
+    "pretest:load": "npm run build --workspace @k12/shared && npm run build --workspace @k12/api",
+    "test:load": "node scripts/load-test.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "devDependencies": {

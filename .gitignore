@@ -8,5 +8,7 @@ Desktop.ini
 .env.local
 *.log
 *.tsbuildinfo
+artifacts/
+__pycache__/
 .idea/
 .vscode/

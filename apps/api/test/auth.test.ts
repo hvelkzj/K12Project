@@ -350,7 +350,7 @@ test('预检、方法限制和请求体大小边界明确', async () => {
   assert.equal(preflight.status, 204)
   assert.equal(
     preflight.headers.get('access-control-allow-headers'),
-    'Content-Type, Authorization',
+    'Content-Type, Authorization, Content-Transfer-Encoding',
   )
   assert.equal(wrongMethod.status, 405)
   assert.equal(wrongMethod.headers.get('allow'), 'POST, OPTIONS')

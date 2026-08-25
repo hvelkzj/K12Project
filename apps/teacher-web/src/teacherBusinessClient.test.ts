@@ -3,6 +3,7 @@ import test from 'node:test'
 import type {
   Assignment,
   AttendanceRecord,
+  Courseware,
   FileSummary,
   ScheduleChange,
   StudentFeedback,
@@ -67,6 +68,7 @@ function overview(): TeacherOverview {
       },
     ],
     attendance: [],
+    courseware: [],
     assignments: [],
     submissions: [],
     feedback: [],
@@ -335,6 +337,47 @@ test('五个教师写接口发送正确方法与请求体', async (context) => {
       await scenario.run(client)
     })
   }
+})
+
+test('教师发布课件发送班级、课程、内容和附件', async () => {
+  const material: Courseware = {
+    id: 2004,
+    classId: 101,
+    courseId: 11,
+    teacherId: 301,
+    title: '分数专题',
+    description: '课堂讲义',
+    attachments: [],
+    publishedAt: '2026-08-25T02:00:00.000Z',
+  }
+  let requestBody = ''
+  const client = createTeacherBusinessClient({
+    apiBaseUrl: 'http://api.test',
+    authClient: authClient(),
+    fetchImpl: async (input, init) => {
+      assert.equal(String(input), 'http://api.test/teacher/courseware')
+      assert.equal(init?.method, 'POST')
+      requestBody = String(init?.body)
+      return jsonResponse(material, 201)
+    },
+  })
+  assert.deepEqual(
+    await client.publishCourseware({
+      classId: 101,
+      courseId: 11,
+      title: '分数专题',
+      description: '课堂讲义',
+      attachments: [],
+    }),
+    material,
+  )
+  assert.deepEqual(JSON.parse(requestBody), {
+    classId: 101,
+    courseId: 11,
+    title: '分数专题',
+    description: '课堂讲义',
+    attachments: [],
+  })
 })
 
 test('无 token 时不发送请求并返回 401', async () => {

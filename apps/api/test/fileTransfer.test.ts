@@ -179,3 +179,46 @@ test('附件接口拒绝角色越权、空文件和伪造附件元数据', async
   })
   assert.equal(forged.status, 404)
 })
+
+test('移动端可以使用 base64 传输真实附件内容', async () => {
+  const now = () => fixedNow
+  const handler = createRequestHandler(
+    createAuthService({ now }),
+    createBusinessStore({ now }),
+  )
+  const student = await login(handler, 'student_101')
+  const bytes = Buffer.from('mobile image bytes')
+  const uploaded = await callHandler(handler, {
+    method: 'POST',
+    url: '/student/files?name=%E4%BD%9C%E4%B8%9A%E7%85%A7%E7%89%87.jpg',
+    rawBody: bytes.toString('base64'),
+    contentType: 'image/jpeg',
+    headers: {
+      ...auth(student),
+      'content-transfer-encoding': 'base64',
+    },
+  })
+  assert.equal(uploaded.status, 201)
+  const file = parseJsonBody<FileSummary>(uploaded)
+  assert.equal(file.byteSize, bytes.byteLength)
+
+  const downloaded = await callHandler(handler, {
+    method: 'GET',
+    url: `/files/${file.id}`,
+    headers: auth(student),
+  })
+  assert.equal(downloaded.status, 200)
+  assert.deepEqual(downloaded.bodyBuffer, bytes)
+
+  const invalid = await callHandler(handler, {
+    method: 'POST',
+    url: '/student/files?name=invalid.jpg',
+    rawBody: '%%%not-base64%%%',
+    contentType: 'image/jpeg',
+    headers: {
+      ...auth(student),
+      'content-transfer-encoding': 'base64',
+    },
+  })
+  assert.equal(invalid.status, 422)
+})

@@ -14,6 +14,7 @@ import type {
   ScheduleChangeNotice,
   ScheduleSummary,
   StudentFeedback,
+  StudentOverview,
   StudentSummary,
   Submission,
   UserAccountSummary,
@@ -29,15 +30,7 @@ export interface ParentOverview {
   notifications: Notification[]
   scheduleChangeNotices: ScheduleChangeNotice[]
   feedback: StudentFeedback[]
-}
-
-export interface StudentOverview {
-  student: StudentSummary
-  courses: CourseSummary[]
-  teachers: UserSummary[]
-  courseware: Courseware[]
-  assignments: Assignment[]
-  submissions: Submission[]
+  attendance: AttendanceRecord[]
 }
 
 export interface TeacherOverview {
@@ -47,6 +40,7 @@ export interface TeacherOverview {
   courses: CourseSummary[]
   schedules: ScheduleSummary[]
   attendance: AttendanceRecord[]
+  courseware: Courseware[]
   assignments: Assignment[]
   submissions: Submission[]
   feedback: StudentFeedback[]
@@ -105,6 +99,7 @@ export interface BusinessStore {
     input: BusinessInput,
   ): AttendanceRecord[]
   publishAssignment(user: UserSummary, input: BusinessInput): Assignment
+  publishCourseware(user: UserSummary, input: BusinessInput): Courseware
   gradeSubmission(
     user: UserSummary,
     submissionId: number,
