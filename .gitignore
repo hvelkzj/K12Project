@@ -8,5 +8,6 @@ Desktop.ini
 .env.local
 *.log
 *.tsbuildinfo
+artifacts/
 .idea/
 .vscode/

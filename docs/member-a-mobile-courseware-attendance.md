@@ -39,8 +39,8 @@
 | 产物 | 状态 |
 |---|---|
 | `apps/student-mobile/dist/build/app/` | uni-app APP 运行资源已生成 |
-| `apps/student-mobile/dist/build/mp-weixin/` | 微信小程序构建目录已生成，可导入开发者工具 |
-| Android 测试 APK | 需要在安装 HBuilderX/Android 运行环境的设备上生成并安装复验 |
+| `apps/student-mobile/dist/build/mp-weixin/` | 已导入微信开发者工具并完成真实业务流程 |
+| Android 测试 APK | HBuilderX 已识别工程；云打包需要 DCloud 账号，安装复验还需要 Android 真机或模拟器 |
 
 构建目录受根 `.gitignore` 管理，不进入源码提交；最终交付时按课程要求单独保存证据。
 
@@ -54,6 +54,8 @@
 - `npm run build:app`：通过。
 - `npm run build:mp-weixin`：通过。
 - `npm run test:load`：500 请求、并发 50、失败 0；详细指标见 `docs/load-test-2026-08-25.md`。
+- 微信开发者工具：通过。使用 `student_101` 完成登录、课件读取、作业详情、提交、状态回写、个人中心和退出；提交后待完成数量由 2 更新为 1。
+- HBuilderX 5.24：工程导入和 uni-app 识别通过；真机运行插件已安装。云打包入口要求 DCloud 登录，本机未连接 Android 设备，因此没有把 APK 或安装验证记为通过。
 
 ## 公共文件影响
 
@@ -65,5 +67,5 @@
 ## 后续验收
 
 - Windows PowerShell 执行 `npm ci`、`npm run check`、`npm run test:load`、`npm run build:app` 和 `npm run build:mp-weixin`。
-- HBuilderX/Android 模拟器或真机生成并安装测试 APK。
-- 微信开发者工具导入小程序构建目录，使用 `student_101` 完成完整业务流程并保存真实截图。
+- 由可用的 DCloud 账号登录 HBuilderX，并连接 Android 模拟器或真机，生成、安装测试 APK 后补录安装截图。
+- 端侧验证过程与截图索引见 `docs/mobile-device-validation-2026-08-25.md`。
