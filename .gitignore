@@ -9,5 +9,6 @@ Desktop.ini
 *.log
 *.tsbuildinfo
 artifacts/
+__pycache__/
 .idea/
 .vscode/
