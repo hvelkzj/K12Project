@@ -731,9 +731,8 @@ def build_report(output_path: Path) -> None:
         ("微信小程序预填账号登录返回 401", "登录页样例密码与公共账号密码不一致", "统一为 K12Demo123!，补客户端测试并重新构建两端"),
         ("Windows Node 24 启动出现 DEP0190", "统一启动脚本使用 shell: true", "改为当前 Node 进程调用 npm_execpath；Windows 重新启动验证"),
         ("Android 真机登录长时间等待后网络失败", "模拟器专用 10.0.2.2 不能访问电脑，且请求未显式超时", "登录页保存局域网地址；API 输出手机地址；10 秒超时并补 3 项回归测试"),
-    ], [2800, 2700, 3860], font_size=8.7)
+    ], [2800, 2700, 3860], font_size=8.0)
 
-    page_break(doc)
     add_heading(doc, "5. 使用示例", 1)
     add_heading(doc, "5.1 统一入口与注册", 2)
     portal = SCREENSHOT_DIR / "portal-home.jpg"
