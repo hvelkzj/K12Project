@@ -9,6 +9,8 @@ import type {
 } from '@k12/shared'
 
 export const mobileTokenStorageKey = 'k12MobileAccessToken'
+export const mobileServiceUrlStorageKey = 'k12MobileServiceUrl'
+export const mobileRequestTimeoutMs = 10_000
 
 export interface MobileStorage {
   get(key: string): string | null
@@ -44,6 +46,9 @@ export interface MobileFileInput {
 }
 
 export interface MobileStudentClient {
+  getServiceUrl(): string
+  setServiceUrl(value: string): string
+  checkConnection(): Promise<void>
   login(username: string, password: string): Promise<UserSummary>
   restoreCurrentUser(): Promise<UserSummary | null>
   logout(): Promise<void>
@@ -70,7 +75,7 @@ export class MobileClientError extends Error {
   }
 }
 
-function defaultServiceUrl(): string {
+export function defaultServiceUrl(): string {
   let value = 'http://127.0.0.1:3000'
   // #ifdef APP-PLUS
   value = 'http://10.0.2.2:3000'
@@ -81,8 +86,23 @@ function defaultServiceUrl(): string {
   return environment?.VITE_API_BASE_URL ?? value
 }
 
-function normalizeServiceUrl(value: string): string {
-  return value.replace(/\/+$/, '')
+export function normalizeServiceUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '')
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `http://${trimmed}`
+  const match = withProtocol.match(
+    /^https?:\/\/(?:\[[0-9a-f:]+\]|[a-z0-9.-]+)(?::(\d{1,5}))?$/i,
+  )
+  const port = match?.[1] ? Number(match[1]) : null
+  if (!match || (port !== null && (port < 1 || port > 65_535))) {
+    throw new MobileClientError(
+      '请输入正确的学习服务地址，例如 http://192.168.1.20:3000',
+      422,
+      'INVALID_SERVICE_URL',
+    )
+  }
+  return withProtocol
 }
 
 function isApiError(value: unknown): value is ApiError {
@@ -119,42 +139,58 @@ export function createUniStorage(): MobileStorage {
 }
 
 export function createUniTransport(
-  serviceUrl = defaultServiceUrl(),
+  serviceUrl: string | (() => string) = defaultServiceUrl(),
+  runtime?: Pick<typeof uni, 'request' | 'downloadFile'>,
 ): MobileTransport {
-  const baseUrl = normalizeServiceUrl(serviceUrl)
+  const getRuntime = () => runtime ?? uni
+  const resolveBaseUrl = () => normalizeServiceUrl(
+    typeof serviceUrl === 'function' ? serviceUrl() : serviceUrl,
+  )
+  const networkError = (result: { errMsg?: string } | undefined, action: '连接' | '下载') => {
+    const timedOut = result?.errMsg?.toLowerCase().includes('timeout')
+    return new MobileClientError(
+      timedOut
+        ? `${action}超时，请检查电脑服务是否已启动以及连接地址是否正确`
+        : `${action}失败，请确认手机与电脑连接同一 Wi-Fi，并检查连接地址`,
+      0,
+      timedOut ? 'NETWORK_TIMEOUT' : 'NETWORK_ERROR',
+    )
+  }
   return {
     request<T>(input: MobileRequest) {
       return new Promise<MobileResponse<T>>((resolve, reject) => {
-        uni.request({
-          url: `${baseUrl}${input.path}`,
+        getRuntime().request({
+          url: `${resolveBaseUrl()}${input.path}`,
           method: input.method ?? 'GET',
           header: input.headers,
           data: input.data,
+          timeout: mobileRequestTimeoutMs,
           success(response) {
             resolve({
               status: response.statusCode,
               data: response.data as T,
             })
           },
-          fail() {
-            reject(new MobileClientError('网络连接失败，请稍后重试', 0, 'NETWORK_ERROR'))
+          fail(result) {
+            reject(networkError(result, '连接'))
           },
         })
       })
     },
     download(path, headers) {
       return new Promise((resolve, reject) => {
-        uni.downloadFile({
-          url: `${baseUrl}${path}`,
+        getRuntime().downloadFile({
+          url: `${resolveBaseUrl()}${path}`,
           header: headers,
+          timeout: mobileRequestTimeoutMs,
           success(response) {
             resolve({
               status: response.statusCode,
               tempFilePath: response.tempFilePath,
             })
           },
-          fail() {
-            reject(new MobileClientError('文件下载失败，请稍后重试', 0, 'NETWORK_ERROR'))
+          fail(result) {
+            reject(networkError(result, '下载'))
           },
         })
       })
@@ -166,8 +202,9 @@ export function createMobileStudentClient(options: {
   transport?: MobileTransport
   storage?: MobileStorage
 } = {}): MobileStudentClient {
-  const transport = options.transport ?? createUniTransport()
   const storage = options.storage ?? createUniStorage()
+  const getServiceUrl = () => storage.get(mobileServiceUrlStorageKey) ?? defaultServiceUrl()
+  const transport = options.transport ?? createUniTransport(getServiceUrl)
 
   function getAccessToken(): string | null {
     return storage.get(mobileTokenStorageKey)
@@ -205,6 +242,19 @@ export function createMobileStudentClient(options: {
   }
 
   return {
+    getServiceUrl,
+
+    setServiceUrl(value) {
+      const normalized = normalizeServiceUrl(value)
+      if (normalized !== getServiceUrl()) clearAccessToken()
+      storage.set(mobileServiceUrlStorageKey, normalized)
+      return normalized
+    },
+
+    async checkConnection() {
+      await request<unknown>({ path: '/health' }, false)
+    },
+
     async login(username, password) {
       const login = await request<LoginResponse>(
         {

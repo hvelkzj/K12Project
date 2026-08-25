@@ -34,6 +34,9 @@ const overview: StudentOverview = {
 
 function fakeClient(overrides: Partial<MobileStudentClient> = {}): MobileStudentClient {
   return {
+    getServiceUrl() { return 'http://127.0.0.1:3000' },
+    setServiceUrl(value) { return value },
+    async checkConnection() {},
     async login() { return user },
     async restoreCurrentUser() { return user },
     async logout() {},

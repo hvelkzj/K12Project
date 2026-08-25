@@ -419,7 +419,7 @@ def draw_test_layers(path: Path) -> None:
     ]
     for box, label, fill in layers:
         rounded_box(draw, box, label, color="#5E6C7B", fill=fill, font=chart_font(25))
-    draw.text((900, 895), "321 项有效测试通过 · 500 请求 / 并发 50 / 失败 0",
+    draw.text((900, 895), "324 项有效测试通过 · 500 请求 / 并发 50 / 失败 0",
               anchor="mm", font=chart_font(25), fill="#2F7A65")
     image.save(path)
 
@@ -567,7 +567,11 @@ def build_report(output_path: Path) -> None:
     mini_submission_screenshot = SCREENSHOT_DIR / "wechat-mini-program-submission.png"
     android_screenshot = SCREENSHOT_DIR / "android-app-home.png"
     android_project_screenshot = SCREENSHOT_DIR / "android-hbuilderx-project.png"
-    apk_candidates = list((ROOT / "artifacts").glob("**/*.apk"))
+    apk_candidates = sorted(
+        (ROOT / "artifacts").glob("**/*.apk"),
+        key=lambda candidate: candidate.stat().st_mtime,
+        reverse=True,
+    )
 
     doc = Document()
     configure_document(doc)
@@ -577,12 +581,12 @@ def build_report(output_path: Path) -> None:
     add_heading(doc, "报告摘要", 1)
     add_text(doc, "本项目围绕 K12 课后教学与家校协同场景，建设统一入口、家长端、学生端、教师端、管理后台、Android APP 与微信小程序。系统以六类角色、双校区数据、统一认证、公共实体与状态为基础，完成请假、签到、作业、课件、反馈、调课、工单和账号管理等跨端联动。")
     add_text(doc, "A 成员负责项目框架、公共契约、认证与业务服务、跨端集成、PR 评审收口、统一入口与注册、附件传输、移动端、课件与考勤闭环、压力测试和最终质量验证。报告中的功能、数据、截图、测试与 Git 记录均来自最终仓库和实际执行结果。")
-    add_callout(doc, "最终质量摘要", "全仓 321 项有效测试通过、0 失败；2 项真实 HTTP 测试仅因受限测试进程禁止监听回环端口而跳过。500 次概览请求在并发 50 下失败数为 0，4 个越权探针全部被拒绝。", fill=PALE_GREEN)
+    add_callout(doc, "最终质量摘要", "全仓 324 项有效测试通过、0 失败；2 项真实 HTTP 测试仅因受限测试进程禁止监听回环端口而跳过。500 次概览请求在并发 50 下失败数为 0，4 个越权探针全部被拒绝。", fill=PALE_GREEN)
     add_table(doc, ["交付面", "实际结果", "证据"], [
         ("网页端", "统一入口 + 家长、学生、教师、后台四个工作区", "npm run check；真实浏览器走查"),
         ("移动端", "uni-app 一套源码构建 App 与微信小程序", "build:app；build:mp-weixin；端侧截图"),
         ("统一服务", "认证、权限、业务联动、文件传输和内存仓库", "58 项 API 有效测试"),
-        ("跨平台", "npm 脚本无单系统命令；Windows 基线与 macOS 最终验证", "Windows 300 项基线；macOS 321 项最终结果"),
+        ("跨平台", "npm 脚本无单系统命令；Windows 基线与 macOS 最终验证", "Windows 300 项基线；macOS 324 项最终结果"),
     ], [1700, 4260, 3400])
 
     add_heading(doc, "1. 功能介绍", 1)
@@ -694,14 +698,14 @@ def build_report(output_path: Path) -> None:
         ("学生网页端", "69", "0", "草稿、筛选、提交、附件、订正、结果"),
         ("教师端", "53", "0", "认证、签到、作业、课件、批改、反馈、调课"),
         ("后台", "57", "0", "校区范围、审批、代课、工单、排课、账号"),
-        ("学生移动端", "22", "0", "登录、概览、课件、作业、附件、考勤、错误"),
-        ("合计", "321", "0", "另有 API 2 项在受限进程按环境跳过"),
+        ("学生移动端", "25", "0", "登录、真机连接、超时、概览、课件、作业、附件、考勤"),
+        ("合计", "324", "0", "另有 API 2 项在受限进程按环境跳过"),
     ], [1750, 1100, 900, 5610], font_size=8.7)
 
     add_heading(doc, "4.2 自动化执行", 2)
     add_table(doc, ["环境", "命令", "结果"], [
         ("macOS 最终分支", "npm ci", "依赖可由根锁文件安装"),
-        ("macOS 最终分支", "npm run check", "Lint、类型检查、321 项有效测试和全部构建通过"),
+        ("macOS 最终分支", "npm run check", "Lint、类型检查、324 项有效测试和全部构建通过"),
         ("macOS 最终分支", "npm run build:app", "生成 uni-app App 运行资源"),
         ("macOS 最终分支", "npm run build:mp-weixin", "生成可导入微信开发者工具的目录"),
         ("Windows 11 基线 ce25b32", "npm ci / npm run check / npm run dev", "300 项测试、构建、六服务与十三账号验证通过"),
@@ -726,6 +730,7 @@ def build_report(output_path: Path) -> None:
         ("移动文件上传后大小与格式判断失真", "端侧读取 base64，而服务端原先按字符串字节校验", "增加传输标识，服务端严格解码后按原始字节执行 10 MB 与 MIME 规则"),
         ("微信小程序预填账号登录返回 401", "登录页样例密码与公共账号密码不一致", "统一为 K12Demo123!，补客户端测试并重新构建两端"),
         ("Windows Node 24 启动出现 DEP0190", "统一启动脚本使用 shell: true", "改为当前 Node 进程调用 npm_execpath；Windows 重新启动验证"),
+        ("Android 真机登录长时间等待后网络失败", "模拟器专用 10.0.2.2 不能访问电脑，且请求未显式超时", "登录页保存局域网地址；API 输出手机地址；10 秒超时并补 3 项回归测试"),
     ], [2800, 2700, 3860], font_size=8.7)
 
     page_break(doc)
@@ -783,12 +788,12 @@ def build_report(output_path: Path) -> None:
         ("课件附件", "下载后调用系统打开", "下载后预览/打开"),
         ("提交附件", "拍照或选择 JPG/PNG", "图片或微信会话 PDF/DOCX/JPG/PNG"),
         ("错误处理", "401/403/409/422/网络错误中文提示", "同一客户端与页面状态"),
-        ("服务地址", "构建配置注入；模拟器默认 10.0.2.2", "开发配置使用本机服务；发布需 HTTPS 域名"),
+        ("服务地址", "模拟器默认 10.0.2.2；真机登录页保存电脑地址", "开发配置使用本机服务；发布需 HTTPS 域名"),
     ], [1750, 3650, 3960])
     if apk_candidates and android_screenshot.exists():
         add_callout(doc, "Android 验收", f"已生成测试 APK：{apk_candidates[0].name}，并保存安装/运行证据。", fill=PALE_GREEN)
     elif apk_candidates:
-        add_callout(doc, "Android APK", f"已使用正式 AppID、云端证书和快速安心模式免费生成测试 APK：{apk_candidates[0].name}。文件约 14 MB，压缩结构与 RSA/SHA-256 签名验证通过；本机没有 Android 设备，因此安装和原生业务流程仍待设备复验。", fill=PALE_GREEN)
+        add_callout(doc, "Android APK", f"已使用正式 AppID、云端证书和快速安心模式免费生成测试 APK：{apk_candidates[0].name}。首次真机安装发现服务地址不可达后，已增加局域网连接设置、健康检查和 10 秒超时；新版完整业务流程仍待真机复验。", fill=PALE_GREEN)
     else:
         add_callout(doc, "Android 验收状态", "App 运行资源与自动化构建已经通过，HBuilderX 5.24 已识别工程并安装真机运行插件。云打包继续操作时要求 DCloud 登录，本机也未连接 Android 真机/模拟器，因此未生成 APK，安装和原生业务流程不记为通过。", fill=PALE_GOLD)
 

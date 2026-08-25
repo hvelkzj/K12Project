@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
+import { mobileStudentClient } from '../../mobileClient'
 import { mobileSession } from '../../mobileSession'
 
 const form = reactive({ username: 'student_101', password: 'K12Demo123!' })
+const serviceUrl = ref(mobileStudentClient.getServiceUrl())
 const submitting = ref(false)
+const progressText = ref('')
 const message = ref('')
 
 onMounted(async () => {
@@ -27,14 +30,19 @@ async function submit(): Promise<void> {
     return
   }
   submitting.value = true
+  progressText.value = '正在连接…'
   message.value = ''
   try {
+    serviceUrl.value = mobileStudentClient.setServiceUrl(serviceUrl.value)
+    await mobileStudentClient.checkConnection()
+    progressText.value = '正在登录…'
     await mobileSession.login(form.username, form.password)
     uni.reLaunch({ url: '/pages/home/index' })
   } catch (error) {
     message.value = error instanceof Error ? error.message : '登录失败，请稍后重试'
   } finally {
     submitting.value = false
+    progressText.value = ''
   }
 }
 </script>
@@ -58,11 +66,16 @@ async function submit(): Promise<void> {
         <text>登录密码</text>
         <input v-model="form.password" password autocomplete="current-password" placeholder="请输入密码" />
       </label>
+      <view class="connection-box">
+        <text class="connection-title">连接设置</text>
+        <text class="connection-copy">手机和电脑需连接同一 Wi-Fi。请填写电脑启动项目后显示的“手机访问地址”。</text>
+        <input v-model="serviceUrl" class="service-input" inputmode="url" placeholder="例如 http://192.168.1.20:3000" />
+      </view>
       <view v-if="message || mobileSession.state.error" class="status-message">
         {{ message || mobileSession.state.error }}
       </view>
       <button class="primary-button login-button" :disabled="submitting" @click="submit">
-        {{ submitting ? '正在登录…' : '进入学习空间' }}
+        {{ submitting ? progressText : '进入学习空间' }}
       </button>
       <text class="login-tip">测试账号已预填，可直接体验完整学习流程。</text>
     </view>
@@ -96,6 +109,10 @@ async function submit(): Promise<void> {
 .card-title { display: block; margin-bottom: 28rpx; font-size: 36rpx; font-weight: 800; }
 .field { display: block; margin-top: 24rpx; color: #485972; font-size: 26rpx; font-weight: 700; }
 .field input { height: 92rpx; margin-top: 12rpx; padding: 0 26rpx; border: 1rpx solid #dbe3ee; border-radius: 20rpx; background: #f8fafc; color: #1d2d45; font-weight: 500; }
+.connection-box { margin-top: 28rpx; padding: 24rpx; border-radius: 20rpx; background: #f1f4fb; }
+.connection-title { display: block; color: #243650; font-size: 27rpx; font-weight: 800; }
+.connection-copy { display: block; margin-top: 10rpx; color: #65748a; font-size: 23rpx; line-height: 1.6; }
+.service-input { height: 82rpx; margin-top: 18rpx; padding: 0 22rpx; border: 1rpx solid #cfd9e8; border-radius: 16rpx; background: #fff; color: #1d2d45; font-size: 25rpx; }
 .login-button { margin-top: 30rpx; }
 .login-tip { display: block; margin-top: 22rpx; color: #8995a7; font-size: 23rpx; text-align: center; }
 </style>

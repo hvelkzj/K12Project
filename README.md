@@ -53,6 +53,8 @@ npm run dev
 
 健康检查：`GET http://127.0.0.1:3000/health`。
 
+API 默认同时监听本机和局域网。启动日志会输出“手机访问地址”，Android 真机与电脑连接同一 Wi-Fi 后，在 APP 登录页的“连接设置”中填写该地址即可。若网络不可达，请求会在 10 秒内结束并提示检查连接，不会一直停留在登录状态。
+
 只启动一个工作区：
 
 ```bash
@@ -73,7 +75,7 @@ npm run build:mp-weixin
 
 - APP 资源输出到 `apps/student-mobile/dist/build/app/`，导入 HBuilderX 后可运行和生成 Android 测试安装包。
 - 微信小程序输出到 `apps/student-mobile/dist/build/mp-weixin/`，可导入微信开发者工具。
-- Android 模拟器默认连接 `http://10.0.2.2:3000`；微信开发者工具默认连接 `http://127.0.0.1:3000`。
+- Android 模拟器默认连接 `http://10.0.2.2:3000`；Android 真机在登录页填写服务启动日志中的“手机访问地址”；微信开发者工具默认连接 `http://127.0.0.1:3000`。
 - 详细端侧说明见 [学生移动端说明](apps/student-mobile/README.md)。
 
 ## 本地测试账号

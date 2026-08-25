@@ -5,8 +5,12 @@ import type { LoginResponse, StudentOverview } from '@k12/shared'
 
 import {
   createMobileStudentClient,
+  createUniTransport,
+  mobileRequestTimeoutMs,
+  mobileServiceUrlStorageKey,
   mobileTokenStorageKey,
   MobileClientError,
+  normalizeServiceUrl,
   type MobileRequest,
   type MobileResponse,
   type MobileStorage,
@@ -50,6 +54,50 @@ const studentLogin: LoginResponse = {
     campusName: '滨江校区',
   },
 }
+
+test('真机服务地址自动补充协议并拒绝路径和非法端口', () => {
+  assert.equal(normalizeServiceUrl(' 192.168.1.20:3000/ '), 'http://192.168.1.20:3000')
+  assert.equal(normalizeServiceUrl('https://school.example.com'), 'https://school.example.com')
+  assert.throws(() => normalizeServiceUrl('http://192.168.1.20:70000'), /正确的学习服务地址/)
+  assert.throws(() => normalizeServiceUrl('http://192.168.1.20:3000/api'), /正确的学习服务地址/)
+})
+
+test('连接地址持久化，切换服务时清理旧会话并先检查健康状态', async () => {
+  const storage = memoryStorage()
+  storage.set(mobileTokenStorageKey, 'old-token')
+  const { calls, transport } = responseTransport(() => ({ status: 200, data: { status: 'ok' } }))
+  const client = createMobileStudentClient({ transport, storage })
+  assert.equal(client.setServiceUrl('192.168.1.20:3000'), 'http://192.168.1.20:3000')
+  assert.equal(storage.get(mobileServiceUrlStorageKey), 'http://192.168.1.20:3000')
+  assert.equal(storage.get(mobileTokenStorageKey), null)
+  await client.checkConnection()
+  assert.equal(calls[0]?.path, '/health')
+  assert.equal(calls[0]?.headers?.Authorization, undefined)
+})
+
+test('端侧请求使用当前连接地址和十秒超时并返回明确提示', async () => {
+  let serviceUrl = 'http://10.0.2.2:3000'
+  const received: Parameters<typeof uni.request>[0][] = []
+  const runtime = {
+    request(options: Parameters<typeof uni.request>[0]) {
+      received.push(options)
+      options.fail?.({ errMsg: 'request:fail timeout' })
+      return {}
+    },
+    downloadFile() { return {} },
+  } as unknown as Pick<typeof uni, 'request' | 'downloadFile'>
+  const transport = createUniTransport(() => serviceUrl, runtime)
+  serviceUrl = 'http://192.168.1.20:3000'
+  await assert.rejects(
+    () => transport.request({ path: '/health' }),
+    (error: unknown) =>
+      error instanceof MobileClientError &&
+      error.code === 'NETWORK_TIMEOUT' &&
+      /连接超时/.test(error.message),
+  )
+  assert.equal(received[0]?.url, 'http://192.168.1.20:3000/health')
+  assert.equal(received[0]?.timeout, mobileRequestTimeoutMs)
+})
 
 test('学生登录保存令牌并只发送公共登录字段', async () => {
   const storage = memoryStorage()
