@@ -32,4 +32,14 @@ export default [
       'vue/multi-word-component-names': 'off',
     },
   },
+  {
+    files: ['apps/student-mobile/**/*.{ts,vue}'],
+    languageOptions: {
+      globals: {
+        uni: 'readonly',
+        wx: 'readonly',
+        plus: 'readonly',
+      },
+    },
+  },
 ]

@@ -1,0 +1,33 @@
+{
+  "name": "@k12/student-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:app": "uni -p app",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build": "npm run build:app && npm run build:mp-weixin",
+    "build:app": "uni build -p app",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-alpha-5020520260824002",
+    "@dcloudio/uni-app-plus": "3.0.0-alpha-5020520260824002",
+    "@dcloudio/uni-components": "3.0.0-alpha-5020520260824002",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5020520260824002",
+    "@k12/shared": "0.1.0",
+    "vue": "3.4.21"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "3.4.31",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-5020520260824002",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5020520260824002",
+    "@types/node": "^24.1.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "5.2.8",
+    "vue-tsc": "^2.0.6"
+  }
+}

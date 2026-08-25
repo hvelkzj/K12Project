@@ -1,12 +1,8 @@
 import type {
   ApiError,
-  Assignment,
-  CourseSummary,
-  Courseware,
   FileSummary,
-  StudentSummary,
+  StudentOverview,
   Submission,
-  UserSummary,
 } from '@k12/shared'
 
 import {
@@ -15,14 +11,7 @@ import {
 } from './services/authService'
 import type { StudentAuthClient } from './services/authService'
 
-export interface StudentOverview {
-  student: StudentSummary
-  courses: CourseSummary[]
-  teachers: UserSummary[]
-  courseware: Courseware[]
-  assignments: Assignment[]
-  submissions: Submission[]
-}
+export type { StudentOverview } from '@k12/shared'
 
 export interface SubmitWorkInput {
   assignmentId: number
