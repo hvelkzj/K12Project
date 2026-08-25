@@ -57,6 +57,7 @@
 - `npm run build:app`：通过。
 - `npm run build:mp-weixin`：通过。
 - `npm run test:load`：500 请求、并发 50、失败 0；详细指标见 `docs/load-test-2026-08-25.md`。
+- Windows PowerShell 最终复验：`npm ci`、`npm run check`、`npm run test:load`、APP/小程序构建和统一启动全部通过；347 项测试 0 失败、0 跳过。
 - 微信开发者工具：通过。使用 `student_101` 完成登录、课件读取、作业详情、提交、状态回写、个人中心和退出；提交后待完成数量由 2 更新为 1。
 - HBuilderX 5.24：工程导入和 uni-app 识别通过；真机运行插件已安装；使用正式 AppID、云端证书和快速安心模式免费生成 `0.1.2` APK。
 - APK：压缩结构无错误，`jarsigner` 验证通过；内置版本为 `0.1.2`/`102` 并包含 Camera 模块。SHA-256 为 `482f70027dbcc7d4f7bc3b9f053064a9b973109caa40fc434496f3c43c010099`。
@@ -70,6 +71,5 @@
 
 ## 后续验收
 
-- Windows PowerShell 执行 `npm ci`、`npm run check`、`npm run test:load`、`npm run build:app` 和 `npm run build:mp-weixin`。
 - 连接 Android 模拟器或真机，安装桌面测试 APK 后补录登录、课件、作业和退出截图。
 - 端侧验证过程与截图索引见 `docs/mobile-device-validation-2026-08-25.md`。

@@ -420,7 +420,7 @@ def draw_test_layers(path: Path) -> None:
     ]
     for box, label, fill in layers:
         rounded_box(draw, box, label, color="#5E6C7B", fill=fill, font=chart_font(25))
-    draw.text((900, 895), "332 项有效测试通过 · 500 请求 / 并发 50 / 失败 0",
+    draw.text((900, 895), "Windows 347 项通过 · macOS 332 项有效通过 · 压力测试失败 0",
               anchor="mm", font=chart_font(25), fill="#2F7A65")
     image.save(path)
 
@@ -584,12 +584,12 @@ def build_report(output_path: Path) -> None:
     add_text(doc, "本项目围绕 K12 课后教学与家校协同场景，建设统一入口、家长端、学生端、教师端、管理后台、Android APP 与微信小程序。系统以六类角色、双校区数据、统一认证、公共实体与状态为基础，完成请假、签到、作业、课件、反馈、调课、工单和账号管理等跨端联动。")
     add_text(doc, "A 成员负责项目框架、公共契约、认证与业务服务、跨端集成、PR 评审收口、统一入口与注册、附件传输、移动端、课件与考勤闭环、压力测试和最终质量验证。报告中的功能、数据、截图、测试与 Git 记录均来自最终仓库和实际执行结果。")
     add_text(doc, f"项目源代码与完整提交历史公开保存在 GitHub：{REPOSITORY_URL}。最终 main 分支作为课程项目发布基线。")
-    add_callout(doc, "最终质量摘要", "全仓 332 项有效测试通过、0 失败；2 项真实 HTTP 测试仅因受限测试进程禁止监听回环端口而跳过。500 次概览请求在并发 50 下失败数为 0，4 个越权探针全部被拒绝。", fill=PALE_GREEN)
+    add_callout(doc, "最终质量摘要", "Windows 347 项测试通过，0 失败、0 跳过；macOS 332 项有效测试通过，0 失败，受限环境跳过 2 项真实 HTTP 测试。压力测试 500 次、并发 50、失败 0，4 个越权探针均被拒绝。", fill=PALE_GREEN)
     add_table(doc, ["交付面", "实际结果", "证据"], [
         ("网页端", "统一入口 + 家长、学生、教师、后台四个工作区", "npm run check；真实浏览器走查"),
         ("移动端", "uni-app 一套源码构建 App 与微信小程序", "build:app；build:mp-weixin；端侧截图"),
         ("统一服务", "认证、权限、业务联动、文件传输和内存仓库", "58 项 API 有效测试"),
-        ("跨平台", "npm 脚本无单系统命令；Windows 基线与 macOS 最终验证", "Windows 300 项基线；macOS 332 项最终结果"),
+        ("跨平台", "同一锁文件与 npm 脚本在 Windows、macOS 通过", "Windows 347 项；macOS 332 项有效结果"),
     ], [1700, 4260, 3400])
 
     add_heading(doc, "1. 功能介绍", 1)
@@ -710,9 +710,9 @@ def build_report(output_path: Path) -> None:
         ("macOS 最终分支", "npm run check", "Lint、类型检查、332 项有效测试和全部构建通过"),
         ("macOS 最终分支", "npm run build:app", "生成 uni-app App 运行资源"),
         ("macOS 最终分支", "npm run build:mp-weixin", "生成可导入微信开发者工具的目录"),
-        ("Windows 11 基线 ce25b32", "npm ci / npm run check / npm run dev", "300 项测试、构建、六服务与十三账号验证通过"),
+        ("Windows 11 最终 main", "npm ci / check / test:load / 双端构建 / dev", "347 项测试 0 失败、0 跳过；构建、压力测试和六服务通过"),
     ], [1700, 3270, 4390])
-    add_text(doc, "Windows 记录来自 2026-08-24 的 develop 基线。移动端新增后的 Windows 复验应使用相同根脚本执行；报告只把已经执行过的基线写为通过。")
+    add_text(doc, "Windows 首次基线记录来自 2026-08-24；项目完成后又对最终版本执行全量复验。最终 Windows 结果覆盖真实 HTTP、压力测试、网页工作区、APP/小程序构建和统一启动，全部通过。")
 
     add_heading(doc, "4.3 压力测试", 2)
     add_table(doc, ["指标", "结果", "说明"], [

@@ -64,4 +64,4 @@
 - 真实 HTTP 注册、登录和学生概览依次返回 201、200、200。
 - 停止根启动后未发现残留监听端口。
 
-Windows PowerShell 仍需运行 `npm ci`、`npm run check` 和 `npm run dev`，确认六个服务地址与停止后的进程状态。
+Windows PowerShell 最终版本已完成 `npm ci`、`npm run check` 和 `npm run dev`，六个服务启动与停止状态验证通过；详见 `docs/windows-test-2026-08-24.md`。

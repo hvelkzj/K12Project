@@ -21,6 +21,8 @@
 
 - 公开 GitHub 仓库：`https://github.com/hvelkzj/K12Project`。
 - `npm run check`：332 项有效测试通过、0 失败；2 项受限进程的回环端口测试跳过。
+- Windows 最终版本：全量命令通过；`npm run check` 为 347 项测试通过、0 失败、0 跳过，真实 HTTP 用例在 Windows 正常执行。
+- Windows 移动端与运行验证：`npm run test:load`、`npm run build:app`、`npm run build:mp-weixin` 和 `npm run dev` 全部通过。
 - `npm run test:load` 最终复验：500 次、并发 50、失败 0；吞吐量 6449.64 请求/秒，平均 7.46 ms，P50 3.65 ms，P95 42.39 ms，最大 72.71 ms。
 - `npm run build:app`：通过，生成 APP 运行资源。
 - `npm run build:mp-weixin`：通过，生成可导入微信开发者工具的构建目录。

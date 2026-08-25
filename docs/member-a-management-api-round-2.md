@@ -77,6 +77,6 @@ npm.cmd run dev:api
 
 ## 需要配合
 
-- Windows 成员需要基于修复后的最新 `develop` 重新执行本节 PowerShell 命令。
+- Windows 最终版本已执行本节 PowerShell 命令并通过，详见 `docs/windows-test-2026-08-24.md`。
 - B 接入通知已读时必须发送 `{ "read": true }`。
 - E 已按统一 PATCH 路由发送 `status: 'CANCELLED'`，无需修改前端接口。
