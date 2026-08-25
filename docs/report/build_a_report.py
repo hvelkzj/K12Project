@@ -785,8 +785,10 @@ def build_report(output_path: Path) -> None:
         ("错误处理", "401/403/409/422/网络错误中文提示", "同一客户端与页面状态"),
         ("服务地址", "构建配置注入；模拟器默认 10.0.2.2", "开发配置使用本机服务；发布需 HTTPS 域名"),
     ], [1750, 3650, 3960])
-    if apk_candidates:
+    if apk_candidates and android_screenshot.exists():
         add_callout(doc, "Android 验收", f"已生成测试 APK：{apk_candidates[0].name}，并保存安装/运行证据。", fill=PALE_GREEN)
+    elif apk_candidates:
+        add_callout(doc, "Android APK", f"已使用正式 AppID、云端证书和快速安心模式免费生成测试 APK：{apk_candidates[0].name}。文件约 14 MB，压缩结构与 RSA/SHA-256 签名验证通过；本机没有 Android 设备，因此安装和原生业务流程仍待设备复验。", fill=PALE_GREEN)
     else:
         add_callout(doc, "Android 验收状态", "App 运行资源与自动化构建已经通过，HBuilderX 5.24 已识别工程并安装真机运行插件。云打包继续操作时要求 DCloud 登录，本机也未连接 Android 真机/模拟器，因此未生成 APK，安装和原生业务流程不记为通过。", fill=PALE_GOLD)
 

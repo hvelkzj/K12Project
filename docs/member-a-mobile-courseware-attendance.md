@@ -40,7 +40,7 @@
 |---|---|
 | `apps/student-mobile/dist/build/app/` | uni-app APP 运行资源已生成 |
 | `apps/student-mobile/dist/build/mp-weixin/` | 已导入微信开发者工具并完成真实业务流程 |
-| Android 测试 APK | HBuilderX 已识别工程；云打包需要 DCloud 账号，安装复验还需要 Android 真机或模拟器 |
+| Android 测试 APK | 免费云打包成功；约 14 MB，签名与压缩结构验证通过 |
 
 构建目录受根 `.gitignore` 管理，不进入源码提交；最终交付时按课程要求单独保存证据。
 
@@ -55,7 +55,8 @@
 - `npm run build:mp-weixin`：通过。
 - `npm run test:load`：500 请求、并发 50、失败 0；详细指标见 `docs/load-test-2026-08-25.md`。
 - 微信开发者工具：通过。使用 `student_101` 完成登录、课件读取、作业详情、提交、状态回写、个人中心和退出；提交后待完成数量由 2 更新为 1。
-- HBuilderX 5.24：工程导入和 uni-app 识别通过；真机运行插件已安装。云打包入口要求 DCloud 登录，本机未连接 Android 设备，因此没有把 APK 或安装验证记为通过。
+- HBuilderX 5.24：工程导入和 uni-app 识别通过；真机运行插件已安装；使用正式 AppID、云端证书和快速安心模式免费生成约 14 MB APK。
+- APK：压缩结构完整，`jarsigner` 验证通过，使用 2048 位 RSA/SHA-256 签名；本机无 Android 设备，因此安装与原生业务流程仍待设备复验。
 
 ## 公共文件影响
 
@@ -67,5 +68,5 @@
 ## 后续验收
 
 - Windows PowerShell 执行 `npm ci`、`npm run check`、`npm run test:load`、`npm run build:app` 和 `npm run build:mp-weixin`。
-- 由可用的 DCloud 账号登录 HBuilderX，并连接 Android 模拟器或真机，生成、安装测试 APK 后补录安装截图。
+- 连接 Android 模拟器或真机，安装桌面测试 APK 后补录登录、课件、作业和退出截图。
 - 端侧验证过程与截图索引见 `docs/mobile-device-validation-2026-08-25.md`。

@@ -28,7 +28,7 @@
 
 ## Android APP
 
-环境：HBuilderX 5.24。
+环境：HBuilderX 5.24，DCloud 快速安心云打包。
 
 结果：
 
@@ -36,14 +36,17 @@
 - HBuilderX 提供“运行到 Android App 基座”、云打包和本地打包入口。
 - App 真机运行插件安装完成。
 - `npm run build:app` 已生成 App 运行资源。
-- 云打包继续操作时要求 DCloud 账号登录；本机未配置 DCloud 凭据，也未连接 Android 真机或模拟器。
-- 当前没有生成 APK，不记录安装和原生业务流程为通过。
+- 已取得项目正式 DCloud AppID `__UNI__1F755D6`，未提交账号凭据或签名密钥。
+- 使用云端证书和快速安心模式免费生成 Android APK，打包过程未上传应用代码和证书。
+- APK 大小约 14 MB，压缩结构完整；`jarsigner` 验证通过，签名算法为 SHA256withRSA，密钥长度 2048 位。
+- APK SHA-256：`a35f74ffe227fa3f966227a7765b83291b02a4ffa26e6b0d59e8647fc66d84d3`。
+- 本机未连接 Android 真机或模拟器，因此只把 APK 生成与签名记为通过，不把安装和原生业务流程记为通过。
 
-继续完成 Android 安装验证需要：
+APK 生成后继续完成安装验证需要：
 
-1. 使用获授权的 DCloud 账号登录 HBuilderX。
-2. 连接 Android 真机或启动 Android 模拟器。
-3. 使用测试签名生成 APK，安装后完成登录、课件、作业提交、状态回写和退出。
-4. 保存 APK、安装截图和关键页面截图。
+1. 连接 Android 真机或启动 Android 模拟器。
+2. 安装桌面 `K12学习空间-Android-0.1.0.apk`。
+3. 启动本地统一服务，完成登录、课件、作业提交、状态回写和退出。
+4. 保存安装截图和关键页面截图。
 
 工程识别截图：`docs/screenshots/android-hbuilderx-project.png`
