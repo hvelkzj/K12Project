@@ -1,4 +1,5 @@
 import type {
+  AttendanceRecord,
   CourseSummary,
   LeaveRequest,
   Notification,
@@ -108,6 +109,16 @@ export const scheduleTwo: ScheduleSummary = {
   status: 'SCHEDULED',
 }
 
+export const attendanceOne: AttendanceRecord = {
+  id: 10_001,
+  scheduleId: scheduleOne.id,
+  studentId: studentOne.id,
+  status: 'PRESENT',
+  note: '按时到课',
+  recordedBy: teacherLi.id,
+  recordedAt: '2026-08-19T09:05:00+08:00',
+}
+
 export const leaveRequest: LeaveRequest = {
   id: 9001,
   parentId: parentUser.id,
@@ -203,6 +214,7 @@ export const overviewOne: ParentOverview = {
   notifications: [generalNotice],
   scheduleChangeNotices: [scheduleChangeNotice],
   feedback: [pendingFeedback],
+  attendance: [attendanceOne],
 }
 
 export const overviewTwo: ParentOverview = {
@@ -214,6 +226,7 @@ export const overviewTwo: ParentOverview = {
   notifications: [],
   scheduleChangeNotices: [],
   feedback: [],
+  attendance: [],
 }
 
 export const emptyOverview: ParentOverview = {
@@ -225,4 +238,5 @@ export const emptyOverview: ParentOverview = {
   notifications: [],
   scheduleChangeNotices: [],
   feedback: [],
+  attendance: [],
 }

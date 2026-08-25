@@ -1,6 +1,6 @@
 # K12 教育培训综合管理平台
 
-五人协作完成的课程项目。项目本体包含统一入口、家长端、学生端、教师/班主任端、教务/系统后台和统一 API。
+五人协作完成的课程项目。项目本体包含统一入口、家长端、学生网页端、学生 Android APP、学生微信小程序、教师/班主任端、教务/系统后台和统一服务。
 
 ## 完成状态
 
@@ -11,10 +11,11 @@
 | 认证、业务 API 与内存数据仓库 | `apps/api` | 已完成 |
 | 家长端 | `apps/parent-web` | 7/7 页面已接入 API |
 | 学生端 | `apps/student-web` | 7/7 页面已接入 API |
+| 学生 APP 与微信小程序 | `apps/student-mobile` | 一套源码，6 个移动页面，已接入统一业务 |
 | 教师/班主任端 | `apps/teacher-web` | 7/7 页面已接入 API |
 | 教务/系统后台 | `apps/admin-web` | 8/8 页面已接入 API |
 
-已连通账号注册与登录；作业发布、提交、订正和批改；调课审批、代课和家长通知；教师反馈、家长异议和工单处理；请假审批与签到；排课维护和账号启停。
+已连通账号注册与登录；课件发布和多端阅读；作业发布、提交、订正和批改；学生与家长考勤；调课审批、代课和家长通知；教师反馈、家长异议和工单处理；请假审批与签到；排课维护和账号启停。
 
 ![统一入口首屏](docs/screenshots/portal-home.jpg)
 
@@ -33,6 +34,7 @@ node -v
 npm -v
 npm ci
 npm run check
+npm run test:load
 npm run dev
 ```
 
@@ -61,6 +63,18 @@ npm run dev:student
 npm run dev:teacher
 npm run dev:admin
 ```
+
+## Android APP 与微信小程序
+
+```text
+npm run build:app
+npm run build:mp-weixin
+```
+
+- APP 资源输出到 `apps/student-mobile/dist/build/app/`，导入 HBuilderX 后可运行和生成 Android 测试安装包。
+- 微信小程序输出到 `apps/student-mobile/dist/build/mp-weixin/`，可导入微信开发者工具。
+- Android 模拟器默认连接 `http://10.0.2.2:3000`；微信开发者工具默认连接 `http://127.0.0.1:3000`。
+- 详细端侧说明见 [学生移动端说明](apps/student-mobile/README.md)。
 
 ## 本地测试账号
 

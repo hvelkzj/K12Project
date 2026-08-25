@@ -1,5 +1,6 @@
 import type {
   Assignment,
+  AttendanceRecord,
   CourseSummary,
   Courseware,
   StudentSummary,
@@ -156,6 +157,18 @@ const submissions: Submission[] = [
   },
 ]
 
+const attendance: AttendanceRecord[] = [
+  {
+    id: 10_001,
+    scheduleId: 1001,
+    studentId,
+    status: 'PRESENT',
+    note: '按时到课',
+    recordedBy: 301,
+    recordedAt: '2026-08-07T09:05:00+08:00',
+  },
+]
+
 export function createStudentOverviewFixture(): StudentOverview {
   return structuredClone({
     student,
@@ -164,5 +177,6 @@ export function createStudentOverviewFixture(): StudentOverview {
     courseware,
     assignments,
     submissions,
+    attendance,
   })
 }

@@ -322,6 +322,7 @@ test('空概览派生空作业列表和空课件列表', () => {
     courseware: [],
     assignments: [],
     submissions: [],
+    attendance: [],
   }
 
   assert.deepEqual(listAssignmentRows(empty), [])

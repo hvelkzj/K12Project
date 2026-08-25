@@ -1,6 +1,6 @@
 # 公共字段契约
 
-版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口；8/24 公开注册与附件传输。
+版本：7/28 字段基线；7/29 公共 TypeScript 包；8/20 第二轮管理接口；8/24 公开注册与附件传输；8/25 学生多端、课件与考勤闭环。
 
 本文件记录跨端字段和已确认接口。接口 JSON 使用 camelCase，数据库列使用 snake_case。
 
@@ -29,6 +29,7 @@
 | `StudentSummary` | `id`、`displayName`、`classId`、`className`、`campusId`、`campusName` |
 | `FileSummary` | `id`、`originalName`、`mimeType`、`byteSize`、`createdAt` |
 | `ScheduleSummary` | `id`、`campusId`、`classId`、`courseId`、`teacherId`、`lessonDate`、`startTime`、`endTime`、`room`、`status` |
+| `StudentOverview` | `student`、`courses`、`teachers`、`courseware`、`assignments`、`submissions`、`attendance` |
 
 ## 角色和状态
 
@@ -88,9 +89,9 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 | 接口 | 响应字段 |
 |---|---|
 | `GET /parent/students` | `ParentStudentBinding[]` |
-| `GET /parent/students/:studentId/overview` | `student: StudentSummary`、`schedules: ScheduleSummary[]`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`leaveRequests: LeaveRequest[]`、`notifications: Notification[]`、`scheduleChangeNotices: ScheduleChangeNotice[]`、`feedback: StudentFeedback[]` |
-| `GET /student/overview` | `student: StudentSummary`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`courseware: Courseware[]`、`assignments: Assignment[]`、`submissions: Submission[]` |
-| `GET /teacher/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`students: StudentSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`attendance: AttendanceRecord[]`、`assignments: Assignment[]`、`submissions: Submission[]`、`feedback: StudentFeedback[]`、`scheduleChanges: ScheduleChange[]`、`leaveRequests: LeaveRequest[]` |
+| `GET /parent/students/:studentId/overview` | `student: StudentSummary`、`schedules: ScheduleSummary[]`、`courses: CourseSummary[]`、`teachers: UserSummary[]`、`leaveRequests: LeaveRequest[]`、`notifications: Notification[]`、`scheduleChangeNotices: ScheduleChangeNotice[]`、`feedback: StudentFeedback[]`、`attendance: AttendanceRecord[]` |
+| `GET /student/overview` | `StudentOverview` |
+| `GET /teacher/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`students: StudentSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`attendance: AttendanceRecord[]`、`courseware: Courseware[]`、`assignments: Assignment[]`、`submissions: Submission[]`、`feedback: StudentFeedback[]`、`scheduleChanges: ScheduleChange[]`、`leaveRequests: LeaveRequest[]` |
 | `GET /admin/overview` | `campuses: CampusSummary[]`、`classes: ClassSummary[]`、`courses: CourseSummary[]`、`schedules: ScheduleSummary[]`、`users: UserAccountSummary[]`、`teachers: UserSummary[]`、`scheduleChanges: ScheduleChange[]`、`feedbackWorkOrders: FeedbackWorkOrder[]`、`leaveRequests: LeaveRequest[]` |
 
 ### 写接口
@@ -102,6 +103,7 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 | `POST /student/submissions` | `assignmentId`、`content`、`attachments: FileSummary[]` | `201 Submission` |
 | `PUT /teacher/attendance` | `scheduleId`、`records: { studentId, status, note }[]` | `200 AttendanceRecord[]` |
 | `POST /teacher/assignments` | `classId`、`courseId`、`scheduleId?`、`title`、`description`、`attachments`、`dueAt`、`allowLate` | `201 Assignment` |
+| `POST /teacher/courseware` | `classId`、`courseId`、`title`、`description`、`attachments` | `201 Courseware` |
 | `PATCH /teacher/submissions/:submissionId` | `score`、`teacherComment`、`correctionRequired` | `200 Submission` |
 | `POST /teacher/feedback` | `scheduleId`、`studentId`、`performance`、`strengths`、`improvements`、`suggestion` | `201 StudentFeedback` |
 | `POST /teacher/schedule-changes` | `scheduleId`、`reason`、`proposedDate`、`proposedStartTime`、`proposedEndTime` | `201 ScheduleChange` |
@@ -118,6 +120,7 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 | `GET /files/:fileId` | Bearer Token | 文件字节；响应包含 MIME、长度和下载文件名 |
 
 - 支持 PDF、DOCX、JPG、JPEG 和 PNG，单个文件不超过 10 MB，空文件返回错误。
+- APP 与小程序上传时可使用 `Content-Transfer-Encoding: base64` 传输文件内容；服务端解码后仍按原始字节执行 10 MB 限制。
 - 作业或提交只能引用当前用户刚上传的附件，不能伪造其他文件的 `FileSummary`。
 - 学生只能下载本班作业、课件和本人提交附件；教师只能下载本人发布内容及本人作业对应的学生提交附件。
 - 家长不能下载作业文件；教务按所属校区访问，系统管理员按关联业务范围访问。
@@ -157,6 +160,8 @@ Mock 密码和注册密码均不进入用户响应。当前内存账号与会话
 文件请求体超过 10 MB 时返回 `413 PAYLOAD_TOO_LARGE`。
 
 - 教师发布作业后学生概览立即可见；学生提交后教师概览立即可见；教师批改后学生概览返回新状态、分数和评语。
+- 教师发布课件后，学生网页端、Android APP 和微信小程序通过同一个学生概览读取。
+- 教师签到保存后，学生概览和已绑定家长概览读取同一条考勤记录。
 - 家长提出异议后创建 `OPEN` 反馈工单。
 - 安排代课后更新课次并为受影响班级的已绑定学生生成调课通知。
 - 业务写接口只接受 `application/json`；跨域预检允许 `GET`、`POST`、`PUT`、`PATCH` 和 `OPTIONS`。
