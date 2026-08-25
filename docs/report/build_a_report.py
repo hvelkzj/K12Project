@@ -39,10 +39,10 @@ def rgb(value: str) -> RGBColor:
 
 def set_run_font(run, *, size: float | None = None, bold: bool | None = None,
                  color: str | None = None, italic: bool | None = None,
-                 east_asia: str = "Arial Unicode MS") -> None:
-    run.font.name = "Arial Unicode MS"
-    run._element.get_or_add_rPr().rFonts.set(qn("w:ascii"), "Arial Unicode MS")
-    run._element.get_or_add_rPr().rFonts.set(qn("w:hAnsi"), "Arial Unicode MS")
+                 east_asia: str = "Hiragino Sans GB") -> None:
+    run.font.name = "Hiragino Sans GB"
+    run._element.get_or_add_rPr().rFonts.set(qn("w:ascii"), "Hiragino Sans GB")
+    run._element.get_or_add_rPr().rFonts.set(qn("w:hAnsi"), "Hiragino Sans GB")
     run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), east_asia)
     if size is not None:
         run.font.size = Pt(size)
@@ -438,11 +438,11 @@ def configure_document(doc: Document) -> None:
 
     styles = doc.styles
     normal = styles["Normal"]
-    normal.font.name = "Arial Unicode MS"
+    normal.font.name = "Hiragino Sans GB"
     normal.font.size = Pt(11)
-    normal._element.get_or_add_rPr().rFonts.set(qn("w:ascii"), "Arial Unicode MS")
-    normal._element.get_or_add_rPr().rFonts.set(qn("w:hAnsi"), "Arial Unicode MS")
-    normal._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Arial Unicode MS")
+    normal._element.get_or_add_rPr().rFonts.set(qn("w:ascii"), "Hiragino Sans GB")
+    normal._element.get_or_add_rPr().rFonts.set(qn("w:hAnsi"), "Hiragino Sans GB")
+    normal._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Hiragino Sans GB")
     normal.paragraph_format.space_before = Pt(0)
     normal.paragraph_format.space_after = Pt(6)
     normal.paragraph_format.line_spacing = 1.10
@@ -454,20 +454,20 @@ def configure_document(doc: Document) -> None:
     }
     for level, (size, color, before, after) in heading_tokens.items():
         style = styles[f"Heading {level}"]
-        style.font.name = "Arial Unicode MS"
+        style.font.name = "Hiragino Sans GB"
         style.font.size = Pt(size)
         style.font.bold = True
         style.font.color.rgb = rgb(color)
-        style._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Arial Unicode MS")
+        style._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Hiragino Sans GB")
         style.paragraph_format.space_before = Pt(before)
         style.paragraph_format.space_after = Pt(after)
         style.paragraph_format.keep_with_next = True
 
     for style_name in ("List Bullet", "List Bullet 2", "List Number"):
         style = styles[style_name]
-        style.font.name = "Arial Unicode MS"
+        style.font.name = "Hiragino Sans GB"
         style.font.size = Pt(11)
-        style._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Arial Unicode MS")
+        style._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Hiragino Sans GB")
         style.paragraph_format.space_after = Pt(8)
         style.paragraph_format.line_spacing = 1.167
 
@@ -623,7 +623,6 @@ def build_report(output_path: Path) -> None:
     ):
         add_bullet(doc, item)
 
-    page_break(doc)
     add_heading(doc, "2. AI 交互阶段概述", 1)
     add_text(doc, "AI 被用作需求梳理、代码实现建议、测试补齐和 PR 评审辅助。每次输出均由人工结合业务边界、成员分工、公共字段和实际运行结果进行判断。完整记录随代码目录中的 docs/ai-log 提交；当前共保存 %d 份 Markdown 记录。" % ai_log_count)
     add_table(doc, ["阶段", "主要提示与 AI 建议", "人工判断和执行"], [
