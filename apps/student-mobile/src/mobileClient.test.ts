@@ -55,10 +55,10 @@ test('学生登录保存令牌并只发送公共登录字段', async () => {
   const storage = memoryStorage()
   const { calls, transport } = responseTransport(() => ({ status: 200, data: studentLogin }))
   const client = createMobileStudentClient({ transport, storage })
-  const user = await client.login(' student_101 ', 'K12Pass123!')
+  const user = await client.login(' student_101 ', 'K12Demo123!')
   assert.equal(user.role, 'STUDENT')
   assert.equal(storage.get(mobileTokenStorageKey), 'student-token')
-  assert.deepEqual(calls[0]?.data, { username: 'student_101', password: 'K12Pass123!' })
+  assert.deepEqual(calls[0]?.data, { username: 'student_101', password: 'K12Demo123!' })
 })
 
 test('其他角色登录会撤销会话并拒绝进入', async () => {
@@ -74,7 +74,7 @@ test('其他角色登录会撤销会话并拒绝进入', async () => {
       : { status: 204, data: null },
   )
   const client = createMobileStudentClient({ transport, storage })
-  await assert.rejects(() => client.login('teacher_301', 'K12Pass123!'), /不能进入/)
+  await assert.rejects(() => client.login('teacher_301', 'K12Demo123!'), /不能进入/)
   assert.equal(storage.get(mobileTokenStorageKey), null)
   assert.equal(calls[1]?.path, '/auth/logout')
 })

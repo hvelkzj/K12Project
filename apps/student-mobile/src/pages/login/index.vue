@@ -3,7 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 
 import { mobileSession } from '../../mobileSession'
 
-const form = reactive({ username: 'student_101', password: 'K12Pass123!' })
+const form = reactive({ username: 'student_101', password: 'K12Demo123!' })
 const submitting = ref(false)
 const message = ref('')
 
