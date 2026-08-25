@@ -106,5 +106,4 @@
 - 真实 HTTP 十三个本地账号登录、当前用户、退出和旧令牌失效：通过。
 - 七条跨端业务流程：通过。
 - 真实 HTTP 注册、登录和学生概览：`201`、`200`、`200`。
-- Windows PowerShell：最新 `develop` 基线的 `npm ci`、`npm run check`、`npm run dev`、六服务 HTTP 和十三账号会话验证通过；当时全仓 300 项测试通过。
-- 本轮移动端、课件和考勤功能合并前需在 Windows PowerShell 重跑 `npm ci`、`npm run check`、`npm run test:load`、`npm run build:app` 和 `npm run build:mp-weixin`。
+- Windows PowerShell：最终版本的 `npm ci`、`npm run check`、`npm run dev`、六服务 HTTP、压力测试、APP/小程序构建和十三账号会话验证全部通过；347 项测试 0 失败、0 跳过。

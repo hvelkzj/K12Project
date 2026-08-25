@@ -18,6 +18,7 @@
 
 - `npm run check`：332 项有效测试通过、0 失败；API 2 项真实 HTTP 用例因受限测试进程禁止监听回环端口而跳过；全部工作区构建通过。
 - `npm run test:load`：500 次请求、最高并发 50、失败 0，4/4 个越权探针被拒绝。
+- Windows 最终复验：`npm ci`、`npm run check`、`npm run test:load`、`npm run build:app`、`npm run build:mp-weixin` 和 `npm run dev` 全部通过；347 项测试 0 失败、0 跳过。
 - APP 与微信小程序构建通过。
 - Android `0.1.2` APK 压缩结构、测试签名、内置版本和 Camera 模块验证通过。
 - APK SHA-256：`482f70027dbcc7d4f7bc3b9f053064a9b973109caa40fc434496f3c43c010099`。

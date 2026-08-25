@@ -62,5 +62,5 @@ npm.cmd run dev:api
 
 ## 需要配合
 
-- Windows 成员需要基于本分支执行上述 PowerShell 命令，并在 PR 中记录结果。
+- Windows 最终版本已执行上述 PowerShell 命令并通过，详见 `docs/windows-test-2026-08-24.md`。
 - B、C、D、E 可以继续使用现有公共接口和字段，不需要为本轮测试调整前端契约。

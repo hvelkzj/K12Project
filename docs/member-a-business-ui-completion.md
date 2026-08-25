@@ -32,4 +32,4 @@
 
 - 未新增依赖和锁文件变更。
 - 文件路径不写入业务代码，上传与下载使用浏览器和 Node.js 跨平台接口。
-- macOS 已通过；Windows PowerShell 仍需成员运行 `npm ci`、`npm run check` 和 `npm run dev`。
+- macOS 已通过；该轮 Windows 待办已在最终版本复验中完成，详见 `docs/windows-test-2026-08-24.md`。
