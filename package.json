@@ -1,0 +1,48 @@
+{
+  "name": "k12-project",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "prepare": "npm run build --workspace @k12/shared",
+    "predev": "npm run build --workspace @k12/shared",
+    "dev": "node scripts/dev.mjs",
+    "predev:api": "npm run build --workspace @k12/shared",
+    "dev:api": "npm run dev --workspace @k12/api",
+    "dev:portal": "npm run dev --workspace @k12/portal-web -- --host 127.0.0.1",
+    "dev:parent": "npm run dev --workspace @k12/parent-web -- --host 127.0.0.1",
+    "dev:student": "npm run dev --workspace @k12/student-web -- --host 127.0.0.1",
+    "dev:teacher": "npm run dev --workspace @k12/teacher-web -- --host 127.0.0.1",
+    "dev:admin": "npm run dev --workspace @k12/admin-web -- --host 127.0.0.1",
+    "dev:app": "npm run dev:app --workspace @k12/student-mobile",
+    "dev:mp-weixin": "npm run dev:mp-weixin --workspace @k12/student-mobile",
+    "build:app": "npm run build:app --workspace @k12/student-mobile",
+    "build:mp-weixin": "npm run build:mp-weixin --workspace @k12/student-mobile",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint .",
+    "pretypecheck": "npm run build --workspace @k12/shared",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "pretest": "npm run build --workspace @k12/shared",
+    "test": "npm run test --workspaces --if-present",
+    "pretest:load": "npm run build --workspace @k12/shared && npm run build --workspace @k12/api",
+    "test:load": "node scripts/load-test.mjs",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "eslint": "^9.32.0",
+    "eslint-plugin-vue": "^10.3.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0",
+    "vue-eslint-parser": "^10.2.0"
+  },
+  "engines": {
+    "node": ">=22.12",
+    "npm": ">=10"
+  }
+}

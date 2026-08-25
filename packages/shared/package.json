@@ -1,0 +1,30 @@
+{
+  "name": "@k12/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mock-accounts": {
+      "types": "./dist/mockAccounts.d.ts",
+      "import": "./dist/mockAccounts.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

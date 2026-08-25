@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+Thumbs.db
+Desktop.ini
+.env
+.env.local
+*.log
+*.tsbuildinfo
+artifacts/
+__pycache__/
+.idea/
+.vscode/
